@@ -14,7 +14,6 @@ from flask_smorest import abort
 from marshmallow import pre_load, fields
 
 from .exceptions import NotFoundError, ForbiddenError, UnauthorizedError
-from .user import current_user
 from .database import db, Base
 
 class BaseSchema(SQLAlchemyAutoSchema):
@@ -199,6 +198,8 @@ class BaseModel(db.Model, Base, metaclass=BaseModelMeta):
 
     @classmethod
     def is_current_user_admin(cls):
+        from .user import current_user
+
         try:
             verify_jwt_in_request()
             if current_user.is_admin:
@@ -207,6 +208,7 @@ class BaseModel(db.Model, Base, metaclass=BaseModelMeta):
             return False
         except Unauthorized:
             return False
+        
         return False
 
     @classmethod

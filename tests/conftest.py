@@ -2,14 +2,17 @@
 
 import pytest
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
 from flask_smorest import Api
 from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
 from marshmallow import Schema, fields
 from datetime import datetime
+import uuid
+
+from flask_more_smorest.database import db
+from flask_more_smorest import BaseModel
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def app():
     """Create and configure a test Flask application."""
     app = Flask(__name__)
@@ -21,18 +24,10 @@ def app():
     app.config["OPENAPI_VERSION"] = "3.0.2"
     app.config["SECRET_KEY"] = "test-secret-key"
 
+    # Initialize database
+    db.init_app(app)
+
     return app
-
-
-@pytest.fixture
-def db(app):
-    """Create and configure a test database."""
-    db = SQLAlchemy(app)
-
-    with app.app_context():
-        db.create_all()
-        yield db
-        db.drop_all()
 
 
 @pytest.fixture
@@ -42,33 +37,30 @@ def api(app):
 
 
 @pytest.fixture
-def user_model(db):
-    """Create a test User model."""
+def simple_user_model():
+    """Create a simple test user model."""
 
-    class User(db.Model):
-        __tablename__ = "users"
+    from flask_more_smorest.models import BaseModel
 
-        id = db.Column(db.Integer, primary_key=True)
+    class SimpleUser(BaseModel):
         username = db.Column(db.String(80), unique=True, nullable=False)
         email = db.Column(db.String(120), unique=True, nullable=False)
-        created_at = db.Column(db.DateTime, default=datetime.utcnow)
         is_active = db.Column(db.Boolean, default=True)
         age = db.Column(db.Integer, nullable=True)
 
         def __repr__(self):
-            return f"<User {self.username}>"
+            return f"<SimpleUser {self.username}>"
 
-    db.create_all()
-    return User
+    return SimpleUser
 
 
 @pytest.fixture
-def user_schema(user_model):
+def user_schema(simple_user_model):
     """Create a test User schema."""
 
     class UserSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = user_model
+            model = simple_user_model
             load_instance = True
             include_fk = True
 
@@ -76,19 +68,22 @@ def user_schema(user_model):
 
 
 @pytest.fixture
-def sample_users(db, user_model):
+def sample_users(app, simple_user_model):
     """Create sample user data for testing."""
-    users = [
-        user_model(username="alice", email="alice@example.com", age=25, is_active=True),
-        user_model(username="bob", email="bob@example.com", age=30, is_active=False),
-        user_model(username="charlie", email="charlie@example.com", age=35, is_active=True),
-    ]
+    with app.app_context():
+        db.create_all()
 
-    for user in users:
-        db.session.add(user)
+        users = [
+            simple_user_model(username="alice", email="alice@example.com", age=25, is_active=True),
+            simple_user_model(username="bob", email="bob@example.com", age=30, is_active=False),
+            simple_user_model(username="charlie", email="charlie@example.com", age=35, is_active=True),
+        ]
 
-    db.session.commit()
-    return users
+        for user in users:
+            db.session.add(user)
+
+        db.session.commit()
+        return users
 
 
 @pytest.fixture

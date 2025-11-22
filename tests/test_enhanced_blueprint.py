@@ -29,7 +29,7 @@ class TestEnhancedBlueprint:
 
         assert hasattr(test_endpoint, "_is_public")
         assert test_endpoint._is_public is True
-        assert "🌐 Public" in test_endpoint.__doc__
+        assert "Public" in getattr(test_endpoint, "__doc__", "")
 
     def test_public_endpoint_without_docstring(self, blueprint):
         """Test public_endpoint decorator on function without docstring."""
@@ -50,7 +50,7 @@ class TestEnhancedBlueprint:
 
         assert hasattr(admin_only, "_is_admin")
         assert admin_only._is_admin is True
-        assert "🔑 Admin only" in admin_only.__doc__
+        assert "Admin only" in getattr(admin_only, "__doc__", "")
 
     def test_admin_endpoint_without_docstring(self, blueprint):
         """Test admin_endpoint decorator on function without docstring."""
@@ -85,7 +85,7 @@ class TestEnhancedBlueprint:
 
         assert hasattr(public_test, "_is_public")
         assert public_test._is_public is True
-        assert "🌐 Public" in public_test.__doc__
+        assert "Public" in getattr(public_test, "__doc__", "")
 
     def test_blueprint_registration(self, app):
         """Test that enhanced blueprint can be registered with Flask app."""

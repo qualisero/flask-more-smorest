@@ -26,7 +26,7 @@ class CRUDBlueprint(EnhancedBlueprint):
     model and schema configuration.
     """
 
-    def __init__(self, *pargs: Any, **kwargs: Any) -> None:
+    def __init__(self, *pargs: str, **kwargs: Any) -> None:
         """Initialize CRUD blueprint with model and schema configuration.
 
         Args:
@@ -44,7 +44,7 @@ class CRUDBlueprint(EnhancedBlueprint):
         else:
             import_name = kwargs.pop("import_name", __name__)
 
-        pargs = [name, import_name] + list(pargs[2:])
+        new_pargs: list[str] = [name, import_name] + list(pargs[2:])
 
         if "url_prefix" not in kwargs:
             kwargs["url_prefix"] = f"/{name}/"
@@ -71,7 +71,7 @@ class CRUDBlueprint(EnhancedBlueprint):
         model_import_name = kwargs.pop("model_import_name", ".".join(import_name.split(".")[:-1] + ["models"]))
         schema_import_name = kwargs.pop("schema_import_name", ".".join(import_name.split(".")[:-1] + ["schemas"]))
 
-        super().__init__(*pargs, **kwargs)
+        super().__init__(*new_pargs, **kwargs)
 
         ModelCls = getattr(import_module(model_import_name), model_name)
         ModelCls.__name__ = model_name
