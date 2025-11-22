@@ -58,14 +58,14 @@ Thank you for your interest in contributing! This document outlines the process 
 4. **Run the full test suite**:
    ```bash
    poetry run pytest
-   poetry run pytest --cov=src/flask_more_smorest
+   poetry run pytest --cov=flask_more_smorest
    ```
 
 5. **Run linting and formatting**:
    ```bash
-   poetry run black src/ tests/
-   poetry run flake8 src/ tests/
-   poetry run mypy src/
+   poetry run black flast-more-smorest/ tests/
+   poetry run flake8 flast-more-smorest/ tests/
+   poetry run mypy flast-more-smorest/
    ```
 
 6. **Commit your changes**:

@@ -1,9 +1,7 @@
 """Tests for CRUD Blueprint functionality."""
 
 import pytest
-from unittest.mock import patch, MagicMock
-from flask import Flask
-from flask_smorest import Api
+from unittest.mock import patch
 from flask_more_smorest import CRUDBlueprint
 
 

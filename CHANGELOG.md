@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit tests with pytest framework
 
 ### Changed
-- Moved source code to proper package structure under `src/flask_more_smorest/`
+- Moved source code to proper package structure under `flask_more_smorest/`
 - Updated pyproject.toml with complete package metadata
 - Enhanced docstrings following Google style guide
 
