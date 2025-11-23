@@ -1,30 +1,62 @@
 """
 User models and authentication system for Flask-More-Smorest.
 
-This module provides:
-1. User - Default user model with role-based permissions
-2. UserRole/UserSetting - Related models for user management
-3. Token-based authentication integration
-4. Mixins for common user model extensions
+This module provides a concrete User model with full functionality for:
+- Email-based authentication with secure password hashing
+- Role-based permissions with domain scoping  
+- User settings for key-value preferences
+- JWT token support for API authentication
+- Built-in relationships to roles, settings, and tokens
 
-The system supports:
-- Custom user models through simple inheritance
-- Role-based permissions with domain scoping
-- Multi-tenant applications
-- JWT token authentication
-- Flexible user data storage
+## User Model Customization
 
-Example usage:
-    # Use default User model
-    from flask_more_smorest import User
+**Simple Inheritance Pattern**:
+The User class is a concrete model that can be extended through inheritance:
 
-    # Or extend with custom fields
-    class CustomUser(User):
-        bio: Mapped[str] = mapped_column(db.String(500))
+```python
+from flask_more_smorest.user import User
 
-        # Override methods if needed
-        def _can_write(self) -> bool:
-            return self.is_verified and super()._can_write()
+# Extend User with additional fields
+class EmployeeUser(User):
+    __tablename__ = "employee_users"  # Custom table name
+    
+    employee_id: Mapped[str] = mapped_column(db.String(50), unique=True)
+    department: Mapped[str] = mapped_column(db.String(100))
+    
+    def get_employee_permissions(self):
+        # Custom method for employee-specific logic
+        return ["read_timesheet", "submit_expenses"]
+```
+
+**UserRole Customization**:
+Create custom role enums and role models by inheriting from UserRole:
+
+```python
+import enum
+from flask_more_smorest.user import UserRole
+
+class EmployeeRole(str, enum.Enum):
+    HR_MANAGER = "hr_manager" 
+    DEPARTMENT_HEAD = "department_head"
+    EMPLOYEE = "employee"
+
+class EmployeeUserRole(UserRole):
+    __tablename__ = "employee_user_roles"
+    
+    # Custom methods for employee role logic
+    def get_employee_permissions(self):
+        return self.role
+```
+
+## Features Included
+
+All User instances (including subclasses) automatically inherit:
+- Role management via User.roles relationship
+- Settings storage via User.settings relationship  
+- Token authentication via User.tokens relationship
+- Permission checking methods (has_role, is_admin, etc.)
+- Domain-scoped multi-tenant support
+- CRUD operation permissions
 """
 
 import logging
@@ -33,7 +65,6 @@ import enum
 import os
 import datetime as dt
 from typing import TYPE_CHECKING, Any, Type
-from abc import ABC, abstractmethod
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -49,28 +80,80 @@ from flask_jwt_extended import verify_jwt_in_request, current_user as jwt_curren
 logger = logging.getLogger(__name__)
 
 
+# Default role enum - can be overridden via UserRole subclasses
+class DefaultUserRole(str, enum.Enum):
+    """Default user role enumeration."""
+    SUPERADMIN = "superadmin"
+    ADMIN = "admin"
+    USER = "user"
+
 class User(BaseModel):
-    """User model with role-based permissions and domain support.
+    """Concrete User model with role-based permissions and domain support.
 
-    This is the main User model for Flask-More-Smorest applications.
-    Projects can use this as-is or extend it with additional fields and methods.
-
-    To create a custom user model, simply inherit from this class:
-
-        class CustomUser(User):
-            bio: Mapped[str] = mapped_column(db.String(500))
-            age: Mapped[int] = mapped_column(db.Integer)
-
-            # Override methods if needed
-            def _can_write(self) -> bool:
-                return self.age >= 18 and super()._can_write()
-
-    The User model provides:
-    - Email-based authentication with password hashing
-    - Role-based permissions with domain scoping
+    This is the main User model for Flask-More-Smorest applications. It provides:
+    - Email-based authentication with secure password hashing  
+    - Role-based permissions with optional domain scoping
     - JWT token support for API authentication
-    - Relationships to roles, settings, and tokens
-    - Permission checking methods (_can_read, _can_write, etc.)
+    - User settings storage for key-value preferences
+    - Built-in relationships to roles, settings, and tokens
+    - Permission checking methods for CRUD operations
+
+    **Using the Default User Model:**
+    
+    Import and use directly:
+    ```python
+    from flask_more_smorest.user import User
+    
+    # User model is ready to use with all features
+    user = User(email="test@example.com")
+    user.set_password("secure_password")
+    user.save()
+    ```
+
+    **Extending the User Model:**
+    
+    Create custom user models by inheriting from this class:
+    ```python
+    from flask_more_smorest.user import User
+    from flask_more_smorest.database import db
+    import sqlalchemy as sa
+    from sqlalchemy.orm import Mapped, mapped_column
+    
+    class CustomUser(User):
+        __tablename__ = "custom_users"  # Use different table name
+        
+        # Add custom fields
+        bio: Mapped[str] = mapped_column(db.String(500), nullable=True)
+        age: Mapped[int] = mapped_column(db.Integer, nullable=True)
+        phone: Mapped[str] = mapped_column(db.String(20), nullable=True)
+        
+        # Override permission methods if needed
+        def _can_write(self) -> bool:
+            # Custom permission logic
+            if self.age and self.age < 18:
+                return False  # Minors can't edit profiles
+            return super()._can_write()
+            
+        # Add custom methods
+        @property
+        def is_adult(self) -> bool:
+            return self.age is not None and self.age >= 18
+    ```
+
+    **Built-in Features Available to All User Models:**
+    
+    All User models (default or custom) automatically include:
+    - `roles`: Relationship to UserRole objects for permission management
+    - `settings`: Relationship to UserSetting objects for user preferences  
+    - `tokens`: Relationship to Token objects for API authentication
+    - `is_admin`/`is_superadmin`: Properties for checking admin privileges
+    - `has_role()`: Method to check specific roles with optional domain scoping
+    - `has_domain_access()`: Method to check domain-specific permissions
+    - Permission methods: `_can_read()`, `_can_write()`, `_can_create()`
+
+    **Inheritance Without Abstract Base Class:**
+    
+    Simply inherit from this concrete User class and add your custom fields and methods.
     """
 
     __tablename__ = "users"
@@ -80,12 +163,17 @@ class User(BaseModel):
     password: Mapped[bytes | None] = mapped_column(db.LargeBinary(128), nullable=True)
     is_enabled: Mapped[bool] = mapped_column(db.Boolean(), default=True)
 
-    # Core relationships that all User models inherit
-    # Using declared_attr for proper inheritance in custom User models
+    # Core relationships that all User models inherit  
+    # Using enable_typechecks=False to allow UserRole subclasses
     @declared_attr
     def roles(cls) -> Mapped[list["UserRole"]]:
         """Relationship to user roles - inherited by all User models."""
-        return relationship("UserRole", back_populates="user", cascade="all, delete-orphan")
+        return relationship(
+            "UserRole", 
+            back_populates="user", 
+            cascade="all, delete-orphan",
+            enable_typechecks=False  # Allow UserRole subclasses
+        )
 
     @declared_attr
     def settings(cls) -> Mapped[list["UserSetting"]]:
@@ -140,17 +228,20 @@ class User(BaseModel):
     @property
     def is_admin(self) -> bool:
         """Check if user has admin privileges."""
-        return self.has_role(UserRole.Role.ADMIN) or self.is_superadmin
+        return self.has_role(DefaultUserRole.ADMIN) or self.is_superadmin
 
     @property
     def is_superadmin(self) -> bool:
         """Check if user has superadmin privileges."""
-        return self.has_role(UserRole.Role.SUPERADMIN)
+        return self.has_role(DefaultUserRole.SUPERADMIN)
 
-    def has_role(self, role: "UserRole.Role", domain_name: str | None = None) -> bool:
+    def has_role(self, role: Any, domain_name: str | None = None) -> bool:
         """Check if user has specified role, optionally scoped to domain."""
+        # Normalize role to string for comparison
+        role_str = role.value if hasattr(role, "value") else str(role)
+
         return any(
-            r.role == role
+            r.role == role_str
             and (domain_name is None or r.domain is None or r.domain.name == domain_name or r.domain.name == "*")
             for r in self.roles
         )
@@ -232,17 +323,28 @@ class Domain(BaseModel):
 
 
 class UserRole(BaseModel):
-    """User roles with domain scoping for multi-tenant applications."""
+    """User roles with domain scoping for multi-tenant applications.
+    
+    To use custom role enums, simply pass enum values when creating roles:
+    
+    class CustomRole(str, enum.Enum):
+        SUPERADMIN = "superadmin"
+        ADMIN = "admin"
+        MANAGER = "manager"
+        USER = "user"
+
+    # Create roles with custom enum values
+    role = UserRole(user=user, role=CustomRole.MANAGER)
+    
+    # The role property will return the string value, which can be
+    # converted back to your custom enum as needed:
+    manager_role = CustomRole(role.role) if hasattr(CustomRole, role.role) else role.role
+    """
 
     __tablename__ = "user_roles"
 
-    class Role(str, enum.Enum):
-        """Predefined user roles."""
-
-        SUPERADMIN = "superadmin"
-        ADMIN = "admin"
-        EDITOR = "editor"
-        USER = "user"
+    # Store role as string to support any enum
+    # No default Role enum - accept any string/enum value
 
     # Use string reference for User to support custom models
     user_id: Mapped[uuid.UUID] = mapped_column(sa.Uuid(as_uuid=True), db.ForeignKey("users.id"), nullable=False)
@@ -256,24 +358,52 @@ class UserRole(BaseModel):
     # Relationships
     domain: Mapped["Domain | None"] = relationship("Domain")
     user: Mapped["User"] = relationship("User", back_populates="roles")
-    role: Mapped[Role] = mapped_column(sa.types.Enum(Role, native_enum=False), nullable=False)
 
-    def __init__(self, domain_id: uuid.UUID | str | None = None, **kwargs):
-        """Initialize role with domain handling."""
+    # Store role as string to support custom enums
+    _role: Mapped[str] = mapped_column("role", sa.String(50), nullable=False)
+
+    @property
+    def role(self) -> Any:
+        """Get role as string value."""
+        return self._role
+
+    @role.setter
+    def role(self, value: Any) -> None:
+        """Set role value from enum or string."""
+        if hasattr(value, "value"):
+            # Handle enum
+            self._role = value.value
+        else:
+            # Handle string
+            self._role = str(value)
+
+    def __init__(self, domain_id: uuid.UUID | str | None = None, role: Any = None, **kwargs):
+        """Initialize role with domain and role handling."""
         if domain_id is None:
             domain_id = Domain.get_default_domain_id()
         # Force explicit use of '*' to set domain_id to None:
         if domain_id == "*":
             domain_id = None
+
+        # Handle role parameter
+        if role is not None:
+            if hasattr(role, "value"):
+                kwargs["_role"] = role.value
+            else:
+                kwargs["_role"] = str(role)
+
         super().__init__(domain_id=domain_id, **kwargs)
 
     def _can_write(self) -> bool:
         """Permission check for modifying roles."""
         try:
             current = get_current_user()
-            if self.role in (self.Role.SUPERADMIN, self.Role.ADMIN):
-                return current.is_superadmin
-            return current.is_admin
+            # Check against default admin roles
+            admin_roles = {DefaultUserRole.SUPERADMIN.value, DefaultUserRole.ADMIN.value}
+            
+            if self._role in admin_roles:
+                return current.has_role(DefaultUserRole.SUPERADMIN)
+            return current.has_role(DefaultUserRole.ADMIN)
         except Exception:
             return True  # Allow for testing
 
@@ -382,12 +512,14 @@ class SoftDeleteMixin:
 
     def soft_delete(self) -> None:
         """Mark record as soft deleted."""
-        from datetime import datetime, timezone
-
-        self.deleted_at = datetime.now(timezone.utc)
-        self.is_enabled = False
+        self.deleted_at = dt.datetime.now(dt.timezone.utc)
+        # Only set is_enabled if it exists
+        if hasattr(self, "is_enabled"):
+            self.is_enabled = False
 
     def restore(self) -> None:
         """Restore soft deleted record."""
         self.deleted_at = None
-        self.is_enabled = True
+        # Only set is_enabled if it exists
+        if hasattr(self, "is_enabled"):
+            self.is_enabled = True

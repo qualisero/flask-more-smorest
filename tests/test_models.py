@@ -42,32 +42,47 @@ class TestBaseModelClass:
 class TestBaseModelConcrete:
     """Tests using a concrete BaseModel implementation."""
 
-    @pytest.fixture(scope="function")
+    @pytest.fixture(scope="function") 
     def test_model(self, app):
         """Create a concrete test model for testing."""
         import time
         import random
+        import threading
+        from flask_more_smorest.database import db
 
-        # Create a unique class name to avoid registry conflicts
-        class_name = f"TestModel_{int(time.time())}_{random.randint(1000, 9999)}"
-        table_name = f"test_table_{int(time.time())}_{random.randint(1000, 9999)}"
+        # Use unique class name to avoid SQLAlchemy registry conflicts
+        thread_id = threading.get_ident() 
+        timestamp = int(time.time() * 1000000)
+        random_id = random.randint(1000, 9999)
+        class_name = f"TestModel_{thread_id}_{timestamp}_{random_id}"
+        table_name = f"test_table_{thread_id}_{timestamp}_{random_id}"
 
-        # Use type() to create a class with a unique name
-        TestModel = type(
-            class_name,
-            (BaseModel,),
-            {
-                "__tablename__": table_name,
-                "__module__": f"test_models_dynamic_{int(time.time())}",  # Unique module name too
-                "name": db.Column(db.String(80), nullable=False),
-                "_can_write": lambda self: True,
-                "_can_read": lambda self: True,
-                "_can_create": lambda self: True,
-            },
-        )
+        # Create test model dynamically to avoid registry warnings
+        from flask_more_smorest.models import BaseModel
+        
+        TestModel = type(class_name, (BaseModel,), {
+            '__tablename__': table_name,
+            '__module__': f"test_models_{thread_id}_{timestamp}",
+            'name': db.Column(db.String(80), nullable=False),
+            '_can_write': lambda self: True,
+            '_can_read': lambda self: True,  
+            '_can_create': lambda self: True
+        })
 
         with app.app_context():
-            db.create_all()
+            # Create table for this test
+            TestModel.__table__.create(db.engine, checkfirst=True)
+            
+            # Clean up table after test
+            def cleanup():
+                try:
+                    TestModel.__table__.drop(db.engine, checkfirst=True)
+                except Exception:
+                    pass
+            
+            # Register cleanup (pytest will handle this)
+            import atexit
+            atexit.register(cleanup)
 
         return TestModel
 

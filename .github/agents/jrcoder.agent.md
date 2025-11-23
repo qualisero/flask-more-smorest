@@ -61,6 +61,9 @@ handoffs:
   ## Technical Standards (2025)
 
   ### Modern Python Patterns
+
+  Do NOT use `Optional` from `typing`. Use `str | None` syntax instead.
+  
   ```python
   # Use dataclasses and type hints
   from dataclasses import dataclass

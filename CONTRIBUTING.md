@@ -91,7 +91,7 @@ def process_user_data(
     user_data: Dict[str, Any], 
     include_inactive: bool = False
 ) -> List[Dict[str, Any]]:
-    \"\"\"Process user data and return filtered results.
+    """Process user data and return filtered results.
     
     Args:
         user_data: Dictionary containing user information
@@ -102,7 +102,7 @@ def process_user_data(
         
     Raises:
         ValueError: If user_data is malformed
-    \"\"\"
+    """
     # Implementation here
     pass
 ```
@@ -122,13 +122,13 @@ import pytest
 from flask_more_smorest import CRUDBlueprint
 
 def test_crud_blueprint_creation():
-    \"\"\"Test that CRUDBlueprint can be created with minimal parameters.\"\"\"
+    """Test that CRUDBlueprint can be created with minimal parameters."""
     blueprint = CRUDBlueprint('users', __name__)
     assert blueprint.name == 'users'
     assert blueprint.url_prefix == '/users/'
 
 def test_crud_blueprint_with_custom_model():
-    \"\"\"Test CRUDBlueprint with custom model and schema names.\"\"\"
+    """Test CRUDBlueprint with custom model and schema names."""
     blueprint = CRUDBlueprint(
         'products', __name__,
         model='Product',

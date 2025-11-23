@@ -42,10 +42,11 @@ from .enhanced_blueprint import EnhancedBlueprint
 from .models import BaseModel, BaseSchema
 from .database import db, init_db
 from .user import (
-    User, UserRole, UserSetting, Domain, Token,
+    User, UserRole, UserSetting, Domain, Token, DefaultUserRole,
     get_current_user, get_current_user_id,
     TimestampMixin, ProfileMixin, SoftDeleteMixin
 )
+from .migrations import init_migrations, create_migration, upgrade_database, downgrade_database
 from .query_filtering import generate_filter_schema, get_statements_from_filters
 from .utils import convert_snake_to_camel
 
@@ -74,7 +75,7 @@ __all__ = [
     "UserSetting", 
     "Domain",
     "Token",
-    "AbstractUser",
+    "DefaultUserRole",
     "get_current_user",
     "get_current_user_id",
     
@@ -82,6 +83,12 @@ __all__ = [
     "TimestampMixin",
     "ProfileMixin", 
     "SoftDeleteMixin",
+    
+    # Migration system
+    "init_migrations",
+    "create_migration", 
+    "upgrade_database",
+    "downgrade_database",
     
     # Utilities
     "generate_filter_schema",
