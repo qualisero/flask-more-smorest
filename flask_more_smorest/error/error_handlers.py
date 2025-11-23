@@ -4,15 +4,14 @@ This module provides error handler functions and a RequestHandlers class
 for registering error handlers with Flask applications.
 """
 
-from typing import TYPE_CHECKING
-import werkzeug
 import logging
+from typing import TYPE_CHECKING
 
 from sqlalchemy.exc import DatabaseError
-from werkzeug.exceptions import HTTPException, InternalServerError
+from werkzeug.exceptions import HTTPException
 
+from .exceptions import ApiException, DBError, ForbiddenError
 from .exceptions import InternalServerError as ApiInternalServerError
-from .exceptions import ApiException, ForbiddenError, DBError
 
 if TYPE_CHECKING:
     from flask import Flask, Response

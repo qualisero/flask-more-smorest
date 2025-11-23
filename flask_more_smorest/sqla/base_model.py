@@ -5,24 +5,24 @@ that includes automatic Marshmallow schema generation, permission checking,
 and common CRUD operations.
 """
 
-from typing import Self, TYPE_CHECKING
-import uuid
-from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
 import datetime as dt
-from contextlib import contextmanager
+import uuid
 from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Self
 
-from flask import request, current_app
-from sqlalchemy.orm import DeclarativeMeta, Mapped, mapped_column, class_mapper, make_transient
-from sqlalchemy.orm.collections import InstrumentedList
 import sqlalchemy as sa
-from marshmallow import pre_load, fields
+from flask import current_app, request
+from marshmallow import fields, pre_load
+from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
+from sqlalchemy.orm import DeclarativeMeta, Mapped, class_mapper, make_transient, mapped_column
+from sqlalchemy.orm.collections import InstrumentedList
 
-from ..error.exceptions import NotFoundError, ForbiddenError, UnauthorizedError
-from .database import db, Base
+from ..error.exceptions import ForbiddenError, NotFoundError
+from .database import Base, db
 
 if TYPE_CHECKING:
-    from flask import Flask
+    from flask import Flask  # noqa: F401
 
 
 class BaseSchema(SQLAlchemyAutoSchema):
@@ -40,7 +40,9 @@ class BaseSchema(SQLAlchemyAutoSchema):
     is_writable = fields.Boolean(dump_only=True)
 
     @pre_load
-    def pre_load(self, data: dict[str, str | int | float | bool], **kwargs: dict) -> dict[str, str | int | float | bool]:
+    def pre_load(
+        self, data: dict[str, str | int | float | bool], **kwargs: dict
+    ) -> dict[str, str | int | float | bool]:
         """Pre-load hook to handle UUID conversion and view_args injection.
 
         Automatically injects URL parameters from Flask's request.view_args
@@ -212,6 +214,47 @@ class BaseModel(db.Model, Base, metaclass=BaseModelMeta):
             return False
 
     @classmethod
+    def _to_uuid(cls, value: str | uuid.UUID) -> uuid.UUID:
+        """Convert string or UUID value to UUID object.
+
+        Args:
+            value: String representation or UUID object
+
+        Returns:
+            UUID object
+
+        Raises:
+            TypeError: If value is not a valid UUID string or UUID object
+        """
+        if type(value) is str:
+            try:
+                return uuid.UUID(value)
+            except ValueError:
+                raise TypeError(f"ID must be a valid UUID string, not {value}")
+        if type(value) is not uuid.UUID:
+            raise TypeError(f"ID must be a string or UUID, not {type(value)}")
+        return value
+
+    @classmethod
+    def _normalize_uuid_fields(
+        cls, fields: dict[str, str | int | uuid.UUID | bool | None]
+    ) -> dict[str, str | int | uuid.UUID | bool | None]:
+        """Convert UUID string fields to UUID objects based on column types.
+
+        Args:
+            fields: Dictionary of field names and values
+
+        Returns:
+            Dictionary with UUID strings converted to UUID objects
+        """
+        normalized = fields.copy()
+        for key, val in fields.items():
+            col = class_mapper(cls).columns[key]
+            if isinstance(col.type, sa.types.Uuid) and val is not None:
+                normalized[key] = cls._to_uuid(val)
+        return normalized
+
+    @classmethod
     def get_by(cls, **kwargs: str | int | uuid.UUID | bool | None) -> Self | None:
         """Get resource by field values.
 
@@ -232,20 +275,7 @@ class BaseModel(db.Model, Base, metaclass=BaseModelMeta):
             >>> user = User.get_by(email='test@example.com')
             >>> article = Article.get_by(id='123e4567-e89b-12d3-a456-426614174000')
         """
-
-        # Convert UUID strings to UUID objects if necessary:
-        for key, val in kwargs.items():
-            col = class_mapper(cls).columns[key]
-            if type(col.type) != sa.types.Uuid:
-                continue
-            if type(val) is str:
-                try:
-                    val = uuid.UUID(val)
-                except ValueError:
-                    raise TypeError(f"ID must be a valid UUID string, not {val}")
-            if type(val) is not uuid.UUID:
-                raise TypeError(f"ID must be a string or UUID, not {type(val)}")
-            kwargs[key] = val
+        kwargs = cls._normalize_uuid_fields(kwargs)
 
         # don't automatically flush the session to avoid side effects
         with db.session.no_autoflush:
@@ -331,6 +361,25 @@ class BaseModel(db.Model, Base, metaclass=BaseModelMeta):
         if not cls.get(id):
             raise NotFoundError(f"{cls.__name__} id {id} doesn't exist")
 
+    def _check_permission(self, operation: str) -> None:
+        """Check if user has permission for specified operation.
+
+        Args:
+            operation: Operation type ('write', 'create', 'delete')
+
+        Raises:
+            ForbiddenError: If user doesn't have permission for the operation
+        """
+        permission_methods = {
+            "write": (self.can_write, "modify"),
+            "create": (self.can_create, "create"),
+            "delete": (self.can_write, "delete"),
+        }
+
+        check_method, action = permission_methods[operation]
+        if not check_method():
+            raise ForbiddenError(f"User not allowed to {action} this resource: {self}")
+
     def save(self, commit: bool = True) -> Self:
         """Save the record: add to session and optionally commit.
 
@@ -349,13 +398,11 @@ class BaseModel(db.Model, Base, metaclass=BaseModelMeta):
         """
 
         if self.id is not None:
-            if not self.can_write():
-                raise ForbiddenError(f"User not allowed to modify this resource: {self}")
+            self._check_permission("write")
             # TODO: should we move on_before_update to the update method?
             self.on_before_update()
         else:
-            if not self.can_create():
-                raise ForbiddenError(f"User not allowed to create resource: {self}")
+            self._check_permission("create")
             self.on_before_create()
 
         db.session.add(self)
@@ -429,8 +476,7 @@ class BaseModel(db.Model, Base, metaclass=BaseModelMeta):
             >>> user = User.get(user_id)
             >>> user.delete()
         """
-        if not self.can_write():
-            raise ForbiddenError(f"User not allowed to delete this resource: {self}")
+        self._check_permission("delete")
 
         # Ensure the object is up to date to prevent issues with cascading:
         db.session.refresh(self)

@@ -4,7 +4,8 @@ This module provides BlueprintOperationIdMixin that extends Flask-Smorest's
 Blueprint to automatically generate OpenAPI operationId values for endpoints.
 """
 
-from typing import Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
+
 from flask_smorest import Blueprint
 
 from .utils import convert_snake_to_camel
@@ -30,7 +31,9 @@ class BlueprintOperationIdMixin(Blueprint):
         ...         pass
     """
 
-    def route(self, rule: str, *pargs: str, **kwargs: bool | str) -> Callable[[type["MethodView"] | Callable], type["MethodView"] | Callable]:
+    def route(
+        self, rule: str, *pargs: str, **kwargs: bool | str
+    ) -> Callable[[type["MethodView"] | Callable], type["MethodView"] | Callable]:
         """Override route to add automatic operationId.
 
         Args:
@@ -41,7 +44,9 @@ class BlueprintOperationIdMixin(Blueprint):
         Returns:
             Decorated route function or MethodView class
         """
-        wrapped: Callable[[type["MethodView"] | Callable], type["MethodView"] | Callable] = super().route(rule, *pargs, **kwargs)
+        wrapped: Callable[[type["MethodView"] | Callable], type["MethodView"] | Callable] = super().route(
+            rule, *pargs, **kwargs
+        )
 
         OPERATION_NAME_MAP: dict[str, str] = {
             "patch": "update",
@@ -51,9 +56,7 @@ class BlueprintOperationIdMixin(Blueprint):
             "put": "replace",
         }
 
-        def _add_operation_id(
-            func: Callable, method_view_class: type["MethodView"] | None = None
-        ) -> Callable:
+        def _add_operation_id(func: Callable, method_view_class: type["MethodView"] | None = None) -> Callable:
             """Add operationId to the function if not already set.
 
             Args:

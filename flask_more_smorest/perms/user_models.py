@@ -59,27 +59,26 @@ All User instances (including subclasses) automatically inherit:
 - CRUD operation permissions
 """
 
-import logging
-import uuid
 import enum
+import logging
 import os
-import datetime as dt
+import uuid
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from flask_jwt_extended import current_user as jwt_current_user
+from flask_jwt_extended import exceptions, verify_jwt_in_request
 from sqlalchemy.ext.declarative import declared_attr
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ..utils import check_password_hash, generate_password_hash
 from ..error.exceptions import UnprocessableEntity
-
 from ..sqla import db
+from ..utils import check_password_hash, generate_password_hash
 from .base_perms_model import BasePermsModel
-
-from flask_jwt_extended import verify_jwt_in_request, current_user as jwt_current_user, exceptions
+from .model_mixins import UserOwnedResourceMixin
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterator  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -409,7 +408,10 @@ class UserRole(BasePermsModel):
             self._role = str(value)
 
     def __init__(
-        self, domain_id: uuid.UUID | str | None = None, role: str | enum.Enum | None = None, **kwargs: str | uuid.UUID | bool | None
+        self,
+        domain_id: uuid.UUID | str | None = None,
+        role: str | enum.Enum | None = None,
+        **kwargs: str | uuid.UUID | bool | None,
     ) -> None:
         """Initialize role with domain and role handling.
 
@@ -457,7 +459,7 @@ class UserRole(BasePermsModel):
             return True
 
 
-class Token(BasePermsModel):
+class Token(BasePermsModel, UserOwnedResourceMixin):
     """API tokens for user authentication."""
 
     __tablename__ = "tokens"
@@ -470,23 +472,8 @@ class Token(BasePermsModel):
     revoked: Mapped[bool] = mapped_column(db.Boolean(), nullable=False, default=False)
     revoked_at: Mapped[sa.DateTime | None] = mapped_column(sa.DateTime(), nullable=True)
 
-    def _can_write(self) -> bool:
-        """Tokens can be modified by their owner."""
-        try:
-            return self.user._can_write()
-        except Exception:
-            return True
 
-    def _can_create(self) -> bool:
-        """Tokens can be created by their owner."""
-        return self._can_write()
-
-    def _can_read(self) -> bool:
-        """Tokens can be read by their owner."""
-        return self._can_write()
-
-
-class UserSetting(BasePermsModel):
+class UserSetting(BasePermsModel, UserOwnedResourceMixin):
     """User-specific key-value settings storage."""
 
     __tablename__ = "user_settings"
@@ -497,18 +484,3 @@ class UserSetting(BasePermsModel):
     value: Mapped[str | None] = mapped_column(db.String(1024), nullable=True)
 
     __table_args__ = (db.UniqueConstraint("user_id", "key"),)
-
-    def _can_write(self) -> bool:
-        """Settings can be modified by their owner."""
-        try:
-            return self.user._can_write()
-        except Exception:
-            return True
-
-    def _can_create(self) -> bool:
-        """Settings can be created by their owner."""
-        return self._can_write()
-
-    def _can_read(self) -> bool:
-        """Settings can be read by their owner."""
-        return self._can_write()

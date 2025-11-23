@@ -5,14 +5,16 @@ JWT authentication, permission checking, and custom schema name resolution.
 """
 
 from typing import TYPE_CHECKING
-from flask import request
-from flask_smorest import Api as ApiOrig
+
 from apispec.ext.marshmallow import MarshmallowPlugin
-from flask_jwt_extended import verify_jwt_in_request, exceptions as jwt_exceptions
 from apispec.ext.marshmallow import resolver as default_resolver
+from flask import request
+from flask_jwt_extended import exceptions as jwt_exceptions
+from flask_jwt_extended import verify_jwt_in_request
+from flask_smorest import Api as ApiOrig
 from marshmallow import Schema
 
-from ..error.exceptions import UnauthorizedError, ForbiddenError
+from ..error.exceptions import ForbiddenError, UnauthorizedError
 
 if TYPE_CHECKING:
     from flask import Flask

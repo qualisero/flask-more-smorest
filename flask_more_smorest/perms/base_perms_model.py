@@ -4,19 +4,22 @@ This module provides BasePermsModel which extends BaseModel with
 permission checking functionality based on the current user context.
 """
 
-from contextlib import contextmanager
+import logging
 from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from flask import has_request_context
-from flask_jwt_extended import verify_jwt_in_request, exceptions
+from flask_jwt_extended import exceptions, verify_jwt_in_request
 from werkzeug.exceptions import Unauthorized
 
 from ..error.exceptions import ForbiddenError, UnauthorizedError
-from ..sqla import db, BaseModel as SQLABaseModel
+from ..sqla import BaseModel as SQLABaseModel
 
 if TYPE_CHECKING:
-    from flask import Flask
+    from flask import Flask  # noqa: F401
+
+logger = logging.getLogger(__name__)
 
 
 class BasePermsModel(SQLABaseModel):
@@ -71,14 +74,42 @@ class BasePermsModel(SQLABaseModel):
         finally:
             cls_self.perms_disabled = original
 
+    def _should_bypass_perms(self) -> bool:
+        """Check if permissions should be bypassed.
+
+        Returns:
+            True if permissions are disabled or not in request context
+        """
+        return self.perms_disabled or not has_request_context()
+
+    def _execute_permission_check(self, check_func: callable, operation: str) -> bool:
+        """Execute permission check with consistent error handling.
+
+        Args:
+            check_func: Permission check function to execute
+            operation: Name of operation for logging (e.g., 'write', 'read')
+
+        Returns:
+            True if permission check passes, False otherwise
+
+        Raises:
+            UnauthorizedError: If user authentication is required
+        """
+        try:
+            return check_func()
+        except RuntimeError:
+            raise UnauthorizedError("User must be authenticated")
+        except Exception as e:
+            logger.debug("can_%s() exception: %s", operation, e)
+            return False
+
     def can_write(self) -> bool:
         """Does current user have write permission on object.
 
         Returns:
             True if user can write, False otherwise
         """
-
-        if self.perms_disabled or not has_request_context():
+        if self._should_bypass_perms():
             return True
 
         is_admin = getattr(self, "is_admin", False)
@@ -86,17 +117,9 @@ class BasePermsModel(SQLABaseModel):
         if not is_role_instance and not is_admin and self.is_current_user_admin():
             return True
 
-        try:
-            if self.id is None:
-                return self._can_create()
-            return self._can_write()
-        except RuntimeError:
-            raise UnauthorizedError("User must be authenticated")
-        except Exception as e:
-            print("DEBUG: can_write() ***EXCEPTION:", e)
-            pass
-
-        return False
+        if self.id is None:
+            return self._execute_permission_check(self._can_create, "create")
+        return self._execute_permission_check(self._can_write, "write")
 
     def can_read(self) -> bool:
         """Does current user have read permissions on object.
@@ -104,22 +127,13 @@ class BasePermsModel(SQLABaseModel):
         Returns:
             True if user can read, False otherwise
         """
-
-        if self.perms_disabled or not has_request_context():
+        if self._should_bypass_perms():
             return True
 
         if self.id is None or self.is_current_user_admin():
             return True
-        try:
-            if self._can_read():
-                return True
-        except RuntimeError:
-            raise UnauthorizedError("User must be authenticated")
-        except Exception as e:
-            print("DEBUG: can_read() ***EXCEPTION:", e)
-            pass
 
-        return False
+        return self._execute_permission_check(self._can_read, "read")
 
     def can_create(self) -> bool:
         """Can current user create object.

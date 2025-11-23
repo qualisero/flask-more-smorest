@@ -5,8 +5,9 @@ It handles the creation of migration environments and provides helpers
 for managing database schema changes.
 """
 
-from typing import TYPE_CHECKING
 from pathlib import Path
+from typing import TYPE_CHECKING
+
 from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
@@ -197,14 +198,14 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
-    
+
     def process_revision_directives(context, revision, directives):
         if getattr(config.cmd_opts, 'autogenerate', False):
             script = directives[0]
             if script.upgrade_ops.is_empty():
                 directives[:] = []
                 print("No changes detected.")
-    
+
     connectable = current_app.extensions['sqlalchemy'].engine
 
     with connectable.connect() as connection:

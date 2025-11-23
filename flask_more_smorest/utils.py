@@ -4,8 +4,9 @@ This module provides common utility functions for password hashing
 and string case conversion.
 """
 
-import bcrypt
 import re
+
+import bcrypt
 
 
 def generate_password_hash(password: str | bytes) -> bytes:

@@ -5,13 +5,14 @@ with automatic logging, debug information, and standardized error responses.
 """
 
 import logging
-from http import HTTPStatus
 import sys
+import traceback
+from http import HTTPStatus
+from pprint import pformat
 from typing import TYPE_CHECKING
+
 from flask import make_response
 from marshmallow import Schema, fields
-import traceback
-from pprint import pformat
 
 from ..utils import convert_camel_to_snake
 
@@ -132,7 +133,7 @@ class ApiException(Exception):
         context.update(kwargs)
 
         if True:  # TODO: check if auth is enabled
-            from ..perms import get_current_user_id, current_user
+            from ..perms import current_user, get_current_user_id
 
             try:
                 if user_id := get_current_user_id():

@@ -4,12 +4,11 @@ This module provides the permissions system including the Api with auth,
 BasePermsModel with permission checks, user models, and PermsBlueprintMixin.
 """
 
+from ..crud import CRUDBlueprint as CRUDBlueprintBase
 from .api import Api
 from .base_perms_model import BasePermsModel as BaseModel
-from .user_models import User, UserRole, Domain, Token, UserSetting, current_user, get_current_user_id
 from .perms_blueprint import PermsBlueprintMixin
-
-from ..crud import CRUDBlueprint as CRUDBlueprintBase
+from .user_models import Domain, Token, User, UserRole, UserSetting, current_user, get_current_user_id
 
 
 class CRUDBlueprint(CRUDBlueprintBase, PermsBlueprintMixin):

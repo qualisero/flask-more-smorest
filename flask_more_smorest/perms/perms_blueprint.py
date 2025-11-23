@@ -4,10 +4,7 @@ This module provides PermsBlueprintMixin which adds decorators for marking
 endpoints as public or admin-only.
 """
 
-from typing import Callable, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from collections.abc import Callable as CallableType
+from collections.abc import Callable
 
 
 class PermsBlueprintMixin:
