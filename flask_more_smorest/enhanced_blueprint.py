@@ -1,19 +1,47 @@
-from flask_smorest import Blueprint 
+"""Enhanced Blueprint with additional decorators and functionality."""
+
+from typing import Callable, Any, Optional, TYPE_CHECKING
+from flask_smorest import Blueprint
 
 from .utils import convert_snake_to_camel
 
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 
 class EnhancedBlueprint(Blueprint):
-    """Blueprint with added annotations."""
+    """Blueprint with added annotations for public and admin endpoints.
 
-    def public_endpoint(self, function):
-        """Decorator to mark an endpoint as public."""
+    This class extends Flask-Smorest's Blueprint to provide additional
+    decorators for marking endpoints with special access levels and
+    automatic operationId generation.
+    """
+
+    def public_endpoint(self, function: Callable[..., Any]) -> Callable[..., Any]:
+        """Decorator to mark an endpoint as public.
+
+        Args:
+            function: The endpoint function to mark as public
+
+        Returns:
+            The decorated function with public annotation
+        """
         function._is_public = True
-        function.__doc__ += " | 🌐 Public"
+        if function.__doc__ is None:
+            function.__doc__ = "Public endpoint"
+        else:
+            function.__doc__ += " | 🌐 Public"
         return function
 
-    def admin_endpoint(self, func):
-        """Decorator to mark an endpoint as admin only."""
+    def admin_endpoint(self, func: Callable[..., Any]) -> Callable[..., Any]:
+        """Decorator to mark an endpoint as admin only.
+
+        Args:
+            func: The endpoint function to mark as admin only
+
+        Returns:
+            The decorated function with admin annotation
+        """
         func._is_admin = True
         if func.__doc__ is None:
             func.__doc__ = "Admin only endpoint"
@@ -21,13 +49,22 @@ class EnhancedBlueprint(Blueprint):
             func.__doc__ += " | 🔑 Admin only"
         return func
 
-    def route(self, rule, *pargs, **kwargs):
-        """Override route to add automatic operationId."""
+    def route(self, rule: str, *pargs: Any, **kwargs: Any) -> Callable[..., Any]:
+        """Override route to add automatic operationId.
+
+        Args:
+            rule: URL rule for the route
+            *pargs: Additional positional arguments
+            **kwargs: Additional keyword arguments
+
+        Returns:
+            Decorated route function
+        """
         wrapped = super().route(rule, *pargs, **kwargs)
 
         OPERATION_NAME_MAP = {"patch": "update", "delete": "delete", "get": "get", "post": "create", "put": "replace"}
 
-        def _add_operation_id(func, method_view_class=None):
+        def _add_operation_id(func: Callable[..., Any], method_view_class: Optional[type] = None) -> Callable[..., Any]:
             """Add operationId to the function if not already set."""
             apidoc = getattr(func, "_apidoc", {})
             if "manual_doc" in apidoc and "operationId" in apidoc["manual_doc"]:
@@ -44,7 +81,7 @@ class EnhancedBlueprint(Blueprint):
             operation_id = operation_id[0].lower() + operation_id[1:]
             return self.doc(operationId=operation_id)(func)
 
-        def _route(class_or_func):
+        def _route(class_or_func: Any) -> Any:
             """Add operationId to the route's methods."""
             if hasattr((class_or_func), "methods"):
                 for method in class_or_func.methods:

@@ -1,9 +1,26 @@
-from typing import Type
+"""Query filtering utilities for Flask-Smorest CRUD operations."""
+
+from typing import Type, Any, Dict, Set, List, Optional, TYPE_CHECKING
 import marshmallow as ma
 from sqlalchemy.orm import DeclarativeBase
 
+if TYPE_CHECKING:
+    from sqlalchemy import Select
 
-def generate_filter_schema(base_schema):
+
+def generate_filter_schema(base_schema: Type[ma.Schema]) -> Type[ma.Schema]:
+    """Generate a filtering schema from a base schema.
+
+    This function creates a new schema class that can be used for filtering
+    queries. Date/DateTime fields are converted to range filters with
+    __from and __to suffixes.
+
+    Args:
+        base_schema: The base Marshmallow schema class
+
+    Returns:
+        A new schema class suitable for filtering operations
+    """
 
     temp_instance = base_schema()
 
@@ -74,9 +91,21 @@ def generate_filter_schema(base_schema):
     return FilterSchema
 
 
-def get_statements_from_filters(kwargs: dict, model: Type[DeclarativeBase]) -> set:
-    """Convert query kwargs into SQLAlchemy filters based on the schema."""
-    filters = set()
+def get_statements_from_filters(kwargs: Dict[str, Any], model: Type[DeclarativeBase]) -> Set[Any]:
+    """Convert query kwargs into SQLAlchemy filters based on the schema.
+
+    This function processes filtering parameters and converts them to
+    SQLAlchemy WHERE clause conditions, supporting range queries for
+    date fields and comparison operators.
+
+    Args:
+        kwargs: Dictionary of filter parameters
+        model: SQLAlchemy model class
+
+    Returns:
+        Set of SQLAlchemy filter conditions
+    """
+    filters: Set[Any] = set()
 
     for field_name, value in kwargs.items():
         if value is None:

@@ -61,16 +61,20 @@ handoffs:
   ## Technical Standards (2025)
 
   ### Modern Python Patterns
+
+  Do NOT use `Optional` from `typing`. Use `str | None` syntax instead.
+  
   ```python
   # Use dataclasses and type hints
   from dataclasses import dataclass
-  from typing import Optional, List, Protocol
+  from typing import list, Protocol
 
   @dataclass(frozen=True, slots=True)
   class UserModel:
       id: int
       name: str
-      email: str
+      email: str | None
+      roles: list[str]
       is_active: bool = True
   ```
 

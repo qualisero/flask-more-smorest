@@ -1,34 +1,50 @@
-"""Extend flask_smorest's Blueprint class to handle default CRUD operations."""
+"""CRUD Blueprint for automatic RESTful API generation with Flask-Smorest."""
 
 from http import HTTPStatus
 from importlib import import_module
+from typing import Any, Dict, List, Optional, Type, Union, TYPE_CHECKING
 
 from flask.views import MethodView
 from marshmallow_sqlalchemy.load_instance_mixin import LoadInstanceMixin
-from marshmallow import RAISE
+from marshmallow import RAISE, Schema
+from sqlalchemy.orm import DeclarativeBase
 
 from .query_filtering import generate_filter_schema, get_statements_from_filters
 from .utils import convert_snake_to_camel
 from .enhanced_blueprint import EnhancedBlueprint
 
+if TYPE_CHECKING:
+    from flask import Flask
+
 
 class CRUDBlueprint(EnhancedBlueprint):
-    """Blueprint subclass that automatically registers CRUD routes."""
+    """Blueprint subclass that automatically registers CRUD routes.
 
-    def __init__(self, *pargs, **kwargs):  # noqa
-        """Use Model and Schema arguments to register default routes."""
+    This class extends EnhancedBlueprint to provide automatic CRUD
+    (Create, Read, Update, Delete) operations for SQLAlchemy models.
+    It automatically generates RESTful endpoints based on the provided
+    model and schema configuration.
+    """
+
+    def __init__(self, *pargs: str, **kwargs: Any) -> None:
+        """Initialize CRUD blueprint with model and schema configuration.
+
+        Args:
+            *pargs: Positional arguments (name, import_name)
+            **kwargs: Keyword arguments including model, schema, and CRUD configuration
+        """
 
         if len(pargs) > 0:
-            name = pargs[0]
+            name: str = pargs[0]
         else:
             name = kwargs.pop("name")
 
         if len(pargs) > 1:
-            import_name = pargs[1]
+            import_name: str = pargs[1]
         else:
             import_name = kwargs.pop("import_name", __name__)
 
-        pargs = [name, import_name] + list(pargs[2:])
+        new_pargs: list[str] = [name, import_name] + list(pargs[2:])
 
         if "url_prefix" not in kwargs:
             kwargs["url_prefix"] = f"/{name}/"
@@ -39,13 +55,15 @@ class CRUDBlueprint(EnhancedBlueprint):
         #     kwargs["url_prefix"] += "/"
 
         model_name: str = kwargs.pop("model", convert_snake_to_camel(name.capitalize()))
-        schema_name = kwargs.pop("schema", model_name + "Schema")
-        res_id_name = kwargs.pop("res_id", "id")
+        schema_name: str = kwargs.pop("schema", model_name + "Schema")
+        res_id_name: str = kwargs.pop("res_id", "id")
         res_id_param_name: str = kwargs.pop("res_id_param", f"{name.lower()}_id")
-        skip_methods: list[str] = kwargs.pop("skip_methods", [])
-        methods_raw: list | dict = kwargs.pop("methods", ["INDEX", "GET", "POST", "PATCH", "DELETE"])
+        skip_methods: List[str] = kwargs.pop("skip_methods", [])
+        methods_raw: Union[List[str], Dict[str, Dict[str, Any]]] = kwargs.pop(
+            "methods", ["INDEX", "GET", "POST", "PATCH", "DELETE"]
+        )
         if isinstance(methods_raw, list):
-            methods: dict[str, dict] = {m: {} for m in methods_raw}
+            methods: Dict[str, Dict[str, Any]] = {m: {} for m in methods_raw}
         else:
             methods = methods_raw
         for m in skip_methods:
@@ -53,7 +71,7 @@ class CRUDBlueprint(EnhancedBlueprint):
         model_import_name = kwargs.pop("model_import_name", ".".join(import_name.split(".")[:-1] + ["models"]))
         schema_import_name = kwargs.pop("schema_import_name", ".".join(import_name.split(".")[:-1] + ["schemas"]))
 
-        super().__init__(*pargs, **kwargs)
+        super().__init__(*new_pargs, **kwargs)
 
         ModelCls = getattr(import_module(model_import_name), model_name)
         ModelCls.__name__ = model_name
@@ -65,7 +83,6 @@ class CRUDBlueprint(EnhancedBlueprint):
                 SchemaCls = getattr(schemaModule, schema_name)
         except ImportError:
             pass
-
 
         if update_schema_name := methods.get("PATCH", {}).get("arg_schema"):
             if isinstance(update_schema_name, str):

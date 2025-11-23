@@ -1,8 +1,8 @@
 ---
-name: Plan
+name: Architect
 description: Researches and outlines multi-step plans
 argument-hint: Outline the goal or problem to research
-tools: ['search', 'usages', 'vscodeAPI', 'problems', 'changes', 'testFailure', 'fetch', 'githubRepo', 'github.vscode-pull-request-github/copilotCodingAgent', 'github.vscode-pull-request-github/issue_fetch', 'github.vscode-pull-request-github/activePullRequest', 'todos', 'runSubagent', 'shell', 'read', 'search']
+tools: ['search', 'usages', 'vscodeAPI', 'problems', 'changes', 'testFailure', 'fetch', 'githubRepo', 'github.vscode-pull-request-github/copilotCodingAgent', 'github.vscode-pull-request-github/issue_fetch', 'github.vscode-pull-request-github/activePullRequest', 'todos', 'runSubagent', 'shell', 'read', 'search', 'runSubagent']
 handoffs:
   - label: Start Implementation
     agent: JrCoder
