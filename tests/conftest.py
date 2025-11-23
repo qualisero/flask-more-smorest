@@ -1,5 +1,6 @@
-"""Test configuration and fixtures for flask-smorest-crud tests."""
+"""Test configuration and fixtures for flask-more-smorest tests."""
 
+from typing import TYPE_CHECKING
 import pytest
 from flask import Flask
 from flask_smorest import Api
@@ -8,13 +9,19 @@ from marshmallow import Schema, fields
 from datetime import datetime
 import uuid
 
-from flask_more_smorest.database import db
-from flask_more_smorest import BaseModel
+from flask_more_smorest.sqla import db, BaseModel
+
+if TYPE_CHECKING:
+    from flask.testing import FlaskClient
 
 
 @pytest.fixture(scope="function")
-def app():
-    """Create and configure a test Flask application."""
+def app() -> Flask:
+    """Create and configure a test Flask application.
+
+    Returns:
+        Configured Flask application instance for testing
+    """
     app = Flask(__name__)
     app.config["TESTING"] = True
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
@@ -31,34 +38,56 @@ def app():
 
 
 @pytest.fixture
-def api(app):
-    """Create a test API instance."""
+def api(app: Flask) -> Api:
+    """Create a test API instance.
+
+    Args:
+        app: Flask application fixture
+
+    Returns:
+        Api instance for testing
+    """
     return Api(app)
 
 
 @pytest.fixture
-def simple_user_model():
-    """Create a simple test user model."""
+def simple_user_model() -> type[BaseModel]:
+    """Create a simple test user model.
 
-    from flask_more_smorest.models import BaseModel
+    Returns:
+        SimpleUser model class for testing
+    """
 
     class SimpleUser(BaseModel):
+        """Test user model."""
+
+        __tablename__ = "simple_users"
+
         username = db.Column(db.String(80), unique=True, nullable=False)
         email = db.Column(db.String(120), unique=True, nullable=False)
         is_active = db.Column(db.Boolean, default=True)
         age = db.Column(db.Integer, nullable=True)
 
-        def __repr__(self):
+        def __repr__(self) -> str:
             return f"<SimpleUser {self.username}>"
 
     return SimpleUser
 
 
 @pytest.fixture
-def user_schema(simple_user_model):
-    """Create a test User schema."""
+def user_schema(simple_user_model: type[BaseModel]) -> type[SQLAlchemyAutoSchema]:
+    """Create a test User schema.
+
+    Args:
+        simple_user_model: SimpleUser model fixture
+
+    Returns:
+        UserSchema class for testing
+    """
 
     class UserSchema(SQLAlchemyAutoSchema):
+        """Test user schema."""
+
         class Meta:
             model = simple_user_model
             load_instance = True
@@ -68,8 +97,16 @@ def user_schema(simple_user_model):
 
 
 @pytest.fixture
-def sample_users(app, simple_user_model):
-    """Create sample user data for testing."""
+def sample_users(app: Flask, simple_user_model: type[BaseModel]) -> list[BaseModel]:
+    """Create sample user data for testing.
+
+    Args:
+        app: Flask application fixture
+        simple_user_model: SimpleUser model fixture
+
+    Returns:
+        List of created user instances
+    """
     with app.app_context():
         db.create_all()
 
@@ -87,14 +124,28 @@ def sample_users(app, simple_user_model):
 
 
 @pytest.fixture
-def client(app):
-    """Create a test client."""
+def client(app: Flask) -> "FlaskClient":
+    """Create a test client.
+
+    Args:
+        app: Flask application fixture
+
+    Returns:
+        Flask test client
+    """
     return app.test_client()
 
 
 @pytest.fixture
-def runner(app):
-    """Create a test runner."""
+def runner(app: Flask):
+    """Create a test CLI runner.
+
+    Args:
+        app: Flask application fixture
+
+    Returns:
+        Flask CLI test runner
+    """
     return app.test_cli_runner()
 
 
@@ -103,7 +154,12 @@ globals()["User"] = None
 globals()["UserSchema"] = None
 
 
-def set_test_models(user_model, user_schema):
-    """Set global test models for import by CRUD blueprint."""
+def set_test_models(user_model: type[BaseModel], user_schema: type[Schema]) -> None:
+    """Set global test models for import by CRUD blueprint.
+
+    Args:
+        user_model: User model class to set globally
+        user_schema: User schema class to set globally
+    """
     globals()["User"] = user_model
     globals()["UserSchema"] = user_schema

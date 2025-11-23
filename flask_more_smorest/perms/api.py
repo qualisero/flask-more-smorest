@@ -1,3 +1,10 @@
+"""Extended Flask-Smorest API with authentication and permission support.
+
+This module provides an Api class that extends Flask-Smorest's Api with
+JWT authentication, permission checking, and custom schema name resolution.
+"""
+
+from typing import TYPE_CHECKING
 from flask import request
 from flask_smorest import Api as ApiOrig
 from apispec.ext.marshmallow import MarshmallowPlugin
@@ -5,13 +12,36 @@ from flask_jwt_extended import verify_jwt_in_request, exceptions as jwt_exceptio
 from apispec.ext.marshmallow import resolver as default_resolver
 from marshmallow import Schema
 
-from error.exceptions import UnauthorizedError, ForbiddenError
+from ..error.exceptions import UnauthorizedError, ForbiddenError
+
+if TYPE_CHECKING:
+    from flask import Flask
 
 
 class Api(ApiOrig):
-    """Api override"""
+    """Extended Api with JWT authentication and permission checking.
 
-    def __init__(self, app=None, *, spec_kwargs=None):
+    This class extends Flask-Smorest's Api to automatically:
+    - Configure JWT authentication in OpenAPI spec
+    - Enforce authentication on non-public endpoints
+    - Check admin permissions on admin-only endpoints
+    - Customize schema naming for OpenAPI
+
+    Example:
+        >>> from flask import Flask
+        >>> from flask_more_smorest.perms import Api
+        >>>
+        >>> app = Flask(__name__)
+        >>> api = Api(app)
+    """
+
+    def __init__(self, app: "Flask | None" = None, *, spec_kwargs: dict[str, str | list | dict] | None = None) -> None:
+        """Initialize the API with custom Marshmallow plugin.
+
+        Args:
+            app: Optional Flask application
+            spec_kwargs: Optional keyword arguments for APISpec
+        """
         if spec_kwargs is None:
             spec_kwargs = {}
         ma_plugin = MarshmallowPlugin(schema_name_resolver=custom_schema_name_resolver)
@@ -20,7 +50,17 @@ class Api(ApiOrig):
             spec_kwargs["security"] = [{"jwt": []}]
         super().__init__(app, spec_kwargs=spec_kwargs)
 
-    def init_app(self, app, *pargs, **kwargs):
+    def init_app(self, app: "Flask", *pargs: str, **kwargs: dict) -> None:
+        """Initialize the API with a Flask application.
+
+        Sets up OpenAPI security schemes and before_request handler
+        for authentication and authorization.
+
+        Args:
+            app: Flask application to initialize
+            *pargs: Additional positional arguments
+            **kwargs: Additional keyword arguments
+        """
         app.config["API_SPEC_OPTIONS"] = {"components": {"securitySchemes": {}}}
         if "jwt" in app.config.get("AUTH_METHODS", []):
             app.config["API_SPEC_OPTIONS"]["components"]["securitySchemes"]["bearerAuth"] = {
@@ -76,7 +116,19 @@ class Api(ApiOrig):
                     raise ForbiddenError("Admin access only")
 
 
-def custom_schema_name_resolver(schema: type[Schema], **kwargs) -> str:
+def custom_schema_name_resolver(schema: type[Schema], **kwargs: str | bool) -> str:
+    """Custom schema name resolver for OpenAPI spec.
+
+    Filters out partial, only, and exclude schemas to keep the
+    OpenAPI spec clean and avoid duplicate schema definitions.
+
+    Args:
+        schema: Marshmallow schema class to resolve name for
+        **kwargs: Additional keyword arguments
+
+    Returns:
+        Empty string for partial/filtered schemas, default name otherwise
+    """
     # print(schema.__class__.__name__, getattr(schema, 'exclude', False))
     if getattr(schema, "partial", False):
         return ""

@@ -1,32 +1,60 @@
-"""CRUD Blueprint for automatic RESTful API generation with Flask-Smorest."""
+"""CRUD Blueprint for automatic RESTful API generation with Flask-Smorest.
+
+This module provides a Blueprint subclass that automatically generates
+RESTful CRUD (Create, Read, Update, Delete) endpoints for SQLAlchemy models
+with Marshmallow schemas.
+"""
 
 from http import HTTPStatus
 from importlib import import_module
-from typing import Any
+from typing import Callable, TYPE_CHECKING
 
 from flask.views import MethodView
 from marshmallow_sqlalchemy.load_instance_mixin import LoadInstanceMixin
-from marshmallow import RAISE
+from marshmallow import RAISE, Schema
 from flask_smorest import Blueprint
 
 from .query_filtering import generate_filter_schema, get_statements_from_filters
 from ..utils import convert_snake_to_camel
 
+if TYPE_CHECKING:
+    from ..sqla.base_model import BaseModel
+
 
 class CRUDBlueprint(Blueprint):
     """Blueprint subclass that automatically registers CRUD routes.
 
-    This class extends EnhancedBlueprint to provide automatic CRUD
+    This class extends Flask-Smorest Blueprint to provide automatic CRUD
     (Create, Read, Update, Delete) operations for SQLAlchemy models.
     It automatically generates RESTful endpoints based on the provided
     model and schema configuration.
+
+    Args:
+        name: Blueprint name (first positional arg)
+        import_name: Import name (second positional arg)
+        model: Model class name (default: derived from name)
+        schema: Schema class name (default: ModelName + "Schema")
+        res_id: Name of the ID field on the model (default: "id")
+        res_id_param: Name of the URL parameter for the ID (default: "{name}_id")
+        skip_methods: List of methods to skip (default: [])
+        methods: List or dict of HTTP methods to generate (default: all CRUD methods)
+        model_import_name: Module path to import model from
+        schema_import_name: Module path to import schema from
+        **kwargs: Additional Blueprint arguments
+
+    Example:
+        >>> blueprint = CRUDBlueprint(
+        ...     'users', __name__,
+        ...     model='User',
+        ...     schema='UserSchema'
+        ... )
     """
 
-    def __init__(self, *pargs: str, **kwargs: Any) -> None:
+    def __init__(self, *pargs: str, **kwargs: str | list[str] | dict[str, dict[str, Schema | str | bool]]) -> None:
         """Initialize CRUD blueprint with model and schema configuration.
 
         Args:
-            *pargs: Positional arguments (name, import_name)
+            *pargs: Positional arguments (name, import_name, etc.)
             **kwargs: Keyword arguments including model, schema, and CRUD configuration
         """
 
@@ -55,11 +83,11 @@ class CRUDBlueprint(Blueprint):
         res_id_name: str = kwargs.pop("res_id", "id")
         res_id_param_name: str = kwargs.pop("res_id_param", f"{name.lower()}_id")
         skip_methods: list[str] = kwargs.pop("skip_methods", [])
-        methods_raw: list[str] | dict[str, dict[str, Any]] = kwargs.pop(
+        methods_raw: list[str] | dict[str, dict[str, Schema | str | bool]] = kwargs.pop(
             "methods", ["INDEX", "GET", "POST", "PATCH", "DELETE"]
         )
         if isinstance(methods_raw, list):
-            methods: dict[str, dict[str, Any]] = {m: {} for m in methods_raw}
+            methods: dict[str, dict[str, Schema | str | bool]] = {m: {} for m in methods_raw}
         else:
             methods = methods_raw
         for m in skip_methods:
@@ -82,7 +110,7 @@ class CRUDBlueprint(Blueprint):
 
         if update_schema_name := methods.get("PATCH", {}).get("arg_schema"):
             if isinstance(update_schema_name, str):
-                UpdateSchemaClsOrInst = getattr(import_module(name), update_schema_name)
+                UpdateSchemaClsOrInst: Schema | type[Schema] = getattr(import_module(name), update_schema_name)
             else:
                 UpdateSchemaClsOrInst = update_schema_name
         else:
@@ -217,6 +245,16 @@ class CRUDBlueprint(Blueprint):
 
         self.route(f"<{id_type}:{res_id_param_name}>")(GenericCRUD)
 
-    def admin_endpoint(self, func: Any) -> Any:
-        """Mark an endpoint function as admin only."""
+    def admin_endpoint(self, func: Callable[..., Callable]) -> Callable[..., Callable]:
+        """Mark an endpoint function as admin only.
+
+        Args:
+            func: The endpoint function to mark as admin-only
+
+        Returns:
+            The original function (this method should be overridden)
+
+        Raises:
+            NotImplementedError: This method requires BlueprintAccessMixin
+        """
         raise NotImplementedError("is_admin requires using BlueprintAccessMixin.")

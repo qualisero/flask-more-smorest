@@ -5,26 +5,32 @@ It handles the creation of migration environments and provides helpers
 for managing database schema changes.
 """
 
+from typing import TYPE_CHECKING
 from pathlib import Path
 from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
-from flask import Flask, current_app
+
+if TYPE_CHECKING:
+    from flask import Flask
 
 
-def init_migrations(app: Flask, directory: str = "migrations") -> None:
+def init_migrations(app: "Flask", directory: str = "migrations") -> None:
     """Initialize Alembic migration environment for the application.
+
+    Creates the migrations directory structure and configuration files
+    needed for Alembic database migrations.
 
     Args:
         app: Flask application instance
         directory: Directory name for migration files (default: 'migrations')
 
     Example:
-        from flask import Flask
-        from flask_more_smorest.migrations import init_migrations
-
-        app = Flask(__name__)
-        init_migrations(app)
+        >>> from flask import Flask
+        >>> from flask_more_smorest.sqla import init_migrations
+        >>>
+        >>> app = Flask(__name__)
+        >>> init_migrations(app)
     """
     migrations_path = Path(directory)
 
@@ -40,13 +46,21 @@ def init_migrations(app: Flask, directory: str = "migrations") -> None:
 def create_migration(message: str, directory: str = "migrations") -> None:
     """Create a new migration file.
 
+    Automatically detects changes in the database models and generates
+    a migration script.
+
     Args:
         message: Description of the migration
-        directory: Directory containing migration files
+        directory: Directory containing migration files (default: 'migrations')
+
+    Raises:
+        RuntimeError: If migrations directory doesn't exist
 
     Example:
-        create_migration("Add user profile fields")
+        >>> create_migration("Add user profile fields")
     """
+    from flask import current_app
+
     migrations_path = Path(directory)
     if not migrations_path.exists():
         raise RuntimeError(f"Migration directory {directory} does not exist. Run init_migrations() first.")
@@ -58,14 +72,18 @@ def create_migration(message: str, directory: str = "migrations") -> None:
 def upgrade_database(revision: str = "head", directory: str = "migrations") -> None:
     """Upgrade database to specified revision.
 
+    Applies database migrations up to the specified revision.
+
     Args:
         revision: Target revision (default: 'head' for latest)
-        directory: Directory containing migration files
+        directory: Directory containing migration files (default: 'migrations')
 
     Example:
-        upgrade_database()  # Upgrade to latest
-        upgrade_database("ae1027a6acf")  # Upgrade to specific revision
+        >>> upgrade_database()  # Upgrade to latest
+        >>> upgrade_database("ae1027a6acf")  # Upgrade to specific revision
     """
+    from flask import current_app
+
     migrations_path = Path(directory)
     alembic_cfg = _get_alembic_config(current_app, str(migrations_path))
     command.upgrade(alembic_cfg, revision)
@@ -74,14 +92,18 @@ def upgrade_database(revision: str = "head", directory: str = "migrations") -> N
 def downgrade_database(revision: str, directory: str = "migrations") -> None:
     """Downgrade database to specified revision.
 
+    Reverts database migrations to the specified revision.
+
     Args:
         revision: Target revision to downgrade to
-        directory: Directory containing migration files
+        directory: Directory containing migration files (default: 'migrations')
 
     Example:
-        downgrade_database("-1")  # Downgrade one revision
-        downgrade_database("ae1027a6acf")  # Downgrade to specific revision
+        >>> downgrade_database("-1")  # Downgrade one revision
+        >>> downgrade_database("ae1027a6acf")  # Downgrade to specific revision
     """
+    from flask import current_app
+
     migrations_path = Path(directory)
     alembic_cfg = _get_alembic_config(current_app, str(migrations_path))
     command.downgrade(alembic_cfg, revision)
@@ -91,19 +113,29 @@ def get_migration_history(directory: str = "migrations") -> list[str]:
     """Get list of migration revisions.
 
     Args:
-        directory: Directory containing migration files
+        directory: Directory containing migration files (default: 'migrations')
 
     Returns:
-        List of revision IDs
+        List of revision IDs in the migration history
     """
+    from flask import current_app
+
     migrations_path = Path(directory)
     alembic_cfg = _get_alembic_config(current_app, str(migrations_path))
     script_dir = ScriptDirectory.from_config(alembic_cfg)
     return [rev.revision for rev in script_dir.walk_revisions()]
 
 
-def _get_alembic_config(app: Flask, migrations_dir: str) -> Config:
-    """Get Alembic configuration for the application."""
+def _get_alembic_config(app: "Flask", migrations_dir: str) -> Config:
+    """Get Alembic configuration for the application.
+
+    Args:
+        app: Flask application instance
+        migrations_dir: Path to migrations directory
+
+    Returns:
+        Configured Alembic Config instance
+    """
     alembic_cfg = Config()
 
     # Set the script location
@@ -119,7 +151,11 @@ def _get_alembic_config(app: Flask, migrations_dir: str) -> Config:
 
 
 def _update_env_py(env_path: Path) -> None:
-    """Update the generated env.py to work with our application."""
+    """Update the generated env.py to work with our application.
+
+    Args:
+        env_path: Path to the env.py file to update
+    """
 
     env_content = '''"""Alembic environment for flask-more-smorest."""
 
@@ -132,7 +168,7 @@ from alembic import context
 
 # Import your application and models here
 from flask import current_app
-from flask_more_smorest.database import db
+from flask_more_smorest.sqla import db
 
 # this is the Alembic Config object
 config = context.config

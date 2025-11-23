@@ -1,22 +1,45 @@
-"""Query filtering utilities for Flask-Smorest CRUD operations."""
+"""Query filtering utilities for Flask-Smorest CRUD operations.
 
-from typing import Any, TYPE_CHECKING
+This module provides utilities for generating filter schemas and converting
+filter parameters into SQLAlchemy query statements. It supports:
+- Range queries for date/datetime fields (field__from, field__to)
+- Min/max queries for numeric fields (field__min, field__max)
+- Enum list filters (field__in)
+"""
+
+from typing import TYPE_CHECKING
 import marshmallow as ma
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import ColumnElement
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import DeclarativeBase
 
 
 def generate_filter_schema(base_schema: type[ma.Schema]) -> type[ma.Schema]:
     """Generate a filtering schema from a base schema.
 
     This function creates a new schema class that can be used for filtering
-    queries. Date/DateTime fields are converted to range filters with
-    __from and __to suffixes.
+    queries. It automatically converts certain field types to filter-friendly
+    variants:
+    - Date/DateTime fields become range filters with __from and __to suffixes
+    - Numeric fields get __min and __max filters (equality removed for floats)
+    - Enum fields get __in list filters
 
     Args:
-        base_schema: The base Marshmallow schema class
+        base_schema: The base Marshmallow schema class to derive filters from
 
     Returns:
-        A new schema class suitable for filtering operations
+        A new schema class suitable for filtering operations with all fields
+        made optional and set to load_only
+
+    Example:
+        >>> class UserSchema(Schema):
+        ...     name = fields.String()
+        ...     age = fields.Integer()
+        ...     created_at = fields.DateTime()
+        >>> FilterSchema = generate_filter_schema(UserSchema)
+        >>> # FilterSchema will have: name, age, age__min, age__max,
+        >>> # created_at__from, created_at__to
     """
 
     temp_instance = base_schema()
@@ -88,21 +111,30 @@ def generate_filter_schema(base_schema: type[ma.Schema]) -> type[ma.Schema]:
     return FilterSchema
 
 
-def get_statements_from_filters(kwargs: dict[str, Any], model: type[DeclarativeBase]) -> set[Any]:
+def get_statements_from_filters(
+    kwargs: dict[str, str | int | float | bool | None], model: type["DeclarativeBase"]
+) -> set[ColumnElement[bool]]:
     """Convert query kwargs into SQLAlchemy filters based on the schema.
 
     This function processes filtering parameters and converts them to
-    SQLAlchemy WHERE clause conditions, supporting range queries for
-    date fields and comparison operators.
+    SQLAlchemy WHERE clause conditions, supporting:
+    - Range queries: field__from (>=) and field__to (<=)
+    - Numeric ranges: field__min (>=) and field__max (<=)
+    - Exact equality: field = value
 
     Args:
-        kwargs: dictionary of filter parameters
-        model: SQLAlchemy model class
+        kwargs: Dictionary of filter parameters from the query string
+        model: SQLAlchemy model class to filter on
 
     Returns:
-        set of SQLAlchemy filter conditions
+        Set of SQLAlchemy filter conditions (BinaryExpression objects)
+
+    Example:
+        >>> filters = {'age__min': 18, 'age__max': 65, 'is_active': True}
+        >>> stmts = get_statements_from_filters(filters, User)
+        >>> results = User.query.filter(*stmts).all()
     """
-    filters: set[Any] = set()
+    filters: set[ColumnElement[bool]] = set()
 
     for field_name, value in kwargs.items():
         if value is None:

@@ -1,17 +1,36 @@
-"""Enhanced Blueprint with additional decorators and functionality."""
+"""Enhanced Blueprint with additional decorators and functionality.
 
-from typing import Callable, Any
+This module provides BlueprintOperationIdMixin that extends Flask-Smorest's
+Blueprint to automatically generate OpenAPI operationId values for endpoints.
+"""
+
+from typing import Callable, TYPE_CHECKING
 from flask_smorest import Blueprint
 
 from .utils import convert_snake_to_camel
 
+if TYPE_CHECKING:
+    from flask.views import MethodView
+
 
 class BlueprintOperationIdMixin(Blueprint):
-    """This class extends Flask-Smorest's Blueprint to support
-    automatic operationId generation.
+    """Blueprint mixin that provides automatic operationId generation.
+
+    This mixin extends Flask-Smorest's Blueprint to automatically generate
+    OpenAPI operationId values for routes based on the route pattern and
+    HTTP method. This provides consistent naming for API operations.
+
+    Example:
+        >>> class MyBlueprint(BlueprintOperationIdMixin):
+        ...     pass
+        >>> bp = MyBlueprint('users', __name__)
+        >>> @bp.route('/')
+        >>> class UserList(MethodView):
+        ...     def get(self):  # operationId: listUser
+        ...         pass
     """
 
-    def route(self, rule: str, *pargs: Any, **kwargs: Any) -> Callable[..., Any]:
+    def route(self, rule: str, *pargs: str, **kwargs: bool | str) -> Callable[[type["MethodView"] | Callable], type["MethodView"] | Callable]:
         """Override route to add automatic operationId.
 
         Args:
@@ -20,15 +39,31 @@ class BlueprintOperationIdMixin(Blueprint):
             **kwargs: Additional keyword arguments
 
         Returns:
-            Decorated route function
+            Decorated route function or MethodView class
         """
-        wrapped = super().route(rule, *pargs, **kwargs)
+        wrapped: Callable[[type["MethodView"] | Callable], type["MethodView"] | Callable] = super().route(rule, *pargs, **kwargs)
 
-        OPERATION_NAME_MAP = {"patch": "update", "delete": "delete", "get": "get", "post": "create", "put": "replace"}
+        OPERATION_NAME_MAP: dict[str, str] = {
+            "patch": "update",
+            "delete": "delete",
+            "get": "get",
+            "post": "create",
+            "put": "replace",
+        }
 
-        def _add_operation_id(func: Callable[..., Any], method_view_class: type | None = None) -> Callable[..., Any]:
-            """Add operationId to the function if not already set."""
-            apidoc = getattr(func, "_apidoc", {})
+        def _add_operation_id(
+            func: Callable, method_view_class: type["MethodView"] | None = None
+        ) -> Callable:
+            """Add operationId to the function if not already set.
+
+            Args:
+                func: The endpoint function to add operationId to
+                method_view_class: The MethodView class if applicable
+
+            Returns:
+                The function with operationId added
+            """
+            apidoc: dict[str, dict[str, str]] = getattr(func, "_apidoc", {})
             if "manual_doc" in apidoc and "operationId" in apidoc["manual_doc"]:
                 return func
             if method_view_class is None:
@@ -43,11 +78,18 @@ class BlueprintOperationIdMixin(Blueprint):
             operation_id = operation_id[0].lower() + operation_id[1:]
             return self.doc(operationId=operation_id)(func)
 
-        def _route(class_or_func: Any) -> Any:
-            """Add operationId to the route's methods."""
+        def _route(class_or_func: type["MethodView"] | Callable) -> type["MethodView"] | Callable:
+            """Add operationId to the route's methods.
+
+            Args:
+                class_or_func: The MethodView class or function to decorate
+
+            Returns:
+                The decorated class or function
+            """
             if hasattr((class_or_func), "methods"):
                 for method in class_or_func.methods:
-                    method_fn = getattr(class_or_func, method.lower(), None)
+                    method_fn: Callable | None = getattr(class_or_func, method.lower(), None)
                     if not method_fn:
                         continue
                     method_fn = _add_operation_id(method_fn, class_or_func)

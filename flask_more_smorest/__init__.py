@@ -5,35 +5,71 @@ enhanced blueprints with annotations, advanced query filtering capabilities, and
 extensible user management with custom model support.
 
 Example:
-    from flask import Flask
-    from flask_more_smorest import CRUDBlueprint, BaseModel
-    from flask_more_smorest.database import db
-
-    app = Flask(__name__)
-    db.init_app(app)
-
-    # Create a CRUD blueprint for User model
-    user_blueprint = CRUDBlueprint(
-        'users', __name__,
-        model='User',
-        schema='UserSchema'
-    )
-
-    app.register_blueprint(user_blueprint)
+    >>> from flask import Flask
+    >>> from flask_more_smorest import CRUDBlueprint, BaseModel, db, init_db
+    >>>
+    >>> app = Flask(__name__)
+    >>> app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
+    >>> init_db(app)
+    >>>
+    >>> # Create a CRUD blueprint for User model
+    >>> user_blueprint = CRUDBlueprint(
+    ...     'users', __name__,
+    ...     model='User',
+    ...     schema='UserSchema'
+    ... )
+    >>>
+    >>> app.register_blueprint(user_blueprint)
 
 Custom User Model Example:
-    from flask_more_smorest import User
-
-    class CustomUser(User):
-        # Add custom fields
-        first_name: Mapped[str] = mapped_column(db.String(50))
-        organization_id: Mapped[uuid.UUID] = mapped_column(db.ForeignKey('organization.id'))
-
-        # Override methods if needed
-        def _can_write(self) -> bool:
-            # Custom logic: only verified users can write
-            return self.email_verified and super()._can_write()
+    >>> from flask_more_smorest import User
+    >>> from sqlalchemy.orm import Mapped, mapped_column
+    >>> import sqlalchemy as sa
+    >>> import uuid
+    >>>
+    >>> class CustomUser(User):
+    ...     # Add custom fields
+    ...     first_name: Mapped[str] = mapped_column(sa.String(50))
+    ...     organization_id: Mapped[uuid.UUID] = mapped_column(
+    ...         sa.ForeignKey('organization.id')
+    ...     )
+    ...
+    ...     # Override methods if needed
+    ...     def _can_write(self) -> bool:
+    ...         # Custom logic: only verified users can write
+    ...         return self.email_verified and super()._can_write()
 """
+
+# Import core blueprints
+from .perms import CRUDBlueprint
+from .blueprint_operationid import BlueprintOperationIdMixin
+from .perms.perms_blueprint import PermsBlueprintMixin as BlueprintAccessMixin
+
+# Import database and models
+from .sqla import BaseModel, db, init_db
+from .sqla.base_model import BaseSchema
+
+# Import user models and authentication
+from .perms.user_models import (
+    User,
+    UserRole,
+    UserSetting,
+    Domain,
+    Token,
+    DefaultUserRole,
+    current_user as get_current_user,
+    get_current_user_id,
+)
+
+# Import user model mixins
+from .perms.model_mixins import TimestampMixin, ProfileMixin, SoftDeleteMixin
+
+# Import migration system
+from .sqla import init_migrations, create_migration, upgrade_database, downgrade_database
+
+# Import utilities
+from .crud.query_filtering import generate_filter_schema, get_statements_from_filters
+from .utils import convert_snake_to_camel
 
 __version__ = "0.1.0"
 __author__ = "Dave <david@qualisero.com>"
