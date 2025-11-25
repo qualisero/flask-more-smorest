@@ -1,7 +1,7 @@
 """Tests for query filtering functionality."""
 
 import pytest
-from datetime import datetime, date
+from datetime import datetime
 from marshmallow import fields, Schema
 from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy.orm import DeclarativeBase
@@ -24,6 +24,7 @@ class QueryTestModel(Base):
     created_at = Column(DateTime)
     is_active = Column(Boolean)
     age = Column(Integer)
+    # TODO: add enum field
 
 
 class QueryTestSchema(Schema):

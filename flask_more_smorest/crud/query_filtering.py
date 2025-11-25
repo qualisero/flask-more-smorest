@@ -7,7 +7,8 @@ filter parameters into SQLAlchemy query statements. It supports:
 - Enum list filters (field__in)
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Mapping
+import datetime as dt
 
 import marshmallow as ma
 from sqlalchemy import ColumnElement
@@ -116,9 +117,7 @@ def generate_filter_schema(base_schema: type[ma.Schema] | ma.Schema) -> type[ma.
     return FilterSchema
 
 
-def get_statements_from_filters(
-    kwargs: dict[str, str | int | float | bool | None], model: type["DeclarativeBase"]
-) -> set[ColumnElement[bool]]:
+def get_statements_from_filters(kwargs: Mapping, model: type["DeclarativeBase"]) -> set[ColumnElement[bool]]:
     """Convert query kwargs into SQLAlchemy filters based on the schema.
 
     This function processes filtering parameters and converts them to

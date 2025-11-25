@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from flask_more_smorest import User, UserRole, DefaultUserRole
-from flask_more_smorest.database import db
+from flask_more_smorest import db
 
 
 class TestUserCustomization:
@@ -136,7 +136,7 @@ class TestUserCustomization:
 
             def _can_write(self) -> bool:
                 """Override: only verified users can write."""
-                return self.verified and super()._can_write()
+                return bool(self.verified) and super()._can_write()
 
             def verify_user(self):
                 """Custom verification logic."""
@@ -168,7 +168,7 @@ class TestUserCustomization:
 
         suffix = str(int(time.time() * 1000) % 100000)
 
-        from flask_more_smorest.user.models import ProfileMixin, SoftDeleteMixin
+        from flask_more_smorest import ProfileMixin, SoftDeleteMixin
 
         class FullFeaturedUser(User, ProfileMixin, SoftDeleteMixin):
             __tablename__ = f"full_featured_users_{suffix}"
@@ -362,6 +362,7 @@ class TestRealWorldScenarios:
 
             api_key: Mapped[str | None] = mapped_column(db.String(128), unique=True, nullable=True)
             last_api_call: Mapped[datetime | None] = mapped_column(db.DateTime, nullable=True)
+            rate_limit: Mapped[int | None] = mapped_column(db.Integer, default=1000, nullable=True)
 
             def __init__(self, **kwargs):
                 """Initialize with custom fields."""
