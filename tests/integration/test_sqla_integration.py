@@ -3,8 +3,6 @@
 This module tests the BaseModel, database initialization, and migration utilities.
 """
 
-from typing import TYPE_CHECKING
-
 import pytest
 import uuid
 from datetime import datetime
