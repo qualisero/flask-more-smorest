@@ -208,7 +208,9 @@ class CRUDBlueprint(Blueprint):
             # Explicit patch schema provided
             if isinstance(update_schema_name, str):
                 return getattr(schema_module, update_schema_name)
-            elif isinstance(update_schema_name, type(Schema)) or isinstance(update_schema_name, Schema):
+            elif (isinstance(update_schema_name, type) and issubclass(update_schema_name, Schema)) or isinstance(
+                update_schema_name, Schema
+            ):
                 return update_schema_name
             else:
                 raise TypeError("PATCH 'arg_schema' must be a string or Schema class/instance.")
@@ -240,9 +242,8 @@ class CRUDBlueprint(Blueprint):
         if "INDEX" in config.methods or "POST" in config.methods:
             if "INDEX" in config.methods:
                 index_schema_class = config.methods["INDEX"].get("schema", schema_cls)
-                assert isinstance(
-                    index_schema_class, type(Schema)
-                ), f"Expected Schema class for INDEX['schema'], got {type(index_schema_class)}"
+                if not isinstance(index_schema_class, type(Schema)):
+                    raise TypeError(f"Expected Schema class for INDEX['schema'], got {type(index_schema_class)}")
                 query_filter_schema = generate_filter_schema(base_schema=index_schema_class)
 
             class GenericIndex(MethodView):
@@ -366,6 +367,5 @@ def check_schema_or_schema_instance(obj: object) -> None:
 
     Returns:
     """
-    assert isinstance(obj, type(Schema)) or isinstance(
-        obj, Schema
-    ), f"Expected Schema class or instance, got {type(obj)}"
+    if not ((isinstance(obj, type) and issubclass(obj, Schema)) or isinstance(obj, Schema)):
+        raise TypeError(f"Expected Schema class or instance, got {type(obj)}")

@@ -7,7 +7,7 @@ permission checking functionality based on the current user context.
 import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Iterable
 
 from flask import has_request_context
 from flask_jwt_extended import exceptions, verify_jwt_in_request
@@ -50,7 +50,7 @@ class BasePermsModel(SQLABaseModel):
             **kwargs: Field values to initialize the model with
         """
 
-        self.check_create(list(kwargs.values()))
+        self.check_create(kwargs.values())
         super().__init__(**kwargs)
 
     @classmethod
@@ -195,7 +195,7 @@ class BasePermsModel(SQLABaseModel):
 
         return False
 
-    def check_create(self, val: list) -> None:
+    def check_create(self, val: Iterable) -> None:
         """Recursively check that all BaseModel instances can be created.
 
         Args:

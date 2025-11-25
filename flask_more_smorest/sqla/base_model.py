@@ -226,12 +226,12 @@ class BaseModel(db.Model, Base, metaclass=BaseModelMeta):
         Raises:
             TypeError: If value is not a valid UUID string or UUID object
         """
-        if type(value) is str:
+        if isinstance(value, str):
             try:
                 return uuid.UUID(value)
             except ValueError:
                 raise TypeError(f"ID must be a valid UUID string, not {value}")
-        if type(value) is not uuid.UUID:
+        if not isinstance(value, uuid.UUID):
             raise TypeError(f"ID must be a string or UUID, not {type(value)}")
         return value
 

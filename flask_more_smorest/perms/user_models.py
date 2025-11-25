@@ -220,7 +220,8 @@ class User(BasePermsModel):
         password = kwargs.pop("password", None)
         super().__init__(**kwargs)
         if password:
-            assert isinstance(password, str)
+            if not isinstance(password, str):
+                raise TypeError("Password must be a string")
             self.set_password(password)
 
     def set_password(self, password: str) -> None:
@@ -402,7 +403,7 @@ class UserRole(BasePermsModel):
             value: Role value (enum or string)
         """
         # Normalize role to string for comparison
-        self._role = value.value if hasattr(value, "value") else str(value)  # type: ignore
+        self._role = value.value if isinstance(value, enum.Enum) else str(value)
 
     def __init__(
         self,
@@ -422,7 +423,8 @@ class UserRole(BasePermsModel):
         # Force explicit use of '*' to set domain_id to None:
         elif domain_id == "*":
             domain_id = None
-        assert not isinstance(domain_id, str), "Expected domain_id to be UUID, None or '*'"
+        if isinstance(domain_id, str):
+            raise TypeError("Expected domain_id to be UUID, None or '*'")
 
         # Handle role parameter
         if role is not None:

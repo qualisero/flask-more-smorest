@@ -7,11 +7,9 @@ Blueprint to automatically generate OpenAPI operationId values for endpoints.
 from typing import TYPE_CHECKING, Callable
 
 from flask_smorest import Blueprint
+from flask.views import MethodView
 
 from .utils import convert_snake_to_camel
-
-if TYPE_CHECKING:
-    from flask.views import MethodView
 
 
 class BlueprintOperationIdMixin(Blueprint):
