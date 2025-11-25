@@ -5,6 +5,8 @@ endpoints as public or admin-only.
 """
 
 from collections.abc import Callable
+from flask.views import MethodView
+from marshmallow import Schema
 
 
 class PermsBlueprintMixin:
@@ -24,6 +26,26 @@ class PermsBlueprintMixin:
         >>> def list_items():
         ...     return []
     """
+
+    def _configure_endpoint(
+        self,
+        view_cls: type[MethodView],
+        method_name: str,
+        docstring: str,
+        method_config: dict[str, Schema | str | bool],
+    ) -> None:
+        """Configure endpoint admin decorator if needed.
+
+        Args:
+            view_cls: MethodView class containing the endpoint
+            method_name: Name of the method to configure
+            docstring: Docstring to set on the method
+            method_config: Configuration dict for the method
+        """
+        # TODO: test that method from both CRUDBlueprint and PermsBlueprintMixin are called
+        if hasattr(view_cls, method_name) and method_config.get("is_admin", False):
+            method = getattr(view_cls, method_name)
+            self.admin_endpoint(method)
 
     def public_endpoint(self, function: Callable) -> Callable:
         """Decorator to mark an endpoint as public.

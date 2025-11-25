@@ -90,8 +90,8 @@ class BlueprintOperationIdMixin(Blueprint):
             Returns:
                 The decorated class or function
             """
-            if hasattr((class_or_func), "methods"):
-                for method in class_or_func.methods:
+            if isinstance(class_or_func, type) and issubclass(class_or_func, MethodView):
+                for method in class_or_func.methods or []:
                     method_fn: Callable | None = getattr(class_or_func, method.lower(), None)
                     if not method_fn:
                         continue

@@ -7,12 +7,13 @@ with Marshmallow schemas.
 
 from http import HTTPStatus
 from importlib import import_module
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from flask.views import MethodView
 from flask_smorest import Blueprint
 from marshmallow import RAISE, Schema
-from marshmallow_sqlalchemy.load_instance_mixin import LoadInstanceMixin
+
+# from marshmallow_sqlalchemy.load_instance_mixin import LoadInstanceMixin
 
 from ..utils import convert_snake_to_camel
 from .query_filtering import generate_filter_schema, get_statements_from_filters
@@ -39,6 +40,7 @@ class CRUDConfig:
     def __init__(
         self,
         name: str,
+        url_prefix: str,
         import_name: str,
         model_name: str,
         schema_name: str,
@@ -49,6 +51,7 @@ class CRUDConfig:
         schema_import_name: str,
     ):
         self.name = name
+        self.url_prefix = url_prefix
         self.import_name = import_name
         self.model_name = model_name
         self.schema_name = schema_name
@@ -88,7 +91,7 @@ class CRUDBlueprint(Blueprint):
         ... )
     """
 
-    def __init__(self, *pargs: str, **kwargs: str | list[str] | dict[str, dict[str, Schema | str | bool]]) -> None:
+    def __init__(self, *pargs: str, **kwargs: list[str] | dict[str, dict[str, Schema | str | bool]]) -> None:
         """Initialize CRUD blueprint with model and schema configuration.
 
         Args:
@@ -104,7 +107,7 @@ class CRUDBlueprint(Blueprint):
         self._register_crud_routes(config, model_cls, schema_cls, update_schema)
 
     def _parse_config(
-        self, pargs: tuple[str, ...], kwargs: dict[str, str | list[str] | dict[str, dict[str, Schema | str | bool]]]
+        self, pargs: tuple[str, ...], kwargs: dict[str, list[str] | dict[str, dict[str, Schema | str | bool]]]
     ) -> CRUDConfig:
         """Parse and validate configuration from args and kwargs.
 
@@ -118,21 +121,22 @@ class CRUDBlueprint(Blueprint):
         if len(pargs) > 0:
             name: str = pargs[0]
         else:
-            name = kwargs.pop("name")
+            if "name" not in kwargs:
+                raise ValueError("CRUDBlueprint requires a 'name' argument.")
+            name = str(kwargs.pop("name"))
 
         if len(pargs) > 1:
             import_name: str = pargs[1]
         else:
-            import_name = kwargs.pop("import_name", __name__)
+            import_name = str(kwargs.pop("import_name", __name__))
 
-        if "url_prefix" not in kwargs:
-            kwargs["url_prefix"] = f"/{name}/"
+        url_prefix: str = str(kwargs.get("url_prefix", f"/{name}/"))
 
-        model_name: str = kwargs.pop("model", convert_snake_to_camel(name.capitalize()))
-        schema_name: str = kwargs.pop("schema", model_name + "Schema")
-        res_id_name: str = kwargs.pop("res_id", "id")
-        res_id_param_name: str = kwargs.pop("res_id_param", f"{name.lower()}_id")
-        skip_methods: list[str] = kwargs.pop("skip_methods", [])
+        model_name: str = str(kwargs.pop("model", convert_snake_to_camel(name.capitalize())))
+        schema_name: str = str(kwargs.pop("schema", model_name + "Schema"))
+        res_id_name: str = str(kwargs.pop("res_id", "id"))
+        res_id_param_name: str = str(kwargs.pop("res_id_param", f"{name.lower()}_id"))
+        skip_methods: list[str] = list(kwargs.pop("skip_methods", []))
         methods_raw: list[str] | dict[str, dict[str, Schema | str | bool]] = kwargs.pop(
             "methods", ["INDEX", "GET", "POST", "PATCH", "DELETE"]
         )
@@ -145,11 +149,16 @@ class CRUDBlueprint(Blueprint):
         for m in skip_methods:
             del methods[m]
 
-        model_import_name = kwargs.pop("model_import_name", ".".join(import_name.split(".")[:-1] + ["models"]))
-        schema_import_name = kwargs.pop("schema_import_name", ".".join(import_name.split(".")[:-1] + ["schemas"]))
+        model_import_name: str = str(
+            kwargs.pop("model_import_name", ".".join(import_name.split(".")[:-1] + ["models"]))
+        )
+        schema_import_name: str = str(
+            kwargs.pop("schema_import_name", ".".join(import_name.split(".")[:-1] + ["schemas"]))
+        )
 
         return CRUDConfig(
             name=name,
+            url_prefix=url_prefix,
             import_name=import_name,
             model_name=model_name,
             schema_name=schema_name,
@@ -178,6 +187,7 @@ class CRUDBlueprint(Blueprint):
             if hasattr(schema_module, config.schema_name):
                 schema_cls = getattr(schema_module, config.schema_name)
         except ImportError:
+            # TODO: Log warning about missing schema module (and provide explicit way to rely on auto loading)
             pass
 
         return model_cls, schema_cls
@@ -192,16 +202,21 @@ class CRUDBlueprint(Blueprint):
         Returns:
             Update schema instance or class
         """
+        schema_module = import_module(config.schema_import_name)
+
         if update_schema_name := config.methods.get("PATCH", {}).get("arg_schema"):
+            # Explicit patch schema provided
             if isinstance(update_schema_name, str):
-                return getattr(import_module(config.name), update_schema_name)
-            else:
+                return getattr(schema_module, update_schema_name)
+            elif isinstance(update_schema_name, type(Schema)) or isinstance(update_schema_name, Schema):
                 return update_schema_name
-        else:
-            if issubclass(schema_cls, LoadInstanceMixin.Schema):
-                return schema_cls(partial=True, load_instance=False)
             else:
-                return schema_cls(partial=True)
+                raise TypeError("PATCH 'arg_schema' must be a string or Schema class/instance.")
+
+        update_schema = schema_cls(partial=True)
+        if hasattr(update_schema, "_load_instance"):
+            update_schema._load_instance = False  # type: ignore[attr-defined]
+        return update_schema
 
     def _register_crud_routes(
         self,
@@ -225,6 +240,9 @@ class CRUDBlueprint(Blueprint):
         if "INDEX" in config.methods or "POST" in config.methods:
             if "INDEX" in config.methods:
                 index_schema_class = config.methods["INDEX"].get("schema", schema_cls)
+                assert isinstance(
+                    index_schema_class, type(Schema)
+                ), f"Expected Schema class for INDEX['schema'], got {type(index_schema_class)}"
                 query_filter_schema = generate_filter_schema(base_schema=index_schema_class)
 
             class GenericIndex(MethodView):
@@ -233,7 +251,7 @@ class CRUDBlueprint(Blueprint):
                 if "INDEX" in config.methods:
 
                     @self.arguments(query_filter_schema, location="query", unknown=RAISE)
-                    @self.response(HTTPStatus.OK, config.methods["INDEX"].get("schema", schema_cls)(many=True))
+                    @self.response(HTTPStatus.OK, index_schema_class(many=True))
                     @self.doc(operationId=f"list{config.model_name}")
                     def get(_self, filters):
                         """Fetch all resources."""
@@ -338,19 +356,16 @@ class CRUDBlueprint(Blueprint):
         if hasattr(view_cls, method_name):
             method = getattr(view_cls, method_name)
             method.__doc__ = docstring
-            if method_config.get("is_admin", False):
-                self.admin_endpoint(method)
 
-    def admin_endpoint(self, func: Callable[..., Callable]) -> Callable[..., Callable]:
-        """Mark an endpoint function as admin only.
 
-        Args:
-            func: The endpoint function to mark as admin-only
+def check_schema_or_schema_instance(obj: object) -> None:
+    """Test if the object is a Schema class or instance and raises TypeError if not.
 
-        Returns:
-            The original function (this method should be overridden)
+    Args:
+        obj: Object to test
 
-        Raises:
-            NotImplementedError: This method requires BlueprintAccessMixin
-        """
-        raise NotImplementedError("is_admin requires using BlueprintAccessMixin.")
+    Returns:
+    """
+    assert isinstance(obj, type(Schema)) or isinstance(
+        obj, Schema
+    ), f"Expected Schema class or instance, got {type(obj)}"

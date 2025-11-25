@@ -83,7 +83,7 @@ class BaseModelMeta(DeclarativeMeta):
         """
 
         # Dump all relationships
-        dump_only = tuple(c.key for c in cls.__mapper__.relationships)
+        dump_only = tuple(c.key for c in getattr(cls.__mapper__, "relationships", []))
 
         schema_cls = type(
             f"{cls.__name__}SchemaBase",
@@ -186,7 +186,7 @@ class BaseModel(db.Model, Base, metaclass=BaseModelMeta):
         sort_order=11,
     )
 
-    def __init__(self, **kwargs: str | int | float | bool | bytes | None) -> None:
+    def __init__(self, **kwargs) -> None:
         """Initialize the model.
 
         Args:
@@ -251,6 +251,7 @@ class BaseModel(db.Model, Base, metaclass=BaseModelMeta):
         for key, val in fields.items():
             col = class_mapper(cls).columns[key]
             if isinstance(col.type, sa.types.Uuid) and val is not None:
+                assert isinstance(val, (str, uuid.UUID)), f"Expected str or UUID for field {key}, got {type(val)}"
                 normalized[key] = cls._to_uuid(val)
         return normalized
 
@@ -552,7 +553,7 @@ class BaseModel(db.Model, Base, metaclass=BaseModelMeta):
 
     @classmethod
     @contextmanager
-    def bypass_perms(cls_self) -> Iterator[None]:
+    def bypass_perms(cls) -> Iterator[None]:
         """No-op context manager for base class (overridden in perms model).
 
         Yields:

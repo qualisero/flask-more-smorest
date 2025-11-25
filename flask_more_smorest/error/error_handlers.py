@@ -7,6 +7,7 @@ for registering error handlers with Flask applications.
 import logging
 from typing import TYPE_CHECKING
 
+from flask import make_response
 from sqlalchemy.exc import DatabaseError
 from werkzeug.exceptions import HTTPException
 
@@ -79,7 +80,7 @@ def handle_generic_exception(e: Exception) -> "Response":
     """
     # pass through HTTP errors
     if isinstance(e, HTTPException):
-        return e.get_response()
+        return make_response(e.get_response())
 
     api_exc = ApiInternalServerError(*e.args)
     return api_exc.make_error_response()

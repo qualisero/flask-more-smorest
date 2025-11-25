@@ -85,7 +85,7 @@ class UserCanReadWriteMixin(HasUserMixin):
         return self.user_id == current_user.id
 
 
-class UserOwnedResourceMixin:
+class UserOwnedResourceMixin(HasUserMixin):
     """Mixin for resources owned by users with permission delegation.
 
     This mixin provides permission methods that delegate to the owning

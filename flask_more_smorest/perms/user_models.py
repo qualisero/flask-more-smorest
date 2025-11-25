@@ -220,6 +220,7 @@ class User(BasePermsModel):
         password = kwargs.pop("password", None)
         super().__init__(**kwargs)
         if password:
+            assert isinstance(password, str)
             self.set_password(password)
 
     def set_password(self, password: str) -> None:
@@ -282,7 +283,7 @@ class User(BasePermsModel):
             True
         """
         # Normalize role to string for comparison
-        role_str = role.value if hasattr(role, "value") else str(role)
+        role_str = role.value if hasattr(role, "value") else str(role)  # type: ignore
 
         return any(
             r.role == role_str
@@ -400,18 +401,14 @@ class UserRole(BasePermsModel):
         Args:
             value: Role value (enum or string)
         """
-        if hasattr(value, "value"):
-            # Handle enum
-            self._role = value.value
-        else:
-            # Handle string
-            self._role = str(value)
+        # Normalize role to string for comparison
+        self._role = value.value if hasattr(value, "value") else str(value)  # type: ignore
 
     def __init__(
         self,
         domain_id: uuid.UUID | str | None = None,
         role: str | enum.Enum | None = None,
-        **kwargs: str | uuid.UUID | bool | None,
+        **kwargs,
     ) -> None:
         """Initialize role with domain and role handling.
 
@@ -423,15 +420,13 @@ class UserRole(BasePermsModel):
         if domain_id is None:
             domain_id = Domain.get_default_domain_id()
         # Force explicit use of '*' to set domain_id to None:
-        if domain_id == "*":
+        elif domain_id == "*":
             domain_id = None
+        assert not isinstance(domain_id, str), "Expected domain_id to be UUID, None or '*'"
 
         # Handle role parameter
         if role is not None:
-            if hasattr(role, "value"):
-                kwargs["_role"] = role.value
-            else:
-                kwargs["_role"] = str(role)
+            kwargs["_role"] = role.value if hasattr(role, "value") else str(role)  # type: ignore
 
         super().__init__(domain_id=domain_id, **kwargs)
 

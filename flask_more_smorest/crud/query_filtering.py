@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import DeclarativeBase
 
 
-def generate_filter_schema(base_schema: type[ma.Schema]) -> type[ma.Schema]:
+def generate_filter_schema(base_schema: type[ma.Schema] | ma.Schema) -> type[ma.Schema]:
     """Generate a filtering schema from a base schema.
 
     This function creates a new schema class that can be used for filtering
@@ -43,7 +43,11 @@ def generate_filter_schema(base_schema: type[ma.Schema]) -> type[ma.Schema]:
         >>> # created_at__from, created_at__to
     """
 
-    temp_instance = base_schema()
+    if isinstance(base_schema, ma.Schema):
+        base_schema = type(base_schema)
+        temp_instance = base_schema()
+    else:
+        temp_instance = base_schema()
 
     new_declared_fields = {}
     remove_declared_fields = set()

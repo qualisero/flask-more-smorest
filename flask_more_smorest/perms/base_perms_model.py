@@ -7,7 +7,7 @@ permission checking functionality based on the current user context.
 import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from flask import has_request_context
 from flask_jwt_extended import exceptions, verify_jwt_in_request
@@ -43,19 +43,19 @@ class BasePermsModel(SQLABaseModel):
     __abstract__ = True
     perms_disabled = False
 
-    def __init__(self, **kwargs: str | int | float | bool | bytes | None) -> None:
+    def __init__(self, **kwargs) -> None:
         """Initialize the model after checking that all sub fields can be created.
 
         Args:
             **kwargs: Field values to initialize the model with
         """
 
-        self.check_create(kwargs.values())
+        self.check_create(list(kwargs.values()))
         super().__init__(**kwargs)
 
     @classmethod
     @contextmanager
-    def bypass_perms(cls_self) -> Iterator[None]:
+    def bypass_perms(cls) -> Iterator[None]:
         """Context manager to bypass permissions for the class.
 
         Temporarily disables permission checking for this model class.
@@ -67,12 +67,12 @@ class BasePermsModel(SQLABaseModel):
             >>> with Article.bypass_perms():
             ...     article.delete()  # Deletes without permission check
         """
-        original = cls_self.perms_disabled
-        cls_self.perms_disabled = True
+        original = cls.perms_disabled
+        cls.perms_disabled = True
         try:
             yield
         finally:
-            cls_self.perms_disabled = original
+            cls.perms_disabled = original
 
     def _should_bypass_perms(self) -> bool:
         """Check if permissions should be bypassed.
@@ -82,7 +82,7 @@ class BasePermsModel(SQLABaseModel):
         """
         return self.perms_disabled or not has_request_context()
 
-    def _execute_permission_check(self, check_func: callable, operation: str) -> bool:
+    def _execute_permission_check(self, check_func: Callable[[], bool], operation: str) -> bool:
         """Execute permission check with consistent error handling.
 
         Args:
@@ -100,7 +100,7 @@ class BasePermsModel(SQLABaseModel):
         except RuntimeError:
             raise UnauthorizedError("User must be authenticated")
         except Exception as e:
-            logger.debug("can_%s() exception: %s", operation, e)
+            logger.error("can_%s() exception: %s", operation, e)
             return False
 
     def can_write(self) -> bool:
@@ -195,7 +195,7 @@ class BasePermsModel(SQLABaseModel):
 
         return False
 
-    def check_create(self, val: object) -> None:
+    def check_create(self, val: list) -> None:
         """Recursively check that all BaseModel instances can be created.
 
         Args:
