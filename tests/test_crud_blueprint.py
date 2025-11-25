@@ -10,9 +10,9 @@ class TestCRUDBlueprint:
 
     def test_crud_blueprint_inheritance(self):
         """Test that CRUDBlueprint inherits from EnhancedBlueprint."""
-        from flask_more_smorest.blueprint_operationid import EnhancedBlueprint
+        from flask_more_smorest.blueprint_operationid import BlueprintOperationIdMixin
 
-        assert issubclass(CRUDBlueprint, EnhancedBlueprint)
+        assert issubclass(CRUDBlueprint, BlueprintOperationIdMixin)
 
     def test_crud_blueprint_basic_init_params(self):
         """Test parameter processing without full initialization."""
