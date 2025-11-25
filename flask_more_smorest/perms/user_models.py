@@ -14,7 +14,7 @@ This module provides a concrete User model with full functionality for:
 The User class is a concrete model that can be extended through inheritance:
 
 ```python
-from flask_more_smorest.user import User
+from flask_more_smorest.perms import User
 
 # Extend User with additional fields
 class EmployeeUser(User):
@@ -33,7 +33,7 @@ Create custom role enums and role models by inheriting from UserRole:
 
 ```python
 import enum
-from flask_more_smorest.user import UserRole
+from flask_more_smorest.perms import UserRole
 
 class EmployeeRole(str, enum.Enum):
     HR_MANAGER = "hr_manager"
@@ -59,24 +59,26 @@ All User instances (including subclasses) automatically inherit:
 - CRUD operation permissions
 """
 
-import logging
-import uuid
 import enum
+import logging
 import os
-import datetime as dt
-from typing import Any
+import uuid
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from flask_jwt_extended import current_user as jwt_current_user
+from flask_jwt_extended import exceptions, verify_jwt_in_request
 from sqlalchemy.ext.declarative import declared_attr
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from utils import check_password_hash, generate_password_hash
-from error.exceptions import UnprocessableEntity
-
-from sqla import db
+from ..error.exceptions import UnprocessableEntity
+from ..sqla import db
+from ..utils import check_password_hash, generate_password_hash
 from .base_perms_model import BasePermsModel
+from .model_mixins import UserOwnedResourceMixin
 
-from flask_jwt_extended import verify_jwt_in_request, current_user as jwt_current_user, exceptions
+if TYPE_CHECKING:
+    from collections.abc import Iterator  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +88,16 @@ current_user: "User" = jwt_current_user
 
 
 def get_current_user_id() -> uuid.UUID | None:
-    """Get current user ID if authenticated."""
+    """Get current user ID if authenticated.
+
+    Returns:
+        Current user's UUID if authenticated, None otherwise
+
+    Example:
+        >>> user_id = get_current_user_id()
+        >>> if user_id:
+        ...     print(f"User {user_id} is authenticated")
+    """
     try:
         verify_jwt_in_request()
         return current_user.id
@@ -209,6 +220,8 @@ class User(BasePermsModel):
         password = kwargs.pop("password", None)
         super().__init__(**kwargs)
         if password:
+            if not isinstance(password, str):
+                raise TypeError("Password must be a string")
             self.set_password(password)
 
     def set_password(self, password: str) -> None:
@@ -254,10 +267,24 @@ class User(BasePermsModel):
         """Check if user has superadmin privileges."""
         return self.has_role(DefaultUserRole.SUPERADMIN)
 
-    def has_role(self, role: Any, domain_name: str | None = None) -> bool:
-        """Check if user has specified role, optionally scoped to domain."""
+    def has_role(self, role: str | enum.Enum, domain_name: str | None = None) -> bool:
+        """Check if user has specified role, optionally scoped to domain.
+
+        Args:
+            role: Role to check (string or enum value)
+            domain_name: Optional domain name to scope the check
+
+        Returns:
+            True if user has the role, False otherwise
+
+        Example:
+            >>> user.has_role(DefaultUserRole.ADMIN)
+            True
+            >>> user.has_role("admin", domain_name="main")
+            True
+        """
         # Normalize role to string for comparison
-        role_str = role.value if hasattr(role, "value") else str(role)
+        role_str = role.value if hasattr(role, "value") else str(role)  # type: ignore
 
         return any(
             r.role == role_str
@@ -360,34 +387,48 @@ class UserRole(BasePermsModel):
     _role: Mapped[str] = mapped_column("role", sa.String(50), nullable=False)
 
     @property
-    def role(self) -> Any:
-        """Get role as string value."""
+    def role(self) -> str:
+        """Get role as string value.
+
+        Returns:
+            Role name as string
+        """
         return self._role
 
     @role.setter
-    def role(self, value: Any) -> None:
-        """Set role value from enum or string."""
-        if hasattr(value, "value"):
-            # Handle enum
-            self._role = value.value
-        else:
-            # Handle string
-            self._role = str(value)
+    def role(self, value: str | enum.Enum) -> None:
+        """Set role value from enum or string.
 
-    def __init__(self, domain_id: uuid.UUID | str | None = None, role: Any = None, **kwargs):
-        """Initialize role with domain and role handling."""
+        Args:
+            value: Role value (enum or string)
+        """
+        # Normalize role to string for comparison
+        self._role = value.value if isinstance(value, enum.Enum) else str(value)
+
+    def __init__(
+        self,
+        domain_id: uuid.UUID | str | None = None,
+        role: str | enum.Enum | None = None,
+        **kwargs,
+    ) -> None:
+        """Initialize role with domain and role handling.
+
+        Args:
+            domain_id: Domain UUID or '*' for all domains
+            role: Role value (enum or string)
+            **kwargs: Additional field values
+        """
         if domain_id is None:
             domain_id = Domain.get_default_domain_id()
         # Force explicit use of '*' to set domain_id to None:
-        if domain_id == "*":
+        elif domain_id == "*":
             domain_id = None
+        if isinstance(domain_id, str):
+            raise TypeError("Expected domain_id to be UUID, None or '*'")
 
         # Handle role parameter
         if role is not None:
-            if hasattr(role, "value"):
-                kwargs["_role"] = role.value
-            else:
-                kwargs["_role"] = str(role)
+            kwargs["_role"] = role.value if hasattr(role, "value") else str(role)  # type: ignore
 
         super().__init__(domain_id=domain_id, **kwargs)
 
@@ -415,7 +456,7 @@ class UserRole(BasePermsModel):
             return True
 
 
-class Token(BasePermsModel):
+class Token(BasePermsModel, UserOwnedResourceMixin):
     """API tokens for user authentication."""
 
     __tablename__ = "tokens"
@@ -428,23 +469,8 @@ class Token(BasePermsModel):
     revoked: Mapped[bool] = mapped_column(db.Boolean(), nullable=False, default=False)
     revoked_at: Mapped[sa.DateTime | None] = mapped_column(sa.DateTime(), nullable=True)
 
-    def _can_write(self) -> bool:
-        """Tokens can be modified by their owner."""
-        try:
-            return self.user._can_write()
-        except Exception:
-            return True
 
-    def _can_create(self) -> bool:
-        """Tokens can be created by their owner."""
-        return self._can_write()
-
-    def _can_read(self) -> bool:
-        """Tokens can be read by their owner."""
-        return self._can_write()
-
-
-class UserSetting(BasePermsModel):
+class UserSetting(BasePermsModel, UserOwnedResourceMixin):
     """User-specific key-value settings storage."""
 
     __tablename__ = "user_settings"
@@ -455,18 +481,3 @@ class UserSetting(BasePermsModel):
     value: Mapped[str | None] = mapped_column(db.String(1024), nullable=True)
 
     __table_args__ = (db.UniqueConstraint("user_id", "key"),)
-
-    def _can_write(self) -> bool:
-        """Settings can be modified by their owner."""
-        try:
-            return self.user._can_write()
-        except Exception:
-            return True
-
-    def _can_create(self) -> bool:
-        """Settings can be created by their owner."""
-        return self._can_write()
-
-    def _can_read(self) -> bool:
-        """Settings can be read by their owner."""
-        return self._can_write()
