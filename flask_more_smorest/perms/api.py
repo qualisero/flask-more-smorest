@@ -9,7 +9,8 @@ from typing import TYPE_CHECKING
 from apispec.ext.marshmallow import MarshmallowPlugin
 from apispec.ext.marshmallow import resolver as default_resolver
 from flask import request
-from flask_jwt_extended import JWTManager
+
+# from flask_jwt_extended import JWTManager
 from flask_jwt_extended import exceptions as jwt_exceptions
 from flask_jwt_extended import verify_jwt_in_request
 from flask_smorest import Api as ApiOrig

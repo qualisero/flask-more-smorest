@@ -8,7 +8,7 @@ with Marshmallow schemas.
 from dataclasses import dataclass
 from http import HTTPStatus
 from importlib import import_module
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from flask.views import MethodView
 from flask_smorest import Blueprint
@@ -136,8 +136,8 @@ class CRUDBlueprint(Blueprint):
         if schema_or_name is None:
             if isinstance(model_cls, type) and issubclass(model_cls, BaseModel):
                 schema_or_name = model_cls.Schema
-            else:
-                schema_or_name = f"{model_name}Schema"
+            elif isinstance(model_or_name, str):
+                schema_or_name = f"{model_or_name}Schema"
 
         if isinstance(schema_or_name, str):
             try:
