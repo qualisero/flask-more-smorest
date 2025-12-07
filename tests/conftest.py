@@ -5,9 +5,7 @@ import pytest
 from flask import Flask
 from flask_smorest import Api
 from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
-from marshmallow import Schema, fields
-from datetime import datetime
-import uuid
+from marshmallow import Schema
 
 from flask_more_smorest.sqla import db, BaseModel
 

@@ -86,7 +86,7 @@ class BaseModelMeta(DeclarativeMeta):
         dump_only = tuple(c.key for c in getattr(cls.__mapper__, "relationships", []))
 
         schema_cls = type(
-            f"{cls.__name__}SchemaBase",
+            f"{cls.__name__}AutoSchema",
             (BaseSchema,),
             {
                 "Meta": type(

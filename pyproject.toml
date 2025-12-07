@@ -73,7 +73,8 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q --strict-markers --cov=flask_more_smorest --cov-report=term-missing --cov-report=html"
+# addopts = "-ra -q --strict-markers --cov=flask_more_smorest --cov-report=term-missing --cov-report=html"
+addopts = "-ra -q --strict-markers"
 testpaths = [
     "tests",
 ]

@@ -4,11 +4,12 @@ This module tests the complete CRUD blueprint functionality with a real Flask ap
 using up-to-date features from flask-smorest, SQLAlchemy, and marshmallow_sqlalchemy.
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterator
 
 import pytest
 import uuid
 from flask import Flask
+from apispec.ext.marshmallow import MarshmallowPlugin, resolver as default_resolver
 from flask_smorest import Api
 
 from flask_more_smorest import CRUDBlueprint, BaseModel, db, init_db
@@ -35,73 +36,80 @@ def app() -> Flask:
     return app
 
 
+def custom_schema_name_resolver(schema, **kwargs: str | bool) -> str:
+    """Custom schema name resolver that appends 'Partial' for partial schemas."""
+    if getattr(schema, "partial", False):
+        return default_resolver(schema) + "Partial"
+    return default_resolver(schema)
+
+
 @pytest.fixture(scope="function")
 def api(app: Flask) -> Api:
     """Create API instance."""
-    return Api(app)
+    # NOTE: this is automatically added when using flask_more_smorest.Api instead of flask_smorest.Api
+    ma_plugin = MarshmallowPlugin(schema_name_resolver=custom_schema_name_resolver)
+    spec_kwargs = {"marshmallow_plugin": ma_plugin}
 
+    return Api(app, spec_kwargs=spec_kwargs)
 
 
 @pytest.fixture(scope="function")
 def product_model(app: Flask) -> type[BaseModel]:
     """Create a Product model for testing."""
 
-    class Product(BaseModel):
-        """Product model for testing CRUD operations."""
+    rand_str = uuid.uuid4().hex
+    class_name = f"Product_{rand_str}"
+    table_name = f"products_{rand_str}"
 
-        __table_args__ = {'extend_existing': True}
-
-        name = db.Column(db.String(100), nullable=False)
-        description = db.Column(db.String(500))
-        price = db.Column(db.Float, nullable=False)
-        in_stock = db.Column(db.Boolean, default=True)
-
-        def _can_read(self) -> bool:
-            """Products are readable by anyone."""
-            return True
-
-        def _can_write(self) -> bool:
-            """Products are writable by anyone for testing."""
-            return True
-
-        @classmethod
-        def _can_create(cls) -> bool:
-            """Products can be created by anyone for testing."""
-            return True
+    ProductModel = type(
+        class_name,
+        (BaseModel,),
+        {
+            "__tablename__": table_name,
+            "__module__": __name__,
+            "name": db.Column(db.String(100), nullable=False),
+            "description": db.Column(db.String(500)),
+            "price": db.Column(db.Float, nullable=False),
+            "in_stock": db.Column(db.Boolean, default=True),
+            "_can_read": lambda self: True,
+            "_can_write": lambda self: True,
+            "_can_create": classmethod(lambda cls: True),
+        },
+    )
 
     with app.app_context():
         db.create_all()
 
-    return Product
+    return ProductModel
 
 
 @pytest.fixture(scope="function")
-def product_blueprint(product_model: type[BaseModel]) -> CRUDBlueprint:
+def product_blueprint(product_model: type[BaseModel]) -> Iterator[CRUDBlueprint]:
     """Create a CRUD blueprint for Product."""
     # We need to set up a mock module for the blueprint to import from
     import sys
     import types
 
     # Create a mock module
-    mock_module = types.ModuleType("mock_models")
-    mock_module.Product = product_model
-    mock_module.ProductSchema = product_model.Schema
-    sys.modules["mock_models"] = mock_module
+    mock_module = types.ModuleType("mock_module")
+    # randstr = uuid.uuid4().hex
+    setattr(mock_module, product_model.__name__, product_model)
+    sys.modules["mock_module"] = mock_module
 
     try:
         blueprint = CRUDBlueprint(
             "products",
             __name__,
-            model="Product",
-            model_import_name="mock_models",
-            schema_import_name="mock_models",
-            url_prefix="/api/products",
+            model=product_model.__name__,
+            model_import_name="mock_module",
+            schema_import_name="mock_module",
+            url_prefix="/api/products/",
         )
         yield blueprint
     finally:
         # Cleanup
-        if "mock_models" in sys.modules:
-            del sys.modules["mock_models"]
+        if "mock_module" in sys.modules:
+            del sys.modules["mock_module"]
 
 
 @pytest.fixture
@@ -117,7 +125,7 @@ class TestCRUDIntegration:
     def test_list_products_empty(self, client: "FlaskClient", app: Flask) -> None:
         """Test listing products when database is empty."""
         with app.app_context():
-            response = client.get("/api/products")
+            response = client.get("/api/products/")
             assert response.status_code == 200
             data = response.get_json()
             assert isinstance(data, list)
@@ -133,7 +141,7 @@ class TestCRUDIntegration:
                     "price": 29.99,
                     "in_stock": True,
                 }
-                response = client.post("/api/products", json=product_data)
+                response = client.post("/api/products/", json=product_data)
                 # CRUD blueprint returns 200 for POST
                 assert response.status_code == 200
 
@@ -216,7 +224,7 @@ class TestCRUDIntegration:
                 # Delete it
                 response = client.delete(f"/api/products/{product_id}")
                 assert response.status_code in [200, 204]  # Accept both
-                
+
                 # Verify it's gone - check in database
                 deleted_product = db.session.get(product_model, uuid.UUID(product_id))
                 assert deleted_product is None
@@ -231,16 +239,16 @@ class TestCRUDIntegration:
                     {"name": "Product 2", "description": "Second", "price": 20.00, "in_stock": True},
                     {"name": "Product 3", "description": "Third", "price": 30.00, "in_stock": False},
                 ]
-                
+
                 for data in products_data:
                     product = product_model(**data)
                     db.session.add(product)
                 db.session.commit()
-                
+
                 # List all products
-                response = client.get("/api/products")
+                response = client.get("/api/products/")
                 assert response.status_code == 200
-                
+
                 data = response.get_json()
                 assert isinstance(data, list)
                 assert len(data) == 3
@@ -262,7 +270,7 @@ class TestCRUDIntegration:
                 db.session.commit()
 
                 # Filter for in-stock products
-                response = client.get("/api/products?in_stock=true")
+                response = client.get("/api/products/?in_stock=true")
                 assert response.status_code == 200
 
                 data = response.get_json()
@@ -276,6 +284,6 @@ class TestCRUDIntegration:
             product_data = {
                 "description": "Missing name and price",
             }
-            response = client.post("/api/products", json=product_data)
+            response = client.post("/api/products/", json=product_data)
             # Should return 422 for validation errors
             assert response.status_code == 422

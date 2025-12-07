@@ -4,20 +4,13 @@ This test demonstrates a complete Flask app configuration using all major featur
 of flask-more-smorest together, showing how streamlined and simple the setup can be.
 """
 
-from typing import TYPE_CHECKING
-
+from typing import TYPE_CHECKING, Iterator
 import pytest
 import uuid
-from flask import Flask
-from flask_smorest import Api
 
-from flask_more_smorest import (
-    CRUDBlueprint,
-    BaseModel,
-    db,
-    init_db,
-    TimestampMixin,
-)
+from flask import Flask
+from flask_jwt_extended import create_access_token
+from flask_more_smorest import CRUDBlueprint, BaseModel, db, Api, init_db, TimestampMixin, User
 
 if TYPE_CHECKING:
     from flask.testing import FlaskClient
@@ -26,7 +19,7 @@ if TYPE_CHECKING:
 @pytest.fixture(scope="function")
 def maximal_app() -> Flask:
     """Create a Flask app with maximal feature usage.
-    
+
     This app demonstrates:
     - Database initialization with init_db
     - Custom models extending BaseModel with mixins
@@ -48,109 +41,103 @@ def maximal_app() -> Flask:
 
     # Initialize database
     init_db(app)
+    from flask_jwt_extended import JWTManager
+
+    jwt = JWTManager()
+    jwt.init_app(app)
+    jwt._set_error_handler_callbacks(app)
 
     return app
 
 
 @pytest.fixture(scope="function")
-def api(maximal_app: Flask) -> Api:
+def db_session(maximal_app: Flask):
+    """Create a database session for tests."""
+    with maximal_app.app_context():
+        db.create_all()
+        yield db.session
+        db.session.remove()
+        db.drop_all()
+
+
+@pytest.fixture(scope="function")
+def api(maximal_app: Flask, db_session) -> Api:
     """Create API instance."""
     return Api(maximal_app)
 
 
-@pytest.fixture(scope="function")
-def article_model(maximal_app: Flask) -> type[BaseModel]:
-    """Create an Article model with mixins and relationships."""
+class Article(BaseModel, TimestampMixin):
+    """Article model demonstrating multiple features."""
 
-    class Article(BaseModel, TimestampMixin):
-        """Article model demonstrating multiple features."""
+    title = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    author_id = db.Column(db.UUID, db.ForeignKey("users.id"), nullable=True)
+    published = db.Column(db.Boolean, default=False)
+    view_count = db.Column(db.Integer, default=0)
 
-        __table_args__ = {'extend_existing': True}
+    # Relationship to User - no backref needed as we test in isolation
+    author = db.relationship("User", foreign_keys=[author_id])
 
-        title = db.Column(db.String(200), nullable=False)
-        content = db.Column(db.Text, nullable=False)
-        author_id = db.Column(db.UUID, db.ForeignKey("users.id"), nullable=True)
-        published = db.Column(db.Boolean, default=False)
-        view_count = db.Column(db.Integer, default=0)
+    def _can_read(self) -> bool:
+        """Published articles can be read by anyone."""
+        return self.published or self._can_write()
 
-        # Relationship to User - no backref needed as we test in isolation
-        author = db.relationship("User", foreign_keys=[author_id])
+    def _can_write(self) -> bool:
+        """Only the author can write."""
+        from flask_more_smorest import get_current_user_id
 
-        def _can_read(self) -> bool:
-            """Published articles can be read by anyone."""
-            return self.published or self._can_write()
+        current_user_id = get_current_user_id()
+        return current_user_id == self.author_id if current_user_id else True
 
-        def _can_write(self) -> bool:
-            """Only the author can write."""
-            from flask_more_smorest import get_current_user_id
-            current_user_id = get_current_user_id()
-            return current_user_id == self.author_id if current_user_id else True
-
-        @classmethod
-        def _can_create(cls) -> bool:
-            """Anyone can create articles for this demo."""
-            return True
-
-    with maximal_app.app_context():
-        db.create_all()
-
-    return Article
+    @classmethod
+    def _can_create(cls) -> bool:
+        """Anyone can create articles for this demo."""
+        return True
 
 
-@pytest.fixture(scope="function")
-def comment_model(maximal_app: Flask, article_model: type[BaseModel]) -> type[BaseModel]:
-    """Create a Comment model to demonstrate relationships."""
-    articles_table = article_model.__tablename__
+class Comment(BaseModel, TimestampMixin):
+    """Comment model for articles."""
 
-    class Comment(BaseModel, TimestampMixin):
-        """Comment model for articles."""
+    content = db.Column(db.Text, nullable=False)
+    article_id = db.Column(db.UUID, db.ForeignKey(Article.id), nullable=False)
+    author_id = db.Column(db.UUID, db.ForeignKey("users.id"), nullable=True)
 
-        __table_args__ = {'extend_existing': True}
+    # Relationships - no backref needed for testing
+    article = db.relationship(Article, foreign_keys=[article_id])
+    author = db.relationship("User", foreign_keys=[author_id])
 
-        content = db.Column(db.Text, nullable=False)
-        article_id = db.Column(db.UUID, db.ForeignKey(f"{articles_table}.id"), nullable=False)
-        author_id = db.Column(db.UUID, db.ForeignKey("users.id"), nullable=True)
+    def _can_read(self) -> bool:
+        """Comments are readable if article is readable."""
+        return self.article._can_read() if self.article else True
 
-        # Relationships - no backref needed for testing
-        article = db.relationship(article_model, foreign_keys=[article_id])
-        author = db.relationship("User", foreign_keys=[author_id])
+    def _can_write(self) -> bool:
+        """Only the comment author can edit."""
+        from flask_more_smorest import get_current_user_id
 
-        def _can_read(self) -> bool:
-            """Comments are readable if article is readable."""
-            return self.article._can_read() if self.article else True
+        current_user_id = get_current_user_id()
+        return current_user_id == self.author_id if current_user_id else True
 
-        def _can_write(self) -> bool:
-            """Only the comment author can edit."""
-            from flask_more_smorest import get_current_user_id
-            current_user_id = get_current_user_id()
-            return current_user_id == self.author_id if current_user_id else True
-
-        @classmethod
-        def _can_create(cls) -> bool:
-            """Anyone can create comments for this demo."""
-            return True
-
-    with maximal_app.app_context():
-        db.create_all()
-
-    return Comment
+    @classmethod
+    def _can_create(cls) -> bool:
+        """Anyone can create comments for this demo."""
+        return True
 
 
 @pytest.fixture(scope="function")
-def blueprints(article_model: type[BaseModel], comment_model: type[BaseModel]) -> dict[str, CRUDBlueprint]:
+def blueprints() -> Iterator[dict[str, CRUDBlueprint]]:
     """Create CRUD blueprints for all models."""
     import sys
     import types
 
     # Create mock modules for blueprint imports
     articles_module = types.ModuleType("mock_articles")
-    articles_module.Article = article_model
-    articles_module.ArticleSchema = article_model.Schema
+    setattr(articles_module, "Article", Article)
+    setattr(articles_module, "ArticleSchema", Article.Schema)
     sys.modules["mock_articles"] = articles_module
 
     comments_module = types.ModuleType("mock_comments")
-    comments_module.Comment = comment_model
-    comments_module.CommentSchema = comment_model.Schema
+    setattr(comments_module, "Comment", Comment)
+    setattr(comments_module, "CommentSchema", Comment.Schema)
     sys.modules["mock_comments"] = comments_module
 
     # Create blueprints - use defaults where possible
@@ -160,7 +147,7 @@ def blueprints(article_model: type[BaseModel], comment_model: type[BaseModel]) -
         model="Article",
         model_import_name="mock_articles",
         schema_import_name="mock_articles",
-        url_prefix="/api/articles",
+        url_prefix="/api/articles/",
     )
 
     comments_bp = CRUDBlueprint(
@@ -169,7 +156,7 @@ def blueprints(article_model: type[BaseModel], comment_model: type[BaseModel]) -
         model="Comment",
         model_import_name="mock_comments",
         schema_import_name="mock_comments",
-        url_prefix="/api/comments",
+        url_prefix="/api/comments/",
     )
 
     yield {"articles": articles_bp, "comments": comments_bp}
@@ -189,209 +176,216 @@ def client(maximal_app: Flask, api: Api, blueprints: dict[str, CRUDBlueprint]) -
     return maximal_app.test_client()
 
 
+@pytest.fixture(scope="function")
+def test_user(db_session) -> Iterator[User]:
+    """Create a test user."""
+
+    u = User(email="test@test.com", password="password")
+    db.session.add(u)
+    db.session.commit()
+    yield u
+    db.session.delete(u)
+
+
+@pytest.fixture(scope="function")
+def auth_client(app: "Flask", client: "FlaskClient", test_user: "User") -> Iterator["FlaskClient"]:
+    """Create an authenticated client for testing."""
+    access_token = create_access_token(identity=test_user.id)
+    client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {access_token}"
+    yield client
+
+
 class TestMaximalFeatureIntegration:
     """Integration tests demonstrating maximal feature usage."""
 
-    def test_complete_article_lifecycle(
-        self, client: "FlaskClient", maximal_app: Flask, article_model: type[BaseModel]
-    ) -> None:
+    def test_complete_article_lifecycle(self, auth_client: "FlaskClient", test_user: User) -> None:
         """Test complete CRUD lifecycle for articles."""
-        with maximal_app.app_context():
-            with article_model.bypass_perms():
-                # Create an article
-                article_data = {
-                    "title": "Test Article",
-                    "content": "This is a comprehensive test article.",
-                    "published": True,
-                }
-                response = client.post("/api/articles", json=article_data)
-                # CRUD blueprint returns 200 for POST
-                assert response.status_code == 200
-                article = response.get_json()
-                article_id = article["id"]
 
-                # Read the article
-                response = client.get(f"/api/articles/{article_id}")
-                assert response.status_code == 200
-                data = response.get_json()
-                assert data["title"] == "Test Article"
-                assert data["published"] is True
-                assert "created_at" in data
-                assert "updated_at" in data
+        # Create an article
+        article_data = {
+            "title": "Test Article",
+            "content": "This is a comprehensive test article.",
+            "published": True,
+        }
+        response = auth_client.post("/api/articles/", json=article_data)
+        # CRUD blueprint returns 200 for POST
+        assert response.status_code == 200, response.data
+        article = response.get_json()
+        article_id = article["id"]
 
-                # Update the article
-                update_data = {"content": "Updated content"}
-                response = client.patch(f"/api/articles/{article_id}", json=update_data)
-                assert response.status_code == 200
-                data = response.get_json()
-                assert data["content"] == "Updated content"
-                assert data["title"] == "Test Article"  # Unchanged
+        # # Read the article
+        response = auth_client.get(f"/api/articles/{article_id}")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["title"] == "Test Article"
+        assert data["published"] is True
+        assert "created_at" in data
+        assert "updated_at" in data
 
-                # List articles
-                response = client.get("/api/articles")
-                assert response.status_code == 200
-                articles = response.get_json()
-                assert len(articles) >= 1
+        # # Update the article
+        update_data = {"content": "Updated content"}
+        response = auth_client.patch(f"/api/articles/{article_id}", json=update_data)
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["content"] == "Updated content"
+        assert data["title"] == "Test Article"  # Unchanged
 
-                # Delete the article
-                response = client.delete(f"/api/articles/{article_id}")
-                assert response.status_code in [200, 204]
+        # List articles
+        response = auth_client.get("/api/articles/")
+        assert response.status_code == 200
+        articles = response.get_json()
+        assert len(articles) >= 1
 
-    def test_filtering_articles(
-        self, client: "FlaskClient", maximal_app: Flask, article_model: type[BaseModel]
-    ) -> None:
+        # Delete the article
+        response = auth_client.delete(f"/api/articles/{article_id}")
+        assert response.status_code in [200, 204]
+
+    def test_filtering_articles(self, auth_client: "FlaskClient", maximal_app: Flask) -> None:
         """Test filtering functionality on articles."""
-        with maximal_app.app_context():
-            with article_model.bypass_perms():
-                # Create multiple articles
-                articles_data = [
-                    {"title": "Published Article 1", "content": "Content 1", "published": True},
-                    {"title": "Published Article 2", "content": "Content 2", "published": True},
-                    {"title": "Draft Article", "content": "Content 3", "published": False},
-                ]
+        # Create multiple articles
+        articles_data = [
+            {"title": "Published Article 1", "content": "Content 1", "published": True},
+            {"title": "Published Article 2", "content": "Content 2", "published": True},
+            {"title": "Draft Article", "content": "Content 3", "published": False},
+        ]
 
-                for data in articles_data:
-                    article = article_model(**data)
-                    db.session.add(article)
-                db.session.commit()
+        for data in articles_data:
+            article = Article(**data)
+            db.session.add(article)
+        db.session.commit()
 
-                # Filter for published articles
-                response = client.get("/api/articles?published=true")
-                assert response.status_code == 200
-                articles = response.get_json()
-                assert len(articles) == 2
-                assert all(a["published"] is True for a in articles)
+        # Filter for published articles
+        response = auth_client.get("/api/articles/", query_string={"published": "true"})
+        assert response.status_code == 200
+        articles = response.get_json()
+        assert len(articles) == 2
+        assert all(a["published"] is True for a in articles)
 
-    def test_related_models(
-        self, maximal_app: Flask, article_model: type[BaseModel], comment_model: type[BaseModel]
-    ) -> None:
+    def test_related_models(self, db_session) -> None:
         """Test relationships between articles and comments."""
-        with maximal_app.app_context():
-            with article_model.bypass_perms(), comment_model.bypass_perms():
-                # Create an article
-                article = article_model(
-                    title="Article with Comments",
-                    content="This article will have comments.",
-                    published=True,
-                )
-                db.session.add(article)
-                db.session.commit()
-                article_id = article.id
 
-                # Create comments directly in database
-                comment1 = comment_model(content="Great article!", article_id=article_id)
-                comment2 = comment_model(content="Very informative.", article_id=article_id)
-                db.session.add(comment1)
-                db.session.add(comment2)
-                db.session.commit()
+        # Create an article
+        article = Article(
+            title="Article with Comments",
+            content="This article will have comments.",
+            published=True,
+        )
+        db.session.add(article)
+        db.session.commit()
+        article_id = article.id
 
-                # Verify comments are associated
-                comments = db.session.query(comment_model).filter_by(article_id=article_id).all()
-                assert len(comments) == 2
-                assert comments[0].article_id == article_id
-                assert comments[1].article_id == article_id
+        # Create comments directly in database
+        comment1 = Comment(content="Great article!", article_id=article_id)
+        comment2 = Comment(content="Very informative.", article_id=article_id)
+        db.session.add(comment1)
+        db.session.add(comment2)
+        db.session.commit()
 
-    def test_permissions_on_models(self, maximal_app: Flask, article_model: type[BaseModel]) -> None:
+        # Verify comments are associated
+        comments: list = db.session.query(Comment).filter_by(article_id=article_id).all()
+        assert len(comments) == 2
+        assert comments[0].article_id == article_id
+        assert comments[1].article_id == article_id
+
+    def test_permissions_on_models(self, db_session) -> None:
         """Test permission system on models."""
-        with maximal_app.app_context():
-            with article_model.bypass_perms():
-                # Create a published article (readable by anyone)
-                published_article = article_model(
-                    title="Published", content="Public content", published=True
-                )
-                published_article.save()
 
-                # Create a draft article (not published)
-                draft_article = article_model(
-                    title="Draft", content="Private content", published=False
-                )
-                draft_article.save()
+        # Create a published article (readable by anyone)
+        published_article = Article(title="Published", content="Public content", published=True)
+        published_article.save()
 
-                # Published article should be readable
-                assert published_article._can_read() is True
+        # Create a draft article (not published)
+        draft_article = Article(title="Draft", content="Private content", published=False)
+        draft_article.save()
 
-                # Draft article readability depends on permission
-                # In this case, since we're in bypass_perms, it should be readable
-                assert draft_article._can_read() is not None
+        # Published article should be readable
+        assert published_article.can_read() is True
 
-    def test_auto_generated_schema_fields(self, maximal_app: Flask, article_model: type[BaseModel]) -> None:
+        # Draft article readability depends on permission
+        # In this case, since we're in bypass_perms, it should be readable
+        assert draft_article.can_read() is True
+
+    def test_auto_generated_schema_fields(self) -> None:
         """Test that auto-generated schemas include all expected fields."""
-        with maximal_app.app_context():
-            schema = article_model.Schema()
 
-            # BaseModel fields
-            assert "id" in schema.fields
-            assert "created_at" in schema.fields
-            assert "updated_at" in schema.fields
-            assert "is_writable" in schema.fields
+        schema = Article.Schema()
 
-            # Article-specific fields
-            assert "title" in schema.fields
-            assert "content" in schema.fields
-            assert "published" in schema.fields
-            assert "view_count" in schema.fields
+        # BaseModel fields
+        assert "id" in schema.fields
+        assert "created_at" in schema.fields
+        assert "updated_at" in schema.fields
+        assert "is_writable" in schema.fields
 
-    def test_timestamps_are_automatic(self, maximal_app: Flask, article_model: type[BaseModel]) -> None:
+        # Article-specific fields
+        assert "title" in schema.fields
+        assert "content" in schema.fields
+        assert "published" in schema.fields
+        assert "view_count" in schema.fields
+
+    def test_timestamps_are_automatic(self, db_session) -> None:
         """Test that timestamps are automatically set and updated."""
-        with maximal_app.app_context():
-            with article_model.bypass_perms():
-                article = article_model(title="Test", content="Test content", published=True)
-                article.save()
 
-                # Timestamps should be set
-                assert article.created_at is not None
-                assert article.updated_at is not None
-                original_updated_at = article.updated_at
+        article = Article(title="Test", content="Test content", published=True)
+        article.save()
 
-                # Update the article
-                article.update(title="Updated Test")
+        # Timestamps should be set
+        assert article.created_at is not None
+        assert article.updated_at is not None
+        original_updated_at = article.updated_at
 
-                # updated_at should be newer
-                assert article.updated_at >= original_updated_at
+        # Update the article
+        article.update(title="Updated Test")
 
-    def test_multiple_blueprints_coexist(self, client, maximal_app):
+        # updated_at should be newer
+        assert article.updated_at >= original_updated_at
+
+    def test_multiple_blueprints_coexist(self, auth_client, db_session) -> None:
         """Test that multiple CRUD blueprints work together."""
-        with maximal_app.app_context():
-            # Both endpoints should be accessible
-            response = client.get("/api/articles")
-            assert response.status_code == 200
 
-            response = client.get("/api/comments")
-            assert response.status_code == 200
+        # Both endpoints should be accessible
+        response = auth_client.get("/api/articles/")
+        assert response.status_code == 200
 
-    def test_uuid_primary_keys(self, maximal_app: Flask, article_model: type[BaseModel]) -> None:
+        response = auth_client.get("/api/comments/")
+        assert response.status_code == 200
+
+    def test_uuid_primary_keys(self, db_session) -> None:
         """Test that models use UUID primary keys."""
-        with maximal_app.app_context():
-            with article_model.bypass_perms():
-                article = article_model(title="UUID Test", content="Testing UUID", published=True)
-                article.save()
 
-                # ID should be a UUID
-                assert article.id is not None
-                assert isinstance(article.id, uuid.UUID)
+        article = Article(title="UUID Test", content="Testing UUID", published=True)
+        article.save()
 
-    def test_model_convenience_methods(self, maximal_app: Flask, article_model: type[BaseModel]) -> None:
+        # ID should be a UUID
+        assert article.id is not None
+        assert isinstance(article.id, uuid.UUID)
+
+    def test_model_convenience_methods(self, db_session) -> None:
         """Test BaseModel convenience methods (get, get_or_404, etc.)."""
-        with maximal_app.app_context():
-            with article_model.bypass_perms():
-                article = article_model(title="Test", content="Test", published=True)
-                article.save()
-                article_id = article.id
 
-                # Test get method
-                retrieved = article_model.get(article_id)
-                assert retrieved is not None
-                assert retrieved.id == article_id
+        article = Article(title="Test", content="Test", published=True)
+        article.save()
+        article_id = article.id
 
-                # Test get_or_404
-                retrieved = article_model.get_or_404(article_id)
-                assert retrieved.id == article_id
+        # Test get method
+        retrieved = Article.get(article_id)
+        assert retrieved is not None
+        assert retrieved.id == article_id
 
-                # Test get_by
-                retrieved = article_model.get_by(title="Test")
-                assert retrieved is not None
-                assert retrieved.title == "Test"
+        # Test get_or_404
+        retrieved = Article.get_or_404(article_id)
+        assert retrieved.id == article_id
 
-                # Test get_by_or_404
-                retrieved = article_model.get_by_or_404(title="Test")
-                assert retrieved.title == "Test"
+        with pytest.raises(Exception):
+            assert Article.get_or_404(uuid.uuid4())
+
+        # Test get_by
+        retrieved = Article.get_by(title="Test")
+        assert retrieved is not None
+        assert retrieved.title == "Test"
+
+        # Test get_by_or_404
+        retrieved = Article.get_by_or_404(title="Test")
+        assert retrieved.title == "Test"
+
+        with pytest.raises(Exception):
+            Article.get_by_or_404(title="Nonexistent")

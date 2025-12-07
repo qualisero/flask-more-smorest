@@ -29,27 +29,24 @@ def app() -> Flask:
 def test_model(app: Flask) -> type[BaseModel]:
     """Create a test model class."""
 
-    class TestItem(BaseModel):
-        """Test item model."""
+    rand_str = uuid.uuid4().hex
+    class_name = f"Product_{rand_str}"
+    table_name = f"products_{rand_str}"
 
-        __table_args__ = {'extend_existing': True}
-
-        name = db.Column(db.String(100), nullable=False)
-        description = db.Column(db.String(500))
-        count = db.Column(db.Integer, default=0)
-
-        def _can_read(self) -> bool:
-            """Test items are readable."""
-            return True
-
-        def _can_write(self) -> bool:
-            """Test items are writable."""
-            return True
-
-        @classmethod
-        def _can_create(cls) -> bool:
-            """Test items can be created."""
-            return True
+    TestItem = type(
+        class_name,
+        (BaseModel,),
+        {
+            "__tablename__": table_name,
+            "__module__": __name__,
+            "name": db.Column(db.String(100), nullable=False),
+            "description": db.Column(db.String(500)),
+            "count": db.Column(db.Integer, default=0),
+            "_can_read": lambda self: True,
+            "_can_write": lambda self: True,
+            "_can_create": classmethod(lambda cls: True),
+        },
+    )
 
     with app.app_context():
         db.create_all()
@@ -95,7 +92,7 @@ class TestBaseModelIntegration:
                 assert item.id is not None
                 retrieved = db.session.get(test_model, item.id)
                 assert retrieved is not None
-                assert retrieved.name == "Test Item"
+                assert retrieved.name == "Test Item"  # type: ignore
 
     def test_base_model_update_method(self, app: Flask, test_model: type[BaseModel]) -> None:
         """Test the update convenience method."""
@@ -108,8 +105,8 @@ class TestBaseModelIntegration:
                 # Update the item
                 item.update(name="Updated Name", count=10)
 
-                assert item.name == "Updated Name"
-                assert item.count == 10
+                assert item.name == "Updated Name"  # type: ignore
+                assert item.count == 10  # type: ignore
                 # updated_at should be newer
                 assert item.updated_at >= original_updated_at
 
@@ -140,7 +137,7 @@ class TestBaseModelIntegration:
                 retrieved = test_model.get(item_id)
                 assert retrieved is not None
                 assert retrieved.id == item_id
-                assert retrieved.name == "Test Item"
+                assert retrieved.name == "Test Item"  # type: ignore
 
     def test_base_model_get_or_404_success(self, app: Flask, test_model: type[BaseModel]) -> None:
         """Test get_or_404 with existing item."""
@@ -178,12 +175,12 @@ class TestBaseModelIntegration:
                 # Find by name
                 result = test_model.get_by(name="Item One")
                 assert result is not None
-                assert result.name == "Item One"
+                assert result.name == "Item One"  # type: ignore
 
                 # Find by count
                 result = test_model.get_by(count=2)
                 assert result is not None
-                assert result.name == "Item Two"
+                assert result.name == "Item Two"  # type: ignore
 
     def test_base_model_get_by_or_404(self, app: Flask, test_model: type[BaseModel]) -> None:
         """Test get_by_or_404 method."""
@@ -196,7 +193,7 @@ class TestBaseModelIntegration:
 
                 # Should retrieve successfully
                 retrieved = test_model.get_by_or_404(name="Test Item")
-                assert retrieved.name == "Test Item"
+                assert retrieved.name == "Test Item"  # type: ignore
 
                 # Should raise NotFoundError
                 with pytest.raises(NotFoundError):
@@ -207,7 +204,7 @@ class TestBaseModelIntegration:
         with app.app_context():
             schema_class = test_model.Schema
             assert schema_class is not None
-            
+
             schema = schema_class()
             assert "id" in schema.fields
             assert "created_at" in schema.fields
@@ -225,7 +222,7 @@ class TestBaseModelIntegration:
                 assert item.id is not None
 
             # Can still access the item after context
-            assert item.name == "Test Item"
+            assert item.name == "Test Item"  # type: ignore
 
 
 class TestDatabaseInitialization:
@@ -248,51 +245,51 @@ class TestDatabaseInitialization:
     def test_db_is_flask_sqlalchemy_instance(self, app: Flask) -> None:
         """Test that db is a Flask-SQLAlchemy instance."""
         from flask_sqlalchemy import SQLAlchemy
-        
+
         assert isinstance(db, SQLAlchemy)
 
     def test_multiple_models_can_be_created(self, app: Flask) -> None:
         """Test creating multiple model classes."""
-        
+
         class Model1(BaseModel):
             __tablename__ = "model1"
             field1 = db.Column(db.String(50))
-            
+
             def _can_read(self):
                 return True
-            
+
             def _can_write(self):
                 return True
-            
+
             @classmethod
             def _can_create(cls):
                 return True
-        
+
         class Model2(BaseModel):
             __tablename__ = "model2"
             field2 = db.Column(db.Integer)
-            
+
             def _can_read(self):
                 return True
-            
+
             def _can_write(self):
                 return True
-            
+
             @classmethod
             def _can_create(cls):
                 return True
-        
+
         with app.app_context():
             db.create_all()
-            
+
             with Model1.bypass_perms(), Model2.bypass_perms():
                 # Both models should work
                 item1 = Model1(field1="test")
                 item1.save()
-                
+
                 item2 = Model2(field2=42)
                 item2.save()
-                
+
                 assert item1.id is not None
                 assert item2.id is not None
 
@@ -320,10 +317,10 @@ class TestBaseModelPermissions:
             with test_model.bypass_perms():
                 item = test_model(name="Test Item", count=5)
                 item.save()
-                
+
                 schema = test_model.Schema()
                 data = schema.dump(item)
-                
+
                 # is_writable should be in the output
                 assert "is_writable" in data
-                assert isinstance(data["is_writable"], bool)
+                assert isinstance(data["is_writable"], bool)  # type: ignore
