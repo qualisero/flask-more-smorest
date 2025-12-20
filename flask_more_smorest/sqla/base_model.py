@@ -69,7 +69,7 @@ class BaseSchema(SQLAlchemyAutoSchema):
 
 
 class BaseModelConverter(ModelConverter):
-    """Model converter for Iao models."""
+    """Model converter for BaseModel-based SQLAlchemy models."""
 
     def _add_relationship_kwargs(self, kwargs: dict[str, Any], prop: PropertyOrColumn) -> None:
         """Add keyword arguments to kwargs (in-place) based on the passed in
