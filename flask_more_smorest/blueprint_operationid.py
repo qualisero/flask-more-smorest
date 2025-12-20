@@ -4,8 +4,8 @@ This module provides BlueprintOperationIdMixin that extends Flask-Smorest's
 Blueprint to automatically generate OpenAPI operationId values for endpoints.
 """
 
-from typing import Callable
 import functools
+from typing import Callable
 
 from flask.views import MethodView
 from flask_smorest import Blueprint

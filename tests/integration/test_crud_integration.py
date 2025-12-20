@@ -10,10 +10,9 @@ from typing import TYPE_CHECKING, Iterator
 import pytest
 from apispec.ext.marshmallow import MarshmallowPlugin
 from apispec.ext.marshmallow import resolver as default_resolver
-from marshmallow import Schema
-
 from flask import Flask
 from flask_smorest import Api
+from marshmallow import Schema
 
 from flask_more_smorest import BaseModel, CRUDBlueprint, db, init_db
 

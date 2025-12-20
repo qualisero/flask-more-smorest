@@ -12,7 +12,6 @@ from pprint import pformat
 from typing import TYPE_CHECKING
 
 from flask import make_response
-from marshmallow import Schema, fields
 
 from ..utils import convert_camel_to_snake
 

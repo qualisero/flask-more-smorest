@@ -9,10 +9,10 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Callable
 
+import sqlalchemy as sa
 from flask import has_request_context
 from flask_jwt_extended import exceptions, verify_jwt_in_request
 from werkzeug.exceptions import Unauthorized
-import sqlalchemy as sa
 
 from ..error.exceptions import ForbiddenError, UnauthorizedError
 from ..sqla import BaseModel as SQLABaseModel

@@ -63,7 +63,7 @@ import enum
 import logging
 import os
 import uuid
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from flask_jwt_extended import current_user as jwt_current_user

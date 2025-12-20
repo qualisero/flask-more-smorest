@@ -7,15 +7,12 @@ filter parameters into SQLAlchemy query statements. It supports:
 - Enum list filters (field__in)
 """
 
-from typing import TYPE_CHECKING, Mapping
+from typing import Mapping
 
 import marshmallow as ma
 from sqlalchemy import ColumnElement
 
 from flask_more_smorest.sqla.base_model import BaseModel
-
-if TYPE_CHECKING:
-    from sqlalchemy.orm import DeclarativeBase
 
 
 def generate_filter_schema(base_schema: type[ma.Schema] | ma.Schema) -> type[ma.Schema]:
@@ -46,12 +43,9 @@ def generate_filter_schema(base_schema: type[ma.Schema] | ma.Schema) -> type[ma.
     """
 
     temp_instance: ma.Schema
-    base_schema_cls: type[ma.Schema]
     if isinstance(base_schema, ma.Schema):
-        # base_schema_cls = type(base_schema)
         temp_instance = base_schema
     else:
-        # base_schema_cls = base_schema
         temp_instance = base_schema()
 
     new_declared_fields = {}
@@ -90,25 +84,6 @@ def generate_filter_schema(base_schema: type[ma.Schema] | ma.Schema) -> type[ma.
                 ma.fields.Enum(field_obj.enum), load_default=None, load_only=True, dump_only=False, required=False
             )
 
-    # class FilterSchema(base_schema_cls):
-
-    #     def on_bind_field(self, field_name, field_obj):
-    #         # Called automatically when a field is attached to this schema
-    #         field_obj.load_default = None
-    #         field_obj.load_only = True
-    #         field_obj.dump_only = False
-    #         field_obj.required = False
-
-    #     @ma.post_load
-    #     def remove_none_fields(self, data, **kwargs):
-    #         # Remove fields with None values from the deserialized data
-    #         return {k: v for k, v in data.items() if v is not None}
-
-    #     class Meta(base_schema_cls.Meta):
-    #         partial = True
-    #         load_instance = False
-    #         # NOTE: need to also set this in bp.arguments() call for flask-smorest to work:
-    #         unknown = ma.RAISE
     def on_bind_field(field_obj: ma.fields.Field) -> None:
         # Called automatically when a field is attached to this schema
         field_obj.load_default = None

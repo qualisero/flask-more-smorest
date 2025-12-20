@@ -9,13 +9,13 @@ import datetime as dt
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Self, Any, TypeAlias
+from typing import TYPE_CHECKING, Any, Self, TypeAlias
 
 import sqlalchemy as sa
 from flask import current_app, request
 from marshmallow import fields, pre_load
 from marshmallow_sqlalchemy import ModelConverter, SQLAlchemyAutoSchema
-from sqlalchemy.orm import DeclarativeMeta, Mapped, class_mapper, make_transient, mapped_column, MapperProperty
+from sqlalchemy.orm import DeclarativeMeta, Mapped, MapperProperty, class_mapper, make_transient, mapped_column
 from sqlalchemy.orm.collections import InstrumentedList
 
 from ..error.exceptions import ForbiddenError, NotFoundError
