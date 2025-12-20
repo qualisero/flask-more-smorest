@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declared_attr
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
 
 if TYPE_CHECKING:
     from .user_models import User, current_user
@@ -52,10 +52,17 @@ class HasUserMixin:
         Returns:
             Mapped relationship to the User who owns this record
         """
+        backref_name = f"{cls.__tablename__}s"  # type: ignore
+
         return relationship(
             "User",
             lazy="joined",
             foreign_keys=[getattr(cls, "user_id")],
+            backref=backref(
+                backref_name,
+                cascade="all, delete-orphan",
+                passive_deletes=True,
+            ),
         )
 
 

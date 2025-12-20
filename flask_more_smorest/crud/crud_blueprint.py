@@ -271,10 +271,12 @@ class CRUDBlueprint(Blueprint):
                     @self.arguments(query_filter_schema, location="query", unknown=RAISE)
                     @self.response(HTTPStatus.OK, index_schema_class(many=True))
                     @self.doc(operationId=f"list{config.model_name}")
-                    def get(_self, filters: dict) -> Sequence[BaseModel]:
-                        """Fetch all resources."""
+                    def get(_self, filters: dict, **kwargs) -> Sequence[BaseModel]:
+                        """Fetch all resources.
+                        kwargs might contains path parameters to filter by (eg /user/<uuid:user_id>/roles/)"""
+                        
                         stmts = get_statements_from_filters(filters, model=model_cls)
-                        res = self._db_session.execute(sa.select(model_cls).filter(*stmts))
+                        res = self._db_session.execute(sa.select(model_cls).filter_by(**kwargs).filter(*stmts))
                         return res.scalars().all()
 
                 if "POST" in config.methods:
