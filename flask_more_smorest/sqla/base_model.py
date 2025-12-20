@@ -23,7 +23,7 @@ from .database import db
 
 if TYPE_CHECKING:
     from flask import Flask  # noqa: F401
-    
+
 PropertyOrColumn: TypeAlias = MapperProperty | sa.Column
 
 
@@ -87,7 +87,6 @@ class BaseModelConverter(ModelConverter):
                         required = True
         # NOTE: always set dump_only to True for relationships (can be overriden in schema)
         kwargs.update({"allow_none": allow_none, "required": required, "dump_only": True})
-
 
 
 class BaseModelMeta(DeclarativeMeta):

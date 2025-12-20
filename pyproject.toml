@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "flask-more-smorest"
-version = "0.1.0"
+version = "0.1.1"
 description = "Enhanced Flask-Smorest blueprints with automatic CRUD operations"
 authors = ["Dave <david@qualisero.com>"]
 maintainers = ["Dave <david@qualisero.com>"]
