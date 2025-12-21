@@ -143,7 +143,10 @@ class BasePermsModel(SQLABaseModel):
             True if user can create, False otherwise
         """
 
-        if self.perms_disabled or not has_request_context():
+        if self.perms_disabled:
+            return True
+        if not has_request_context():
+            logger.debug("No request context; bypassing create permission checks")
             return True
         is_admin = getattr(self, "is_admin", False)
         is_role_instance = type(self).__name__ == "UserRole"

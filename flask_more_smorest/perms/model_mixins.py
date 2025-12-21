@@ -12,8 +12,10 @@ import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 
+from flask_more_smorest.error.exceptions import ForbiddenError
+
 if TYPE_CHECKING:
-    from .user_models import User, current_user
+    from .user_models import User
 
 
 class HasUserMixin:
@@ -89,9 +91,9 @@ class UserCanReadWriteMixin(HasUserMixin):
         Returns:
             True if current user owns this record
         """
-        from .user_models import current_user
-        
-        return self.user_id == current_user.id
+        from .user_models import get_current_user_id
+
+        return self.user_id == get_current_user_id()
 
     def _can_read(self) -> bool:
         """User can read if they are the owner of the object.
@@ -99,9 +101,9 @@ class UserCanReadWriteMixin(HasUserMixin):
         Returns:
             True if current user owns this record
         """
-        from .user_models import current_user
-        
-        return self.user_id == current_user.id
+        from .user_models import get_current_user_id
+
+        return self.user_id == get_current_user_id()
 
 
 class UserOwnedResourceMixin(HasUserMixin):
@@ -126,10 +128,7 @@ class UserOwnedResourceMixin(HasUserMixin):
         Returns:
             True if the owning user has write permission
         """
-        try:
-            return self.user._can_write()
-        except Exception:
-            return True
+        return self.user._can_write()
 
     def _can_create(self) -> bool:
         """Resource can be created by its owner.
@@ -137,6 +136,16 @@ class UserOwnedResourceMixin(HasUserMixin):
         Returns:
             True if the owning user has write permission
         """
+        if self.user_id:
+            from .user_models import User
+
+            try:
+                user = User.get_or_404(self.user_id)
+            except ForbiddenError:
+                return False
+
+            return user._can_write()
+
         return self._can_write()
 
     def _can_read(self) -> bool:

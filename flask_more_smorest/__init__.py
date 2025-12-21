@@ -47,6 +47,7 @@ from .crud.query_filtering import generate_filter_schema, get_statements_from_fi
 
 # Import core blueprints
 from .perms import Api, CRUDBlueprint
+from .perms.jwt import init_jwt
 
 # Import user model mixins
 from .perms.model_mixins import ProfileMixin, SoftDeleteMixin, TimestampMixin
@@ -80,6 +81,7 @@ __all__ = [
     "db",
     "init_db",
     # User models and authentication
+    "init_jwt",
     "User",
     "UserRole",
     "UserSetting",

@@ -11,6 +11,7 @@ from ..blueprint_operationid import BlueprintOperationIdMixin
 from ..crud import CRUDBlueprint as CRUDBlueprintBase
 from .api import Api
 from .base_perms_model import BasePermsModel as BaseModel
+from .jwt import init_jwt
 from .perms_blueprint import PermsBlueprintMixin
 from .user_models import Domain, Token, User, UserRole, UserSetting, current_user, get_current_user_id
 
@@ -46,4 +47,5 @@ __all__ = [
     "get_current_user_id",
     "PermsBlueprintMixin",
     "CRUDBlueprint",
+    "init_jwt",
 ]

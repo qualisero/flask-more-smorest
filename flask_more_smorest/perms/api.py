@@ -9,14 +9,13 @@ from typing import TYPE_CHECKING
 from apispec.ext.marshmallow import MarshmallowPlugin
 from apispec.ext.marshmallow import resolver as default_resolver
 from flask import request
-
-# from flask_jwt_extended import JWTManager
 from flask_jwt_extended import exceptions as jwt_exceptions
 from flask_jwt_extended import verify_jwt_in_request
 from flask_smorest import Api as ApiOrig
 from marshmallow import Schema
 
 from ..error.exceptions import ForbiddenError, UnauthorizedError
+from .jwt import init_jwt
 
 if TYPE_CHECKING:
     from flask import Flask
@@ -53,13 +52,6 @@ class Api(ApiOrig):
         if app and not app.config.get("DISABLE_AUTH", False):
             spec_kwargs["security"] = [{"jwt": []}]
 
-        # if app:
-        # print(app.config.get("JWT_SECRET_KEY", []))
-        #     jwt = JWTManager()
-        #     jwt.init_app(app)
-        #     jwt._set_error_handler_callbacks(app)
-        # jwt.user_lookup_loader(user_loader_callback)
-
         super().__init__(app, spec_kwargs=spec_kwargs)
 
     def init_app(self, app: "Flask", *pargs: str, **kwargs: dict) -> None:
@@ -73,6 +65,9 @@ class Api(ApiOrig):
             *pargs: Additional positional arguments
             **kwargs: Additional keyword arguments
         """
+
+        init_jwt(app)
+
         app.config["API_SPEC_OPTIONS"] = {"components": {"securitySchemes": {}}}
         if "jwt" in app.config.get("AUTH_METHODS", []):
             app.config["API_SPEC_OPTIONS"]["components"]["securitySchemes"]["bearerAuth"] = {

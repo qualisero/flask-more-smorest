@@ -380,7 +380,11 @@ class UserRole(BasePermsModel):
 
     # Relationships
     domain: Mapped["Domain | None"] = relationship("Domain")
-    user: Mapped["User"] = relationship("User", back_populates="roles")
+    user: Mapped["User"] = relationship(
+        "User",
+        back_populates="roles",
+        enable_typechecks=False,  # allow User subclasses
+    )
 
     # Store role as string to support custom enums
     _role: Mapped[str] = mapped_column("role", sa.String(50), nullable=False)
@@ -455,7 +459,7 @@ class UserRole(BasePermsModel):
             return True
 
 
-class Token(BasePermsModel, UserOwnedResourceMixin):
+class Token(UserOwnedResourceMixin, BasePermsModel):
     """API tokens for user authentication."""
 
     token: Mapped[str] = mapped_column(db.String(1024), nullable=False)
@@ -465,7 +469,7 @@ class Token(BasePermsModel, UserOwnedResourceMixin):
     revoked_at: Mapped[sa.DateTime | None] = mapped_column(sa.DateTime(), nullable=True)
 
 
-class UserSetting(BasePermsModel, UserOwnedResourceMixin):
+class UserSetting(UserOwnedResourceMixin, BasePermsModel):
     """User-specific key-value settings storage."""
 
     key: Mapped[str] = mapped_column(db.String(80), nullable=False)
