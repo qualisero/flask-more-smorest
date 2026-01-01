@@ -7,12 +7,26 @@ filter parameters into SQLAlchemy query statements. It supports:
 - Enum list filters (field__in)
 """
 
+import copy
 from typing import Mapping
 
 import marshmallow as ma
+from marshmallow import validate
 from sqlalchemy import ColumnElement
 
 from flask_more_smorest.sqla.base_model import BaseModel
+
+_NUMERIC_FIELDS = (ma.fields.Integer, ma.fields.Float, ma.fields.Decimal)
+_TEMPORAL_FIELDS = (ma.fields.DateTime, ma.fields.Date)
+
+
+def _clone_field(field: ma.fields.Field) -> ma.fields.Field:
+    new_field = copy.deepcopy(field)
+    new_field.load_default = None
+    new_field.load_only = True
+    new_field.dump_only = False
+    new_field.required = False
+    return new_field
 
 
 def generate_filter_schema(base_schema: type[ma.Schema] | ma.Schema) -> type[ma.Schema]:
@@ -24,6 +38,7 @@ def generate_filter_schema(base_schema: type[ma.Schema] | ma.Schema) -> type[ma.
     - Date/DateTime fields become range filters with __from and __to suffixes
     - Numeric fields get __min and __max filters (equality removed for floats)
     - Enum fields get __in list filters
+    - Adds optional pagination parameters (page, page_size) to allow validation
 
     Args:
         base_schema: The base Marshmallow schema class to derive filters from
@@ -42,86 +57,103 @@ def generate_filter_schema(base_schema: type[ma.Schema] | ma.Schema) -> type[ma.
         >>> # created_at__from, created_at__to
     """
 
-    temp_instance: ma.Schema
     if isinstance(base_schema, ma.Schema):
-        temp_instance = base_schema
+        base_instance = base_schema
+        base_cls = type(base_instance)
     else:
-        temp_instance = base_schema()
+        base_cls = base_schema
+        base_instance = base_cls()
 
-    new_declared_fields = {}
-    remove_declared_fields = set()
+    field_definitions: dict[str, ma.fields.Field] = {}
+    preserved_fields: dict[str, ma.fields.Field] = {}
+    excluded_fields: set[str] = set()
 
-    for field_name, field_obj in temp_instance.fields.items():
-        field_type = type(field_obj)
+    for field_name, field_obj in base_instance.fields.items():
+        new_fields: dict[str, ma.fields.Field] = {}
+        keep_original = True
 
-        if isinstance(field_obj, ma.fields.DateTime) or isinstance(field_obj, ma.fields.Date):
-            # Replace date fields with range fields
-            new_declared_fields[f"{field_name}__from"] = field_type(
-                load_default=None, load_only=True, dump_only=False, required=False
-            )
-            new_declared_fields[f"{field_name}__to"] = field_type(
-                load_default=None, load_only=True, dump_only=False, required=False
-            )
-            remove_declared_fields |= {field_name}
-        if (
-            isinstance(field_obj, ma.fields.Integer)
-            or isinstance(field_obj, ma.fields.Float)
-            or isinstance(field_obj, ma.fields.Decimal)
-        ):
-            # Add min/max fields for numeric types
-            new_declared_fields[f"{field_name}__min"] = field_type(
-                load_default=None, load_only=True, dump_only=False, required=False
-            )
-            new_declared_fields[f"{field_name}__max"] = field_type(
-                load_default=None, load_only=True, dump_only=False, required=False
-            )
+        if isinstance(field_obj, _TEMPORAL_FIELDS):
+            keep_original = False
+            for suffix in ("__from", "__to"):
+                cloned = _clone_field(field_obj)
+                new_fields[f"{field_name}{suffix}"] = cloned
+
+        if isinstance(field_obj, _NUMERIC_FIELDS):
+            for suffix in ("__min", "__max"):
+                cloned = _clone_field(field_obj)
+                new_fields[f"{field_name}{suffix}"] = cloned
             if not isinstance(field_obj, ma.fields.Integer):
-                # Equality filters on float/decimal fields don't make much sense
-                remove_declared_fields |= {field_name}
-        if isinstance(field_obj, ma.fields.Enum):
-            # Add __in filter for enum fields
-            new_declared_fields[f"{field_name}__in"] = ma.fields.List(
-                ma.fields.Enum(field_obj.enum), load_default=None, load_only=True, dump_only=False, required=False
-            )
+                keep_original = False
 
-    def on_bind_field(field_obj: ma.fields.Field) -> None:
-        # Called automatically when a field is attached to this schema
+        if isinstance(field_obj, ma.fields.Enum):
+            enum_field = ma.fields.List(
+                ma.fields.Enum(field_obj.enum),
+                load_default=None,
+                load_only=True,
+                dump_only=False,
+                required=False,
+            )
+            new_fields[f"{field_name}__in"] = enum_field
+
+        if keep_original:
+            preserved_fields[field_name] = _clone_field(field_obj)
+        else:
+            excluded_fields.add(field_name)
+
+        for new_name, new_field in new_fields.items():
+            field_definitions[new_name] = new_field
+
+    def _remove_none_fields(self: ma.Schema, data: dict, **kwargs: dict) -> dict:
+        return {k: v for k, v in data.items() if v is not None}
+
+    def _on_bind_field(self: ma.Schema, field_name: str, field_obj: ma.fields.Field) -> None:
         field_obj.load_default = None
         field_obj.load_only = True
         field_obj.dump_only = False
         field_obj.required = False
 
-    def remove_none_fields(data: dict) -> dict:
-        # Remove fields with None values from the deserialized data
-        return {k: v for k, v in data.items() if v is not None}
+    base_meta = getattr(base_cls, "Meta", object)
+    base_exclude: tuple[str, ...] = tuple(getattr(base_meta, "exclude", ()))
+    combined_exclude = tuple(dict.fromkeys(base_exclude + tuple(sorted(excluded_fields))))
 
-    FilterSchema: type[ma.Schema] = type(
-        "FilterSchema",
-        (type(temp_instance),),
-        {
-            "on_bind_field": lambda self, field_name, field_obj: on_bind_field(field_obj),
-            "remove_none_fields": ma.post_load(lambda self, data, **kwargs: remove_none_fields(data)),
-            "Meta": type(
-                "Meta",
-                (getattr(type(temp_instance), "Meta", object),),
-                {
-                    "partial": True,
-                    "load_instance": False,
-                    "unknown": ma.RAISE,
-                },
-            ),
-        },
+    meta_attrs: dict[str, object] = {
+        "partial": True,
+        "load_instance": False,
+        "unknown": ma.RAISE,
+    }
+    if combined_exclude:
+        meta_attrs["exclude"] = combined_exclude
+
+    meta_class = type(
+        "Meta",
+        (base_meta,),
+        meta_attrs,
     )
 
-    # Add the new fields to the class's declared_fields
-    for field_name, field_obj in new_declared_fields.items():
-        setattr(FilterSchema, field_name, field_obj)
-        FilterSchema._declared_fields[field_name] = field_obj
-    # Remove fields that have been replaced with range fields
-    for field_name in remove_declared_fields:
-        if field_name in FilterSchema._declared_fields:
-            del FilterSchema._declared_fields[field_name]
+    attrs: dict[str, object] = {
+        "Meta": meta_class,
+        "on_bind_field": _on_bind_field,
+        "remove_none_fields": ma.post_load(_remove_none_fields),
+    }
+    attrs.update(preserved_fields)
+    attrs.update(field_definitions)
 
+    # Pagination parameters
+    attrs["page"] = ma.fields.Integer(
+        load_default=None,
+        load_only=True,
+        required=False,
+        validate=validate.Range(min=1),
+    )
+    attrs["page_size"] = ma.fields.Integer(
+        load_default=None,
+        load_only=True,
+        required=False,
+        validate=validate.Range(min=1),
+    )
+
+    class_name = f"{base_cls.__name__}FilterSchema"
+    FilterSchema: type[ma.Schema] = type(class_name, (base_cls,), attrs)
     return FilterSchema
 
 
@@ -150,6 +182,9 @@ def get_statements_from_filters(kwargs: Mapping, model: type[BaseModel]) -> set[
 
     for field_name, value in kwargs.items():
         if value is None:
+            continue
+        if field_name in ("page", "page_size"):
+            # Skip pagination parameters as they are handled separately
             continue
         if field_name.endswith("__from"):
             base_field = getattr(model, field_name[:-6])

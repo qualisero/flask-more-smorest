@@ -7,18 +7,16 @@ permission checking functionality based on the current user context.
 import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Callable
+from typing import Any, Callable, Self, cast
 
 import sqlalchemy as sa
 from flask import has_request_context
 from flask_jwt_extended import exceptions, verify_jwt_in_request
+from sqlalchemy.orm.state import InstanceState
 from werkzeug.exceptions import Unauthorized
 
 from ..error.exceptions import ForbiddenError, UnauthorizedError
 from ..sqla import BaseModel as SQLABaseModel
-
-if TYPE_CHECKING:
-    from flask import Flask  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -98,11 +96,13 @@ class BasePermsModel(SQLABaseModel):
         """
         try:
             return check_func()
-        except RuntimeError:
+        except (exceptions.JWTExtendedException, Unauthorized):
             raise UnauthorizedError("User must be authenticated")
-        except Exception as e:
-            logger.error("can_%s() exception: %s", operation, e)
-            return False
+        except RuntimeError as e:
+            # Handle "Working outside of request context" errors
+            if not has_request_context():
+                raise UnauthorizedError("User must be authenticated")
+            raise e
 
     def can_write(self) -> bool:
         """Does current user have write permission on object.
@@ -146,7 +146,6 @@ class BasePermsModel(SQLABaseModel):
         if self.perms_disabled:
             return True
         if not has_request_context():
-            logger.debug("No request context; bypassing create permission checks")
             return True
         is_admin = getattr(self, "is_admin", False)
         is_role_instance = type(self).__name__ == "UserRole"
@@ -179,6 +178,61 @@ class BasePermsModel(SQLABaseModel):
         """
         return self._can_write()
 
+    def _check_permission(self, operation: str) -> None:
+        """Ensure permissions exist before mutating the resource."""
+        permission_methods = {
+            "write": (self.can_write, "modify"),
+            "create": (self.can_create, "create"),
+            "delete": (self.can_write, "delete"),
+        }
+        check_method, action = permission_methods[operation]
+        if not check_method():
+            raise ForbiddenError(f"User not allowed to {action} this resource: {self}")
+
+    def save(self, commit: bool = True) -> Self:
+        """Extend BaseModel save with permission checks."""
+        state = cast(InstanceState[Any], sa.inspect(self))
+        if getattr(state, "transient", False) or getattr(state, "pending", False):
+            self._check_permission("create")
+        else:
+            self._check_permission("write")
+        return super().save(commit=commit)
+
+    def delete(self, commit: bool = True) -> None:
+        """Extend BaseModel delete with permission checks."""
+        self._check_permission("delete")
+        return super().delete(commit=commit)
+
+    @classmethod
+    def get_by(cls, **kwargs: Any) -> Self | None:
+        """Get resource by field values with permission check.
+
+        Behavior:
+            * If no resource is found, returns ``None``.
+            * If a resource is found and ``can_read()`` returns ``True``, the
+              instance is returned.
+            * If a resource is found but ``can_read()`` returns ``False``:
+
+              - If ``current_app.config['RETURN_404_ON_ACCESS_DENIED']`` is
+                truthy, this behaves as if the resource does not exist and
+                returns ``None``.
+              - Otherwise, a :class:`ForbiddenError` is raised.
+        """
+        from flask import current_app
+
+        res = super().get_by(**kwargs)
+        if res is None:
+            return None
+
+        if res.can_read():
+            return res
+
+        if current_app and current_app.config.get("RETURN_404_ON_ACCESS_DENIED"):
+            # Pretend the resource does not exist
+            return None
+
+        raise ForbiddenError(f"User not allowed to read resource: {res}")
+
     @classmethod
     def is_current_user_admin(cls) -> bool:
         """Check if current user is an admin.
@@ -192,25 +246,40 @@ class BasePermsModel(SQLABaseModel):
             verify_jwt_in_request()
             if current_user.is_admin:
                 return True
-        except exceptions.JWTExtendedException:
+        except (exceptions.JWTExtendedException, Unauthorized):
+            logger.debug("JWT verification failed or unauthorized when checking admin status", exc_info=True)
             return False
-        except Unauthorized:
+        except RuntimeError as exc:
+            logger.debug("Runtime error during admin check (likely outside request context): %s", exc)
+            return False
+        except Exception as exc:  # pragma: no cover - defensive guard
+            logger.warning("Unexpected error during admin check: %s", exc, exc_info=True)
             return False
 
         return False
 
-    def check_create(self, val: list | set | tuple | object) -> None:
+    def check_create(self, val: list | set | tuple | object, _visited: set[int] | None = None) -> None:
         """Recursively check that all BaseModel instances can be created.
 
         Args:
             val: Value or collection of values to check
+            _visited: Internal set of visited object ids to prevent infinite recursion
 
         Raises:
             ForbiddenError: If any nested object cannot be created
         """
+        if _visited is None:
+            _visited = set()
+
+        obj_id = id(val)
+        if obj_id in _visited:
+            # Cycle detected; stop descending further to avoid infinite recursion
+            return
+        _visited.add(obj_id)
+
         if isinstance(val, BasePermsModel):
             if getattr(sa.inspect(val), "transient", False) and not val.can_create():
                 raise ForbiddenError(f"User not allowed to create resource: {val}")
         elif isinstance(val, list) or isinstance(val, set) or isinstance(val, tuple):
             for x in val:
-                self.check_create(x)
+                self.check_create(x, _visited=_visited)

@@ -5,12 +5,22 @@ Blueprint to automatically generate OpenAPI operationId values for endpoints.
 """
 
 import functools
-from typing import Callable
+from typing import Callable, Final
 
 from flask.views import MethodView
 from flask_smorest import Blueprint
 
 from .utils import convert_snake_to_camel
+
+HTTP_METHOD_OPERATION_MAP: Final[dict[str, str]] = {
+    "patch": "update",
+    "delete": "delete",
+    "get": "get",
+    "post": "create",
+    "put": "replace",
+}
+
+__all__ = ["BlueprintOperationIdMixin", "HTTP_METHOD_OPERATION_MAP"]
 
 
 class BlueprintOperationIdMixin(Blueprint):
@@ -47,14 +57,6 @@ class BlueprintOperationIdMixin(Blueprint):
             rule, *pargs, **kwargs
         )
 
-        OPERATION_NAME_MAP: dict[str, str] = {
-            "patch": "update",
-            "delete": "delete",
-            "get": "get",
-            "post": "create",
-            "put": "replace",
-        }
-
         def _add_operation_id(func: Callable, method_view_class: type["MethodView"] | None = None) -> Callable:
             """Add operationId to the function if not already set.
 
@@ -68,14 +70,17 @@ class BlueprintOperationIdMixin(Blueprint):
             apidoc: dict[str, dict[str, str]] = getattr(func, "_apidoc", {})
             if "manual_doc" in apidoc and "operationId" in apidoc["manual_doc"]:
                 return func
+            method_name = func.__name__.lower()
             if method_view_class is None:
                 operation_id = func.__name__
             else:
-                if func.__name__.lower() == "get" and method_view_class.__name__.endswith("s") and rule.endswith("/"):
-                    operation_id = f"list{method_view_class.__name__[:-1]}"
+                class_name = method_view_class.__name__
+                # TODO: decide if ending in `/` should be enough to consider it a collection
+                if method_name == "get" and class_name.endswith("s") and rule.endswith("/"):
+                    operation_id = f"list{class_name}"
                 else:
-                    operation_name = OPERATION_NAME_MAP.get(func.__name__.lower(), func.__name__.lower())
-                    operation_id = f"{operation_name}{method_view_class.__name__}"
+                    operation_name = HTTP_METHOD_OPERATION_MAP.get(method_name, method_name)
+                    operation_id = f"{operation_name}{class_name}"
             operation_id = convert_snake_to_camel(operation_id)
             operation_id = operation_id[0].lower() + operation_id[1:]
             decorated_func = self.doc(operationId=operation_id)(func)

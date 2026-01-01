@@ -1,28 +1,25 @@
 """Base model for SQLAlchemy models with automatic schema generation.
 
 This module provides BaseModel, a base class for all SQLAlchemy models
-that includes automatic Marshmallow schema generation, permission checking,
-and common CRUD operations.
+that includes automatic Marshmallow schema generation and common CRUD operations.
 """
 
 import datetime as dt
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Self, TypeAlias
+from typing import Any, Self, TypeAlias, cast
 
 import sqlalchemy as sa
-from flask import current_app, request
+from flask import request
 from marshmallow import fields, pre_load
 from marshmallow_sqlalchemy import ModelConverter, SQLAlchemyAutoSchema
 from sqlalchemy.orm import DeclarativeMeta, Mapped, MapperProperty, class_mapper, make_transient, mapped_column
 from sqlalchemy.orm.collections import InstrumentedList
+from sqlalchemy.orm.state import InstanceState
 
-from ..error.exceptions import ForbiddenError, NotFoundError
+from ..error.exceptions import NotFoundError
 from .database import db
-
-if TYPE_CHECKING:
-    from flask import Flask  # noqa: F401
 
 PropertyOrColumn: TypeAlias = MapperProperty | sa.Column
 
@@ -60,7 +57,12 @@ class BaseSchema(SQLAlchemyAutoSchema):
             for view_arg, val in args.items():
                 if view_arg not in self.fields or self.fields[view_arg].dump_only or data.get(view_arg) is not None:
                     continue
-                # Should we only replace if view_arg is required?
+                # TODO: Consider restricting automatic injection to fields marked as required.
+                #       This would ensure that only mandatory identifiers (for example, IDs coming
+                #       from the URL path) are populated from view_args, while optional fields
+                #       remain controlled by the client payload. Changing this behavior could
+                #       affect how partial updates are interpreted and may reduce surprising
+                #       cases where non-required fields are implicitly filled from the route.
                 data[view_arg] = val
 
         return data
@@ -164,7 +166,6 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
     - Automatic created_at and updated_at timestamps
     - Automatic Marshmallow schema generation
     - Common CRUD operations (get, save, update, delete)
-    - Permission checking hooks (can_read, can_write, can_create)
     - Lifecycle hooks (on_before_create, on_after_create, etc.)
 
     All models should inherit from this class to get these features.
@@ -173,7 +174,6 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
         id: UUID primary key (automatically generated)
         created_at: Timestamp of creation
         updated_at: Timestamp of last update
-        perms_disabled: Whether permission checks are disabled (default: True)
 
     Example:
         >>> class Article(BaseModel):
@@ -183,7 +183,6 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
     """
 
     __abstract__ = True
-    perms_disabled = True  # Default to True, overridden in perms model
 
     id: Mapped[uuid.UUID] = mapped_column(
         sa.Uuid(as_uuid=True),
@@ -213,7 +212,12 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
         Raises:
             RuntimeError: If database session is not active
         """
-        if not db.session or not db.session.is_active:
+        try:
+            session_proxy = db.session
+        except RuntimeError as exc:  # Raised if init_db/app context not configured
+            raise RuntimeError("In order to use BaseModel, you must import init_db from sqla and run it.") from exc
+
+        if session_proxy is None:
             raise RuntimeError("In order to use BaseModel, you must import init_db from sqla and run it.")
 
         super().__init__(**kwargs)
@@ -221,15 +225,13 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
     # @cached_property
     @property
     def is_writable(self) -> bool:
-        """Check if the object is writable by the current user.
+        """Return whether the instance is writable.
 
-        Returns:
-            True if the current user can write to this object, False otherwise
+        BaseModel does not enforce permissions, so instances are
+        considered writable by default. Permission-aware subclasses
+        can override this property.
         """
-        try:
-            return self.can_write()
-        except Exception:
-            return False
+        return True
 
     @classmethod
     def _to_uuid(cls, value: str | uuid.UUID) -> uuid.UUID:
@@ -284,12 +286,10 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
             **kwargs: Field name and value pairs to filter by
 
         Returns:
-            The matching model instance, or None if not found or access denied
+            The matching model instance, or None if not found
 
         Raises:
             TypeError: If ID is not a valid UUID string or UUID object
-            ForbiddenError: If user doesn't have read permission and
-                           RETURN_404_ON_ACCESS_DENIED is False
 
         Example:
             >>> user = User.get_by(email='test@example.com')
@@ -299,15 +299,9 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
 
         # don't automatically flush the session to avoid side effects
         with db.session.no_autoflush:
-            res = db.session.execute(db.select(cls).filter_by(**kwargs)).scalar_one_or_none()
+            result = db.session.execute(db.select(cls).filter_by(**kwargs)).scalar_one_or_none()
 
-        if res and not cls.perms_disabled and not res.can_read():
-            if current_app.config.get("RETURN_404_ON_ACCESS_DENIED"):
-                # If the resource exists but the user cannot read it, return None (raises 404)
-                return None
-            raise ForbiddenError(f"User not allowed to read this resource: {res}")
-
-        return res
+        return result
 
     @classmethod
     def get_by_or_404(cls, **kwargs: str | int | uuid.UUID | bool | None) -> Self:
@@ -381,24 +375,11 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
         if not cls.get(id):
             raise NotFoundError(f"{cls.__name__} id {id} doesn't exist")
 
-    def _check_permission(self, operation: str) -> None:
-        """Check if user has permission for specified operation.
-
-        Args:
-            operation: Operation type ('write', 'create', 'delete')
-
-        Raises:
-            ForbiddenError: If user doesn't have permission for the operation
-        """
-        permission_methods = {
-            "write": (self.can_write, "modify"),
-            "create": (self.can_create, "create"),
-            "delete": (self.can_write, "delete"),
-        }
-
-        check_method, action = permission_methods[operation]
-        if not check_method():
-            raise ForbiddenError(f"User not allowed to {action} this resource: {self}")
+    @classmethod
+    @contextmanager
+    def bypass_perms(cls) -> Iterator[None]:
+        """No-op context manager for base class (overridden in perms model)."""
+        yield
 
     def save(self, commit: bool = True) -> Self:
         """Save the record: add to session and optionally commit.
@@ -417,28 +398,33 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
             >>> user.save()
         """
 
-        state = sa.inspect(self)  # type: ignore
-        if getattr(state, "transient", False):
-            self._check_permission("create")
+        state = cast(InstanceState[Any], sa.inspect(self))
+        is_transient = getattr(state, "transient", False)
+        is_pending = getattr(state, "pending", False)
+        is_new = is_transient or is_pending
+
+        if is_new:
             self.on_before_create()
         else:
-            self._check_permission("write")
-            # TODO: should we move on_before_update to the update method?
             self.on_before_update()
 
         db.session.add(self)
         if commit:
-            self.commit()
+            self.commit(is_create=is_new)
 
         return self
 
-    def commit(self, is_delete: bool = False) -> None:
+    def commit(self, is_delete: bool = False, *, is_create: bool | None = None) -> None:
         """Commit the session and call appropriate lifecycle hooks.
 
         Args:
             is_delete: Whether this is a delete operation (default: False)
+            is_create: Explicit flag indicating whether this commit corresponds to a creation
         """
-        is_create = self.id is None
+        if is_create is None:
+            state = cast(InstanceState[Any], sa.inspect(self))
+            is_create = getattr(state, "pending", False) and not getattr(state, "deleted", False)
+
         db.session.commit()
         if is_create:
             self.on_after_create()
@@ -497,14 +483,14 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
             >>> user = User.get(user_id)
             >>> user.delete()
         """
-        self._check_permission("delete")
+        # Refresh state if this instance is bound to the session; ignore otherwise.
+        if self in db.session:
+            db.session.refresh(self)
 
-        # Ensure the object is up to date to prevent issues with cascading:
-        db.session.refresh(self)
         self.on_before_delete()
         db.session.delete(self)
         if commit:
-            self.commit(is_delete=True)
+            self.commit(is_delete=True, is_create=False)
 
     def get_clone(self) -> Self:
         """Return a copy of the object with a new ID.
@@ -571,59 +557,27 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
         """
         pass
 
-    @classmethod
-    @contextmanager
-    def bypass_perms(cls) -> Iterator[None]:
-        """No-op context manager for base class (overridden in perms model).
-
-        Yields:
-            None
-        """
-        yield
-
-    def can_write(self) -> bool:
-        """Check if current user can write to this object.
-
-        No-op for base class (overridden in perms model).
-
-        Returns:
-            True (always allows writes in base model)
-        """
-        return True
-
-    def can_read(self) -> bool:
-        """Check if current user can read this object.
-
-        No-op for base class (overridden in perms model).
-
-        Returns:
-            True (always allows reads in base model)
-        """
-        return True
-
-    def can_create(self) -> bool:
-        """Check if current user can create this object.
-
-        No-op for base class (overridden in perms model).
-
-        Returns:
-            True (always allows creation in base model)
-        """
-        return True
-
     def check_create(self, val: list | set | tuple | object) -> None:
-        pass
+        """Recursively validate nested models before creating them.
 
-    @classmethod
-    def is_current_user_admin(cls) -> bool:
-        """Check if current user is an admin.
-
-        No-op for base class (overridden in perms model).
-
-        Returns:
-            False (no admin concept in base model)
+        Ensures nested BaseModel instances have an opportunity to perform
+        their own permission checks (for example, BasePermsModel subclasses).
         """
-        return False
+        if isinstance(val, BaseModel):
+            if val is self:
+                return
+            val.check_create(val)
+            return
+
+        if isinstance(val, dict):
+            iterable: Iterable[object] = val.values()
+        elif isinstance(val, Iterable) and not isinstance(val, (str, bytes)):
+            iterable = val
+        else:
+            return
+
+        for item in iterable:
+            self.check_create(item)
 
     def __repr__(self) -> str:
         """Return string representation of the model.
