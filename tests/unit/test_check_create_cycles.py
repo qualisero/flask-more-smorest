@@ -33,7 +33,7 @@ def test_check_create_handles_cycles_without_recursion_error(app: Flask) -> None
 
         root = Node()
         # Create a self-cycle
-        root.parent = root
+        root.parent = root  # pyright: ignore[reportAttributeAccessIssue]
 
         # Should not raise RecursionError due to cycle; any permission
         # exceptions would be raised explicitly instead.
