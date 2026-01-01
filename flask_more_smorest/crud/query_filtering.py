@@ -24,6 +24,7 @@ def generate_filter_schema(base_schema: type[ma.Schema] | ma.Schema) -> type[ma.
     - Date/DateTime fields become range filters with __from and __to suffixes
     - Numeric fields get __min and __max filters (equality removed for floats)
     - Enum fields get __in list filters
+    - Adds optional pagination parameters (page, page_size) to allow validation
 
     Args:
         base_schema: The base Marshmallow schema class to derive filters from
@@ -117,6 +118,15 @@ def generate_filter_schema(base_schema: type[ma.Schema] | ma.Schema) -> type[ma.
     for field_name, field_obj in new_declared_fields.items():
         setattr(FilterSchema, field_name, field_obj)
         FilterSchema._declared_fields[field_name] = field_obj
+
+    # Add optional pagination fields to allow them in query string without RAISE error
+    page_field = ma.fields.Integer(load_default=None, load_only=True, required=False)
+    page_size_field = ma.fields.Integer(load_default=None, load_only=True, required=False)
+    setattr(FilterSchema, "page", page_field)
+    setattr(FilterSchema, "page_size", page_size_field)
+    FilterSchema._declared_fields["page"] = page_field
+    FilterSchema._declared_fields["page_size"] = page_size_field
+
     # Remove fields that have been replaced with range fields
     for field_name in remove_declared_fields:
         if field_name in FilterSchema._declared_fields:
@@ -150,6 +160,9 @@ def get_statements_from_filters(kwargs: Mapping, model: type[BaseModel]) -> set[
 
     for field_name, value in kwargs.items():
         if value is None:
+            continue
+        if field_name in ("page", "page_size"):
+            # Skip pagination parameters as they are handled separately
             continue
         if field_name.endswith("__from"):
             base_field = getattr(model, field_name[:-6])

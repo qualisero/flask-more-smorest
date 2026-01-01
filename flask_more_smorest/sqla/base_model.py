@@ -9,7 +9,7 @@ import datetime as dt
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Self, TypeAlias
+from typing import Any, Self, TypeAlias
 
 import sqlalchemy as sa
 from flask import current_app, request
@@ -20,9 +20,6 @@ from sqlalchemy.orm.collections import InstrumentedList
 
 from ..error.exceptions import ForbiddenError, NotFoundError
 from .database import db
-
-if TYPE_CHECKING:
-    from flask import Flask  # noqa: F401
 
 PropertyOrColumn: TypeAlias = MapperProperty | sa.Column
 
@@ -60,7 +57,7 @@ class BaseSchema(SQLAlchemyAutoSchema):
             for view_arg, val in args.items():
                 if view_arg not in self.fields or self.fields[view_arg].dump_only or data.get(view_arg) is not None:
                     continue
-                # Should we only replace if view_arg is required?
+                # TODO: Should we only replace if view_arg is required?
                 data[view_arg] = val
 
         return data
@@ -418,12 +415,11 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
         """
 
         state = sa.inspect(self)  # type: ignore
-        if getattr(state, "transient", False):
+        if getattr(state, "transient", False) or getattr(state, "pending", False):
             self._check_permission("create")
             self.on_before_create()
         else:
             self._check_permission("write")
-            # TODO: should we move on_before_update to the update method?
             self.on_before_update()
 
         db.session.add(self)

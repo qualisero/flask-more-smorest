@@ -9,8 +9,9 @@ from marshmallow import Schema
 
 from ..blueprint_operationid import BlueprintOperationIdMixin
 from ..crud import CRUDBlueprint as CRUDBlueprintBase
+from ..crud.crud_blueprint import MethodConfig
 from .api import Api
-from .base_perms_model import BasePermsModel as BaseModel
+from .base_perms_model import BasePermsModel
 from .jwt import init_jwt
 from .perms_blueprint import PermsBlueprintMixin
 from .user_models import Domain, Token, User, UserRole, UserSetting, current_user, get_current_user_id
@@ -28,7 +29,7 @@ class CRUDBlueprint(CRUDBlueprintBase, PermsBlueprintMixin, BlueprintOperationId
         view_cls: type[MethodView],
         method_name: str,
         docstring: str,
-        method_config: dict[str, Schema | str | bool | object],
+        method_config: MethodConfig,
     ) -> None:
         # Call each mixin's implementation explicitly
         PermsBlueprintMixin._configure_endpoint(self, view_cls, method_name, docstring, method_config)
@@ -37,7 +38,7 @@ class CRUDBlueprint(CRUDBlueprintBase, PermsBlueprintMixin, BlueprintOperationId
 
 __all__ = [
     "Api",
-    "BaseModel",
+    "BasePermsModel",
     "User",
     "UserRole",
     "Domain",

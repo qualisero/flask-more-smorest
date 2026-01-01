@@ -41,16 +41,17 @@ Custom User Model Example:
 """
 
 from .blueprint_operationid import BlueprintOperationIdMixin
+from .crud.crud_blueprint import CRUDMethod
 
 # Import utilities
 from .crud.query_filtering import generate_filter_schema, get_statements_from_filters
 
 # Import core blueprints
-from .perms import Api, CRUDBlueprint
+from .perms import Api, BasePermsModel, CRUDBlueprint
 from .perms.jwt import init_jwt
 
 # Import user model mixins
-from .perms.model_mixins import ProfileMixin, SoftDeleteMixin, TimestampMixin
+from .perms.model_mixins import ProfileMixin, SoftDeleteMixin, TimestampMixin, UserCanReadWriteMixin
 from .perms.perms_blueprint import PermsBlueprintMixin as BlueprintAccessMixin
 
 # Import user models and authentication
@@ -64,7 +65,7 @@ from .sqla import BaseModel, create_migration, db, downgrade_database, init_db, 
 from .sqla.base_model import BaseSchema
 from .utils import convert_snake_to_camel
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "Dave <david@qualisero.com>"
 __email__ = "david@qualisero.com"
 __description__ = "Enhanced Flask-Smorest blueprints with automatic CRUD operations and extensible user management"
@@ -73,10 +74,12 @@ __all__ = [
     "Api",
     # Core blueprints
     "CRUDBlueprint",
+    "CRUDMethod",
     "BlueprintAccessMixin",
     "BlueprintOperationIdMixin",
     # Database and models
     "BaseModel",
+    "BasePermsModel",
     "BaseSchema",
     "db",
     "init_db",
@@ -94,6 +97,7 @@ __all__ = [
     "TimestampMixin",
     "ProfileMixin",
     "SoftDeleteMixin",
+    "UserCanReadWriteMixin",
     # Migration system
     "init_migrations",
     "create_migration",

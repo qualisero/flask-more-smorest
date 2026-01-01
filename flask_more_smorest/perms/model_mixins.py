@@ -6,11 +6,11 @@ functionality to User models and other models in Flask-More-Smorest.
 
 import datetime as dt
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declared_attr
-from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
+from sqlalchemy.orm import Mapped, backref, mapped_column, relationship, synonym
 
 from flask_more_smorest.error.exceptions import ForbiddenError
 
@@ -24,36 +24,85 @@ class HasUserMixin:
     Adds a user_id field and user relationship to track which user
     owns or created the model instance.
 
+    The mixin supports optional aliasing/nullable configuration via:
+        - ``__user_field_name__``: custom attribute alias for ``user_id``
+        - ``__user_relationship_name__``: custom alias for ``user``
+        - ``__user_id_nullable__``: allow NULL owner IDs
+
     Example:
         >>> class Article(BasePermsModel, HasUserMixin):
+        ...     __user_field_name__ = "author_id"
+        ...     __user_relationship_name__ = "author"
+        ...     __user_id_nullable__ = True
         ...     title: Mapped[str] = mapped_column(sa.String(200))
         ...
-        >>> article = Article(title="Test", user_id=current_user.id)
+        >>> article = Article(title="Test", author_id=current_user.id)
     """
 
-    @declared_attr
-    def user_id(cls) -> Mapped[uuid.UUID]:
-        """User ID foreign key.
+    __user_field_name__ = "user_id"
+    __user_relationship_name__ = "user"
+    __user_id_nullable__ = False
 
-        Returns:
-            Mapped UUID column with foreign key to users table
-        """
+    def __init_subclass__(cls, **kwargs: Any):
+        """Configure user field and relationship aliases on subclass creation."""
+        super().__init_subclass__(**kwargs)
+        cls._configure_user_aliases()
+
+    @classmethod
+    def _user_column_nullable(cls) -> bool:
+        return bool(getattr(cls, "__user_id_nullable__", False))
+
+    @classmethod
+    def _user_field_alias(cls) -> str:
+        return str(getattr(cls, "__user_field_name__", "user_id"))
+
+    @classmethod
+    def _user_relationship_alias(cls) -> str:
+        return str(getattr(cls, "__user_relationship_name__", "user"))
+
+    @classmethod
+    def _configure_user_aliases(cls) -> None:
+        field_alias = cls._user_field_alias()
+        rel_alias = cls._user_relationship_alias()
+
+        if field_alias and field_alias != "user_id" and not hasattr(cls, field_alias):
+            setattr(cls, field_alias, synonym("user_id"))
+            cls._copy_annotation("user_id", field_alias)
+
+        if rel_alias and rel_alias != "user" and not hasattr(cls, rel_alias):
+            setattr(cls, rel_alias, synonym("user"))
+            cls._copy_annotation("user", rel_alias)
+
+    @classmethod
+    def _copy_annotation(cls, source: str, target: str) -> None:
+        annotations = dict(getattr(cls, "__annotations__", {}))
+        source_type = annotations.get(source)
+        if source_type is None:
+            if source == "user_id":
+                source_type = Mapped[uuid.UUID]
+            else:
+                source_type = Mapped["User"]
+        annotations[target] = source_type
+        setattr(cls, "__annotations__", annotations)
+
+    @declared_attr
+    def user_id(cls) -> Mapped[uuid.UUID | None]:
+        """User ID foreign key with optional nullability."""
         from .user_models import get_current_user_id
+
+        nullable = cls._user_column_nullable()
+        default_callable = None if nullable else get_current_user_id
 
         return mapped_column(
             sa.Uuid(as_uuid=True),
             sa.ForeignKey("user.id", ondelete="CASCADE"),
-            nullable=False,
-            default=get_current_user_id,
+            nullable=nullable,
+            default=default_callable,
         )
 
     @declared_attr
     def user(cls) -> Mapped["User"]:
-        """Relationship to User model.
-
-        Returns:
-            Mapped relationship to the User who owns this record
-        """
+        """Relationship to User model."""
         backref_name = f"{cls.__tablename__}s"  # type: ignore
         # Add backref to User model, unless it already exists
         from .user_models import User
@@ -77,10 +126,17 @@ class UserCanReadWriteMixin(HasUserMixin):
     Combines HasUserMixin with permission methods that allow users
     to read and write only their own records.
 
+    Note:
+        This mixin enforces __user_id_nullable__ = False to ensure
+        automatic ownership assignment. Without an owner, the permission
+        checks would always fail.
+
     Example:
         >>> class Note(BasePermsModel, UserCanReadWriteMixin):
         ...     content: Mapped[str] = mapped_column(sa.Text)
     """
+
+    __user_id_nullable__ = False
 
     def _can_write(self) -> bool:
         """User can write if they are the owner of the object.

@@ -7,7 +7,7 @@ permission checking functionality based on the current user context.
 import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Callable
+from typing import Callable
 
 import sqlalchemy as sa
 from flask import has_request_context
@@ -17,8 +17,8 @@ from werkzeug.exceptions import Unauthorized
 from ..error.exceptions import ForbiddenError, UnauthorizedError
 from ..sqla import BaseModel as SQLABaseModel
 
-if TYPE_CHECKING:
-    from flask import Flask  # noqa: F401
+# if TYPE_CHECKING:
+#     from flask import Flask  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -98,8 +98,13 @@ class BasePermsModel(SQLABaseModel):
         """
         try:
             return check_func()
-        except RuntimeError:
+        except (exceptions.JWTExtendedException, Unauthorized):
             raise UnauthorizedError("User must be authenticated")
+        except RuntimeError as e:
+            # Handle "Working outside of request context" errors
+            if "Working outside of request context" in str(e):
+                raise UnauthorizedError("User must be authenticated")
+            raise e
         except Exception as e:
             logger.error("can_%s() exception: %s", operation, e)
             return False
