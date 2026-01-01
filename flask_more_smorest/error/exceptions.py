@@ -61,7 +61,7 @@ class ApiException(Exception):
             exc: Original exception that caused this error
             **kwargs: Additional context information
         """
-        self.custom_args: dict[str, str | int | bool | None] = {}
+        self.custom_args: dict[str, str | int | bool | None] = dict(kwargs)
         self.debug_context = self.get_debug_context(**kwargs)
 
         if message is None:
@@ -75,7 +75,7 @@ class ApiException(Exception):
             else:
                 self.message = message
 
-        super().__init__(self.message, **kwargs)
+        super().__init__(self.message)
 
         self.log_exception()
 
@@ -140,8 +140,11 @@ class ApiException(Exception):
             exc = sys.exception()
             if exc is not None:
                 formatted_tb: list[str] = traceback.format_list(traceback.extract_tb(exc.__traceback__))
-                if isinstance(error["debug_context"], dict):
-                    error["debug_context"]["traceback"] = formatted_tb
+                debug_block = error.get("debug")
+                if isinstance(debug_block, dict):
+                    debug_context = debug_block.get("debug_context")
+                    if isinstance(debug_context, dict):
+                        debug_context["traceback"] = formatted_tb
 
         response_obj: dict[str, dict] = {"error": error}
 

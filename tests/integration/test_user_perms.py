@@ -231,6 +231,26 @@ def test_users(user_perms_app: Flask, db_session: "scoped_session") -> dict[str,
         }
 
 
+@pytest.fixture
+def user_tokens(
+    user_perms_app: Flask,
+    db_session: "scoped_session",
+    test_users: dict[str, uuid.UUID],
+) -> dict[str, str]:
+    """JWT tokens for admin, verified, and unverified users."""
+
+    with user_perms_app.app_context():
+        admin_user = db_session.get(CustomUser, test_users["admin_id"])
+        verified_user = db_session.get(CustomUser, test_users["verified_id"])
+        unverified_user = db_session.get(CustomUser, test_users["unverified_id"])
+
+    return {
+        "admin": create_access_token(identity=admin_user),
+        "verified": create_access_token(identity=verified_user),
+        "unverified": create_access_token(identity=unverified_user),
+    }
+
+
 class TestCustomUserExtension:
     """Test CustomUser class extension."""
 
@@ -258,17 +278,20 @@ class TestCustomUserExtension:
         assert not user.has_role(DefaultUserRole.ADMIN)
 
     def test_custom_user_custom_permissions(
-        self, user_perms_app: Flask, db_session: "scoped_session", test_users: dict[str, uuid.UUID]
+        self,
+        user_perms_app: Flask,
+        db_session: "scoped_session",
+        test_users: dict[str, uuid.UUID],
+        user_tokens: dict[str, str],
     ) -> None:
         """Test CustomUser's custom write permission requiring verification."""
         verified_user = db_session.get(CustomUser, test_users["verified_id"])
         unverified_user = db_session.get(CustomUser, test_users["unverified_id"])
-        admin_user = db_session.get(CustomUser, test_users["admin_id"])
 
-        # Create access tokens
-        verified_token = create_access_token(identity=verified_user)
-        unverified_token = create_access_token(identity=unverified_user)
-        admin_token = create_access_token(identity=admin_user)
+        tokens = user_tokens
+        verified_token = tokens["verified"]
+        unverified_token = tokens["unverified"]
+        admin_token = tokens["admin"]
 
         # Test verified user can write their own profile
         assert verified_user is not None
@@ -295,24 +318,28 @@ class TestUserRelatedTables:
     """Test user-related default tables (settings, tokens, roles)."""
 
     def test_user_settings(
-        self, user_perms_app: Flask, db_session: "scoped_session", test_users: dict[str, uuid.UUID]
+        self,
+        user_perms_app: Flask,
+        db_session: "scoped_session",
+        test_users: dict[str, uuid.UUID],
+        user_tokens: dict[str, str],
     ) -> None:
         """Test UserSetting creation and retrieval."""
         user = db_session.get(CustomUser, test_users["verified_id"])
         assert user is not None
+
+        tokens = user_tokens
 
         # Create user settings
         setting1 = UserSetting(user_id=user.id, key="theme", value="dark")
         db_session.add(setting1)
         db_session.commit()
 
-        user_token = create_access_token(identity=user)
-        with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {user_token}"}):
+        with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {tokens['verified']}"}):
             setting2 = UserSetting(user_id=user.id, key="language", value="en")
             setting2.save()  # Using save() method
 
-        other_user = db_session.get(CustomUser, test_users["unverified_id"])
-        other_token = create_access_token(identity=other_user)
+        other_token = tokens["unverified"]
 
         with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {other_token}"}):
             # Attempt to create setting for another user should fail
@@ -330,7 +357,7 @@ class TestUserRelatedTables:
             with pytest.raises(ForbiddenError):
                 setting1.update(value="light")  # Should raise
 
-        with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {user_token}"}):
+        with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {tokens['verified']}"}):
             assert setting1.can_read()
             assert setting2.can_read()
             setting2.update(value="fr")  # Should not raise
@@ -351,7 +378,11 @@ class TestUserRelatedTables:
         assert language_setting.value == "fr"
 
     def test_user_tokens(
-        self, user_perms_app: Flask, db_session: "scoped_session", test_users: dict[str, uuid.UUID]
+        self,
+        user_perms_app: Flask,
+        db_session: "scoped_session",
+        test_users: dict[str, uuid.UUID],
+        user_tokens: dict[str, str],
     ) -> None:
         """Test Token creation and retrieval."""
         user = db_session.get(CustomUser, test_users["verified_id"])
@@ -362,8 +393,8 @@ class TestUserRelatedTables:
         db_session.add(token1)
         db_session.commit()
 
-        user_token = create_access_token(identity=user)
-        with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {user_token}"}):
+        tokens = user_tokens
+        with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {tokens['verified']}"}):
             token2 = Token(user_id=user.id, token="test_token_2", description="API Token 2")
             token2.save()  # Using save() method
 
@@ -411,7 +442,11 @@ class TestUserCanReadWriteMixin:
         assert note.user.email == user.email
 
     def test_note_read_permissions(
-        self, user_perms_app: Flask, db_session: "scoped_session", test_users: dict[str, uuid.UUID]
+        self,
+        user_perms_app: Flask,
+        db_session: "scoped_session",
+        test_users: dict[str, uuid.UUID],
+        user_tokens: dict[str, str],
     ) -> None:
         """Test that users can only read their own notes."""
         user1 = db_session.get(CustomUser, test_users["verified_id"])
@@ -423,18 +458,24 @@ class TestUserCanReadWriteMixin:
         db_session.add(note)
         db_session.commit()
 
+        tokens = user_tokens
+        user1_token = tokens["verified"]
+        user2_token = tokens["unverified"]
+
         # Test user1 can read their own note
-        user1_token = create_access_token(identity=user1)
         with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {user1_token}"}):
             assert note.can_read()
 
         # Test user2 cannot read user1's note
-        user2_token = create_access_token(identity=user2)
         with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {user2_token}"}):
             assert not note.can_read()
 
     def test_note_write_permissions(
-        self, user_perms_app: Flask, db_session: "scoped_session", test_users: dict[str, uuid.UUID]
+        self,
+        user_perms_app: Flask,
+        db_session: "scoped_session",
+        test_users: dict[str, uuid.UUID],
+        user_tokens: dict[str, str],
     ) -> None:
         """Test that users can only write their own notes."""
         user1 = db_session.get(CustomUser, test_users["verified_id"])
@@ -446,13 +487,15 @@ class TestUserCanReadWriteMixin:
         db_session.add(note)
         db_session.commit()
 
-        user1_token = create_access_token(identity=user1)
+        tokens = user_tokens
+        user1_token = tokens["verified"]
+        user2_token = tokens["unverified"]
+
         with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {user1_token}"}):
             assert note.can_write()
             note.update(content="Updated content")
 
         # Test user2 cannot write user1's note
-        user2_token = create_access_token(identity=user2)
         with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {user2_token}"}):
             assert not note.can_write()
             with pytest.raises(ForbiddenError):
@@ -463,7 +506,11 @@ class TestCustomPermissionRules:
     """Test Document model with custom permission rules."""
 
     def test_public_document_read_permissions(
-        self, user_perms_app: Flask, db_session: "scoped_session", test_users: dict[str, uuid.UUID]
+        self,
+        user_perms_app: Flask,
+        db_session: "scoped_session",
+        test_users: dict[str, uuid.UUID],
+        user_tokens: dict[str, str],
     ) -> None:
         """Test that public documents can be read by anyone."""
         owner = db_session.get(CustomUser, test_users["verified_id"])
@@ -481,17 +528,23 @@ class TestCustomPermissionRules:
         db_session.commit()
 
         # Test owner can read
-        owner_token = create_access_token(identity=owner)
+        tokens = user_tokens
+        owner_token = tokens["verified"]
+        other_token = tokens["unverified"]
+
         with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {owner_token}"}):
             assert public_doc.can_read()
 
         # Test other user can read public document
-        other_token = create_access_token(identity=other_user)
         with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {other_token}"}):
             assert public_doc.can_read()
 
     def test_private_document_read_permissions(
-        self, user_perms_app: Flask, db_session: "scoped_session", test_users: dict[str, uuid.UUID]
+        self,
+        user_perms_app: Flask,
+        db_session: "scoped_session",
+        test_users: dict[str, uuid.UUID],
+        user_tokens: dict[str, str],
     ) -> None:
         """Test that private documents can only be read by owner."""
         owner = db_session.get(CustomUser, test_users["verified_id"])
@@ -509,17 +562,23 @@ class TestCustomPermissionRules:
         db_session.commit()
 
         # Test owner can read
-        owner_token = create_access_token(identity=owner)
+        tokens = user_tokens
+        owner_token = tokens["verified"]
+        other_token = tokens["unverified"]
+
         with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {owner_token}"}):
             assert private_doc.can_read()
 
         # Test other user cannot read private document
-        other_token = create_access_token(identity=other_user)
         with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {other_token}"}):
             assert not private_doc.can_read()
 
     def test_document_write_permissions(
-        self, user_perms_app: Flask, db_session: "scoped_session", test_users: dict[str, uuid.UUID]
+        self,
+        user_perms_app: Flask,
+        db_session: "scoped_session",
+        test_users: dict[str, uuid.UUID],
+        user_tokens: dict[str, str],
     ) -> None:
         """Test that only owner can write documents."""
         owner = db_session.get(CustomUser, test_users["verified_id"])
@@ -537,20 +596,26 @@ class TestCustomPermissionRules:
         db_session.commit()
 
         # Test owner can write
-        owner_token = create_access_token(identity=owner)
+        tokens = user_tokens
+        owner_token = tokens["verified"]
+        other_token = tokens["unverified"]
+
         with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {owner_token}"}):
             assert doc.can_write()
             doc.update(content="Owner updated content")
 
         # Test other user cannot write even if document is public
-        other_token = create_access_token(identity=other_user)
         with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {other_token}"}):
             assert not doc.can_write()
             with pytest.raises(ForbiddenError):
                 doc.update(content="Malicious update")
 
     def test_document_create_permissions(
-        self, user_perms_app: Flask, db_session: "scoped_session", test_users: dict[str, uuid.UUID]
+        self,
+        user_perms_app: Flask,
+        db_session: "scoped_session",
+        test_users: dict[str, uuid.UUID],
+        user_tokens: dict[str, str],
     ) -> None:
         """Test that only verified users can create documents."""
         verified_user = db_session.get(CustomUser, test_users["verified_id"])
@@ -559,8 +624,8 @@ class TestCustomPermissionRules:
         assert unverified_user is not None
 
         # Test verified user can create
-        verified_token = create_access_token(identity=verified_user)
-        with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {verified_token}"}):
+        tokens = user_tokens
+        with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {tokens['verified']}"}):
             doc1 = Document(
                 owner_id=verified_user.id,
                 title="New Document",
@@ -571,8 +636,7 @@ class TestCustomPermissionRules:
             doc1.save()  # Should not raise
 
         # Test unverified user cannot create
-        unverified_token = create_access_token(identity=unverified_user)
-        with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {unverified_token}"}):
+        with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {tokens['unverified']}"}):
             doc2 = Document(
                 owner_id=unverified_user.id,
                 title="New Document",
@@ -582,3 +646,75 @@ class TestCustomPermissionRules:
             assert not doc2.can_create()
             with pytest.raises(ForbiddenError):
                 doc2.save()
+
+    def test_private_document_requires_authentication_for_read_write(
+        self,
+        user_perms_app: Flask,
+        db_session: "scoped_session",
+        test_users: dict[str, uuid.UUID],
+        user_tokens: dict[str, str],
+    ) -> None:
+        """Ensure private documents require authentication even for reads/writes."""
+        owner = db_session.get(CustomUser, test_users["verified_id"])
+        other_user = db_session.get(CustomUser, test_users["unverified_id"])
+        assert owner is not None
+        assert other_user is not None
+
+        private_doc = Document(
+            owner_id=owner.id,
+            title="Blocked",
+            content="Secret",
+            is_public=False,
+        )
+        db_session.add(private_doc)
+        db_session.commit()
+
+        tokens = user_tokens
+        owner_token = tokens["verified"]
+
+        with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {owner_token}"}):
+            assert private_doc.can_read()
+            assert private_doc.can_write()
+
+        # Without authentication, permission checks should deny access
+        with user_perms_app.test_request_context():
+            assert not private_doc.can_read()
+            assert not private_doc.can_write()
+
+        with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {tokens['unverified']}"}):
+            assert not private_doc.can_read()
+            assert not private_doc.can_write()
+
+    def test_bypass_perms_allows_forced_creation_for_blocked_user(
+        self,
+        user_perms_app: Flask,
+        db_session: "scoped_session",
+        test_users: dict[str, uuid.UUID],
+        user_tokens: dict[str, str],
+    ) -> None:
+        """Bypass permissions to create a document even when user lacks rights."""
+        unverified_user = db_session.get(CustomUser, test_users["unverified_id"])
+        assert unverified_user is not None
+
+        tokens = user_tokens
+        with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {tokens['unverified']}"}):
+            doc = Document(
+                owner_id=unverified_user.id,
+                title="Denied",
+                content="No rights",
+                is_public=False,
+            )
+            assert not doc.can_create()
+            with pytest.raises(ForbiddenError):
+                doc.save()
+
+        with Document.bypass_perms():
+            forced_doc = Document(
+                owner_id=unverified_user.id,
+                title="Forced",
+                content="Allowed",
+                is_public=False,
+            )
+            forced_doc.save()
+
+        assert db_session.get(Document, forced_doc.id) is not None

@@ -2,7 +2,7 @@
 
 from flask.views import MethodView
 
-from flask_more_smorest.blueprint_operationid import BlueprintOperationIdMixin
+from flask_more_smorest.blueprint_operationid import HTTP_METHOD_OPERATION_MAP, BlueprintOperationIdMixin
 
 
 class TestBlueprintOperationIdMixin:
@@ -25,6 +25,12 @@ class TestBlueprintOperationIdMixin:
             bp = BlueprintOperationIdMixin("test", __name__)
             assert hasattr(bp, "route")
             assert callable(bp.route)
+
+    def test_default_operation_name_map_contains_common_methods(self) -> None:
+        """HTTP_METHOD_OPERATION_MAP includes verbs we rely on."""
+        assert HTTP_METHOD_OPERATION_MAP["get"] == "get"
+        assert HTTP_METHOD_OPERATION_MAP["post"] == "create"
+        assert HTTP_METHOD_OPERATION_MAP["patch"] == "update"
 
     def test_operation_id_generation_for_list_endpoint(self) -> None:
         """Test operationId generation for list endpoints."""
@@ -49,6 +55,27 @@ class TestBlueprintOperationIdMixin:
             assert "manual_doc" in apidoc
             assert "operationId" in apidoc["manual_doc"]
             assert apidoc["manual_doc"]["operationId"] == "listUser"
+
+    def test_operation_id_generation_handles_plural_class_names(self) -> None:
+        """Plural MethodView class names should drop the trailing 's'."""
+        from flask import Flask
+
+        app = Flask(__name__)
+
+        with app.app_context():
+            bp = BlueprintOperationIdMixin("companies", __name__)
+
+            @bp.route("/")
+            class Companies(MethodView):
+                methods = ["GET"]
+
+                def get(self) -> dict:
+                    return {"companies": []}
+
+            get_method = getattr(Companies, "get")
+            apidoc = getattr(get_method, "_apidoc", {})
+            assert "manual_doc" in apidoc
+            assert apidoc["manual_doc"]["operationId"] == "listCompanie"
 
     def test_operation_id_generation_for_get_endpoint(self) -> None:
         """Test operationId generation for GET single item endpoint."""

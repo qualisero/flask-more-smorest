@@ -103,7 +103,7 @@ class CRUDBlueprint(CRUDPaginationMixin, Blueprint):
         res_id: str = "id",
         res_id_param: str | None = None,
         methods: list[CRUDMethod] | MethodConfigMapping = list(CRUDMethod),
-        skip_methods: list[CRUDMethod] = [],
+        skip_methods: list[CRUDMethod] | None = None,
         db_session: Session | scoped_session[Session] | None = None,
         static_folder: str | None = None,
         static_url_path: str | None = None,
@@ -163,7 +163,7 @@ class CRUDBlueprint(CRUDPaginationMixin, Blueprint):
         res_id: str,
         res_id_param: str | None,
         methods: list[CRUDMethod] | MethodConfigMapping,
-        skip_methods: list[CRUDMethod],
+        skip_methods: list[CRUDMethod] | None,
         url_prefix: str | None,
     ) -> CRUDConfig:
         """Build and validate configuration."""
@@ -182,7 +182,6 @@ class CRUDBlueprint(CRUDPaginationMixin, Blueprint):
                 raise ValueError(
                     f"Could not import model '{model_or_name}' from '{resolved_model_import_path}'."
                 ) from e
-            model_cls.__name__ = model_or_name
         elif isinstance(model_or_name, type) and issubclass(model_or_name, BaseModel):
             model_cls = model_or_name
         else:
@@ -211,7 +210,7 @@ class CRUDBlueprint(CRUDPaginationMixin, Blueprint):
 
         normalized_methods = self._normalize_methods(methods)
 
-        for m in skip_methods:
+        for m in skip_methods or []:
             normalized_methods.pop(CRUDMethod(m), None)
 
         return CRUDConfig(
@@ -258,6 +257,38 @@ class CRUDBlueprint(CRUDPaginationMixin, Blueprint):
                 raise TypeError("CRUDBlueprint method config entries must be dicts, True for defaults, or omitted")
 
         return normalized
+
+    def _resolve_schema_class(
+        self,
+        schema_candidate: type[Schema] | Schema | str,
+        *,
+        config: CRUDConfig,
+        method: CRUDMethod,
+    ) -> type[Schema]:
+        """Resolve a schema reference (string/class/instance) to a Schema subclass."""
+
+        if isinstance(schema_candidate, str):
+            try:
+                schema_module = import_module(config.schema_import_path)
+                resolved = getattr(schema_module, schema_candidate)
+            except (ImportError, AttributeError) as e:
+                raise ValueError(
+                    f"Could not import schema '{schema_candidate}' from '{config.schema_import_path}'."
+                ) from e
+        elif isinstance(schema_candidate, type) and issubclass(schema_candidate, Schema):
+            resolved = schema_candidate
+        elif isinstance(schema_candidate, Schema):
+            resolved = schema_candidate.__class__
+        else:
+            raise TypeError(
+                f"CRUDBlueprint {method.value} schema must be a string, Schema subclass, or Schema instance;"
+                f" got {type(schema_candidate)!r}."
+            )
+
+        if not isinstance(resolved, type) or not issubclass(resolved, Schema):
+            raise TypeError(f"Resolved schema for {method.value} must be a Schema subclass, got {type(resolved)!r}.")
+
+        return resolved
 
     def _prepare_update_schema(
         self, config: CRUDConfig
@@ -314,10 +345,10 @@ class CRUDBlueprint(CRUDPaginationMixin, Blueprint):
 
         if CRUDMethod.INDEX in config.methods or CRUDMethod.POST in config.methods:
             if CRUDMethod.INDEX in config.methods:
-                cls = config.methods[CRUDMethod.INDEX].get("schema", schema_cls)
-                if not isinstance(cls, type(Schema)):
-                    raise TypeError(f"Expected Schema class for INDEX['schema'], got {type(cls)}")
-                index_schema_class: type[Schema] = cls
+                index_schema_candidate = config.methods[CRUDMethod.INDEX].get("schema", schema_cls)
+                index_schema_class = self._resolve_schema_class(
+                    index_schema_candidate, config=config, method=CRUDMethod.INDEX
+                )
                 query_filter_schema = generate_filter_schema(base_schema=index_schema_class)
 
             class GenericIndex(MethodView):
@@ -339,22 +370,18 @@ class CRUDBlueprint(CRUDPaginationMixin, Blueprint):
                         kwargs might contains path parameters to filter by (eg /user/<uuid:user_id>/roles/)"""
 
                         stmts = get_statements_from_filters(filters, model=model_cls)
-                        query = sa.select(model_cls).filter_by(**kwargs).filter(*stmts)
+                        base_query = sa.select(model_cls).filter_by(**kwargs).filter(*stmts)
 
                         # Handle pagination
-                        # Count total items
-                        count_query = sa.select(sa.func.count()).select_from(query.subquery())
+                        count_query = sa.select(sa.func.count()).select_from(base_query.subquery())
                         total_items = self._db_session.scalar(count_query)
                         pagination_parameters.item_count = total_items  # pyright: ignore[reportAttributeAccessIssue]
 
-                        count_query = (
-                            sa.select(sa.func.count()).select_from(model_cls).filter_by(**kwargs).filter(*stmts)
-                        )
-                        query = query.limit(pagination_parameters.page_size).offset(
+                        paginated_query = base_query.limit(pagination_parameters.page_size).offset(
                             pagination_parameters.page_size * (pagination_parameters.page - 1)
                         )
 
-                        res = self._db_session.execute(query)
+                        res = self._db_session.execute(paginated_query)
                         return res.scalars().all()
 
                 if CRUDMethod.POST in config.methods:

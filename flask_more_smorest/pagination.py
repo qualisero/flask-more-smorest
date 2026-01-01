@@ -2,6 +2,7 @@ from functools import wraps
 from typing import Any
 
 from flask_smorest.pagination import PaginationParameters
+from werkzeug.exceptions import BadRequest
 
 
 class CRUDPaginationMixin:
@@ -43,9 +44,29 @@ class CRUDPaginationMixin:
                 if filters is None:
                     filters = {}
 
-                # Extract values with fallbacks
-                p_val = filters.get("page") or page or 1
-                p_size_val = filters.get("page_size") or page_size or 10
+                def _coerce_positive_int(name: str, value: Any, default: int) -> int:
+                    candidate = value if value is not None else default
+                    if candidate is None:
+                        raise BadRequest(f"Missing pagination parameter: {name}")
+                    try:
+                        int_value = int(candidate)
+                    except (TypeError, ValueError) as exc:
+                        raise BadRequest(f"{name} must be a positive integer") from exc
+                    if int_value <= 0:
+                        raise BadRequest(f"{name} must be a positive integer")
+                    return int_value
+
+                # Extract values with fallbacks and validation
+                raw_page = filters.get("page")
+                if raw_page is None:
+                    raw_page = page
+                p_val = _coerce_positive_int("page", raw_page, default=1)
+
+                raw_page_size = filters.get("page_size")
+                if raw_page_size is None:
+                    raw_page_size = page_size
+                p_size_default = page_size if page_size is not None else 10
+                p_size_val = _coerce_positive_int("page_size", raw_page_size, default=p_size_default)
 
                 # Create parameters object
                 pagination_parameters = PaginationParameters(page=p_val, page_size=p_size_val)

@@ -5,7 +5,6 @@ BasePermsModel with permission checks, user models, and PermsBlueprintMixin.
 """
 
 from flask.views import MethodView
-from marshmallow import Schema
 
 from ..blueprint_operationid import BlueprintOperationIdMixin
 from ..crud import CRUDBlueprint as CRUDBlueprintBase

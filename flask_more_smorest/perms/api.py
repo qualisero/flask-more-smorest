@@ -68,59 +68,71 @@ class Api(ApiOrig):
 
         init_jwt(app)
 
-        app.config["API_SPEC_OPTIONS"] = {"components": {"securitySchemes": {}}}
+        spec_options = dict(app.config.get("API_SPEC_OPTIONS", {}))
+        components = dict(spec_options.get("components", {}))
+        security_schemes = dict(components.get("securitySchemes", {}))
+
         if "jwt" in app.config.get("AUTH_METHODS", []):
-            app.config["API_SPEC_OPTIONS"]["components"]["securitySchemes"]["bearerAuth"] = {
+            security_schemes["bearerAuth"] = {
                 "type": "http",
                 "scheme": "bearer",
                 "bearerFormat": "JWT",
                 "description": "`Bearer $your_token_value` will be inserted as Authorization header.",
             }
-            # TODO: implement OAuth2 flows
-            # "adminOAuth": {
-            #     "type": "oauth2",
-            #     "flows": {
-            #         "password": {
-            #             "tokenUrl": "https://example.com/oauth/token",
-            #             "scopes": {"admin": "Admin access", "user": "User access"},
-            #         }
-            #     },
-            #     "description": "OAuth2 flow for role-based access (e.g. admin scope).",
-            # },
+
+        components["securitySchemes"] = security_schemes
+        spec_options["components"] = components
+        app.config["API_SPEC_OPTIONS"] = spec_options
+        # TODO: implement OAuth2 flows
+        # "adminOAuth": {
+        #     "type": "oauth2",
+        #     "flows": {
+        #         "password": {
+        #             "tokenUrl": "https://example.com/oauth/token",
+        #             "scopes": {"admin": "Admin access", "user": "User access"},
+        #         }
+        #     },
+        #     "description": "OAuth2 flow for role-based access (e.g. admin scope).",
+        # },
 
         super().init_app(app, *pargs, **kwargs)
 
-        @app.before_request
-        def require_login() -> None:
-            if not request.endpoint or request.endpoint.startswith("api-docs"):
-                return
-            admin_endpoint = False
-            if request.endpoint in app.view_functions:
-                fn = app.view_functions[request.endpoint]
-                public_endpoint = getattr(fn, "_is_public", False)
-                admin_endpoint = getattr(fn, "_is_admin", False)
-                if hasattr(fn, "view_class"):
-                    public_endpoint |= getattr(fn.view_class, "_is_public", False)
-                    admin_endpoint |= getattr(fn.view_class, "_is_admin", False)
-                    # Handle MethodView classes:
-                    if actual_method := getattr(fn.view_class, request.method.lower(), None):
-                        public_endpoint |= getattr(actual_method, "_is_public", False)
-                        admin_endpoint |= getattr(actual_method, "_is_admin", False)
-                if public_endpoint and not admin_endpoint:
-                    return
-            try:
-                # NOTE: we do not completely skip auth if DISABLE_AUTH=1, in case the endpoint relies on current_user
-                verify_jwt_in_request()
-            except (jwt_exceptions.JWTDecodeError, jwt_exceptions.NoAuthorizationError) as e:
-                if app.config.get("DISABLE_AUTH", False):
-                    return
-                raise UnauthorizedError(f"Invalid token ({e})")
+        extensions_state = app.extensions.setdefault("flask-more-smorest", {})
+        if not extensions_state.get("require_login_registered", False):
 
-            if admin_endpoint:
-                from .user_models import User
+            @app.before_request
+            def require_login() -> None:
+                if not request.endpoint or request.endpoint.startswith("api-docs"):
+                    return
+                admin_endpoint = False
+                if request.endpoint in app.view_functions:
+                    fn = app.view_functions[request.endpoint]
+                    public_endpoint = getattr(fn, "_is_public", False)
+                    admin_endpoint = getattr(fn, "_is_admin", False)
+                    if hasattr(fn, "view_class"):
+                        public_endpoint |= getattr(fn.view_class, "_is_public", False)
+                        admin_endpoint |= getattr(fn.view_class, "_is_admin", False)
+                        # Handle MethodView classes:
+                        if actual_method := getattr(fn.view_class, request.method.lower(), None):
+                            public_endpoint |= getattr(actual_method, "_is_public", False)
+                            admin_endpoint |= getattr(actual_method, "_is_admin", False)
+                    if public_endpoint and not admin_endpoint:
+                        return
+                try:
+                    # NOTE: we do not completely skip auth if DISABLE_AUTH=1, in case the endpoint relies on current_user
+                    verify_jwt_in_request()
+                except (jwt_exceptions.JWTDecodeError, jwt_exceptions.NoAuthorizationError) as e:
+                    if app.config.get("DISABLE_AUTH", False):
+                        return
+                    raise UnauthorizedError(f"Invalid token ({e})")
 
-                if not User.is_current_user_admin():
-                    raise ForbiddenError("Admin access only")
+                if admin_endpoint:
+                    from .user_models import User
+
+                    if not User.is_current_user_admin():
+                        raise ForbiddenError("Admin access only")
+
+            extensions_state["require_login_registered"] = True
 
 
 def custom_schema_name_resolver(schema: type[Schema], **kwargs: str | bool) -> str:

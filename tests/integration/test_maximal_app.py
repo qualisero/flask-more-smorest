@@ -334,6 +334,14 @@ class TestMaximalFeatureIntegration:
         data = response.get_json()
         assert len(data) == 5
 
+        # Invalid page should return a validation error
+        response = auth_client.get("/api/articles/", query_string={"page": 0, "page_size": 10})
+        assert response.status_code == 422
+
+        # Invalid page_size should return a validation error
+        response = auth_client.get("/api/articles/", query_string={"page": 1, "page_size": 0})
+        assert response.status_code == 422
+
     def test_complete_article_lifecycle(
         self,
         auth_client: "FlaskClient",

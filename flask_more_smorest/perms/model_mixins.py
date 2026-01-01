@@ -33,7 +33,7 @@ class HasUserMixin:
         >>> class Article(BasePermsModel, HasUserMixin):
         ...     __user_field_name__ = "author_id"
         ...     __user_relationship_name__ = "author"
-        ...     __user_id_nullable__ = True
+        ...     __user_id_nullable__ = False
         ...     title: Mapped[str] = mapped_column(sa.String(200))
         ...
         >>> article = Article(title="Test", author_id=current_user.id)

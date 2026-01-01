@@ -1,5 +1,6 @@
 """Unit tests for query filtering functionality."""
 
+import enum
 from datetime import date, datetime
 
 import pytest
@@ -30,6 +31,19 @@ class QueryTestSchema(Schema):
     birth_date = fields.Date()
     is_active = fields.Boolean()
     age = fields.Integer()
+    price = fields.Float()
+
+
+class FloatOnlySchema(Schema):
+    price = fields.Float()
+
+
+class EnumSchema(Schema):
+    class Status(enum.Enum):
+        ACTIVE = "active"
+        INACTIVE = "inactive"
+
+    status = fields.Enum(Status)
 
 
 class TestGenerateFilterSchema:
@@ -49,8 +63,9 @@ class TestGenerateFilterSchema:
         assert "created_at__from" in filter_schema.fields
         assert "created_at__to" in filter_schema.fields
 
-        # DateTime field should be removed
+        # DateTime and float fields should be removed
         assert "created_at" not in filter_schema.fields
+        assert "price" not in filter_schema.fields
 
     def test_filter_schema_field_types(self) -> None:
         """Test that filter schema maintains correct field types."""
@@ -65,6 +80,8 @@ class TestGenerateFilterSchema:
         assert isinstance(filter_schema.fields["name"], fields.String)
         assert isinstance(filter_schema.fields["age"], fields.Integer)
         assert isinstance(filter_schema.fields["is_active"], fields.Boolean)
+        assert isinstance(filter_schema.fields["price__min"], fields.Float)
+        assert isinstance(filter_schema.fields["price__max"], fields.Float)
 
     def test_filter_schema_field_properties(self) -> None:
         """Test that filter schema fields have correct properties."""
@@ -79,6 +96,11 @@ class TestGenerateFilterSchema:
         assert created_to.load_default is None
         assert created_from.required is False
         assert created_to.required is False
+
+        price_min = filter_schema.fields["price__min"]
+        price_max = filter_schema.fields["price__max"]
+        assert price_min.required is False
+        assert price_max.required is False
 
     def test_filter_schema_with_date_field(self) -> None:
         """Test filter schema generation with Date fields."""
@@ -106,6 +128,54 @@ class TestGenerateFilterSchema:
         assert isinstance(filter_schema.fields["age"], fields.Integer)
         assert "is_active" in filter_schema.fields
         assert isinstance(filter_schema.fields["is_active"], fields.Boolean)
+        assert "price__min" in filter_schema.fields
+        assert "price__max" in filter_schema.fields
+        assert "price" not in filter_schema.fields
+
+    def test_generate_filter_schema_does_not_mutate_base_schema(self) -> None:
+        """Calling helper should not alter the base schema class or instance."""
+        base_schema = QueryTestSchema()
+        original_fields = set(base_schema.fields.keys())
+
+        generate_filter_schema(QueryTestSchema)
+
+        assert set(base_schema.fields.keys()) == original_fields
+        assert "created_at" in base_schema.fields
+        assert "price" in base_schema.fields
+
+    def test_generate_filter_schema_accepts_schema_instance(self) -> None:
+        """Passing a schema instance should behave equivalent to passing class."""
+        filter_cls_from_instance = generate_filter_schema(QueryTestSchema())
+        filter_cls_from_class = generate_filter_schema(QueryTestSchema)
+
+        assert set(filter_cls_from_instance().fields.keys()) == set(filter_cls_from_class().fields.keys())
+
+    def test_generate_filter_schema_float_field_only(self) -> None:
+        """Float fields should be replaced with min/max filters only."""
+        filter_schema_class = generate_filter_schema(FloatOnlySchema)
+        filter_schema = filter_schema_class()
+
+        assert "price__min" in filter_schema.fields
+        assert "price__max" in filter_schema.fields
+        assert "price" not in filter_schema.fields
+
+    def test_generate_filter_schema_enum_support(self) -> None:
+        """Enum fields should expose __in list filters."""
+        filter_schema_class = generate_filter_schema(EnumSchema)
+        filter_schema = filter_schema_class()
+
+        assert "status__in" in filter_schema.fields
+        assert isinstance(filter_schema.fields["status__in"], fields.List)
+
+    def test_filter_schema_includes_pagination_fields(self) -> None:
+        """Pagination parameters should always be available and optional."""
+        filter_schema_class = generate_filter_schema(QueryTestSchema)
+        filter_schema = filter_schema_class()
+
+        assert "page" in filter_schema.fields
+        assert "page_size" in filter_schema.fields
+        assert filter_schema.fields["page"].required is False
+        assert filter_schema.fields["page_size"].required is False
 
 
 class TestGetStatementsFromFilters:
