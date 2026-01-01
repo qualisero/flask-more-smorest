@@ -361,7 +361,7 @@ class CRUDBlueprint(CRUDPaginationMixin, Blueprint):
                     @self.paginate()
                     @self.doc(operationId=f"list{config.model_name}")
                     def get(
-                        _self,
+                        _self,  # NOTE: using _self to avoid collision with outer self
                         filters: dict,
                         pagination_parameters: "PaginationParameters",
                         **kwargs: Any,

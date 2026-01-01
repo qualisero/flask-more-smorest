@@ -483,7 +483,10 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
             >>> user = User.get(user_id)
             >>> user.delete()
         """
-        db.session.refresh(self)
+        # Refresh state if this instance is bound to the session; ignore otherwise.
+        if self in db.session:
+            db.session.refresh(self)
+
         self.on_before_delete()
         db.session.delete(self)
         if commit:

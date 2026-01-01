@@ -103,9 +103,6 @@ class BasePermsModel(SQLABaseModel):
             if not has_request_context():
                 raise UnauthorizedError("User must be authenticated")
             raise e
-        except Exception as e:
-            logger.error("can_%s() exception: %s", operation, e)
-            return False
 
     def can_write(self) -> bool:
         """Does current user have write permission on object.
@@ -261,18 +258,28 @@ class BasePermsModel(SQLABaseModel):
 
         return False
 
-    def check_create(self, val: list | set | tuple | object) -> None:
+    def check_create(self, val: list | set | tuple | object, _visited: set[int] | None = None) -> None:
         """Recursively check that all BaseModel instances can be created.
 
         Args:
             val: Value or collection of values to check
+            _visited: Internal set of visited object ids to prevent infinite recursion
 
         Raises:
             ForbiddenError: If any nested object cannot be created
         """
+        if _visited is None:
+            _visited = set()
+
+        obj_id = id(val)
+        if obj_id in _visited:
+            # Cycle detected; stop descending further to avoid infinite recursion
+            return
+        _visited.add(obj_id)
+
         if isinstance(val, BasePermsModel):
             if getattr(sa.inspect(val), "transient", False) and not val.can_create():
                 raise ForbiddenError(f"User not allowed to create resource: {val}")
         elif isinstance(val, list) or isinstance(val, set) or isinstance(val, tuple):
             for x in val:
-                self.check_create(x)
+                self.check_create(x, _visited=_visited)

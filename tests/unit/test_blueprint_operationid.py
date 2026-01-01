@@ -54,7 +54,7 @@ class TestBlueprintOperationIdMixin:
             apidoc = getattr(get_method, "_apidoc", {})
             assert "manual_doc" in apidoc
             assert "operationId" in apidoc["manual_doc"]
-            assert apidoc["manual_doc"]["operationId"] == "listUser"
+            assert apidoc["manual_doc"]["operationId"] == "listUsers"
 
     def test_operation_id_generation_handles_plural_class_names(self) -> None:
         """Plural MethodView class names should drop the trailing 's'."""
@@ -75,7 +75,7 @@ class TestBlueprintOperationIdMixin:
             get_method = getattr(Companies, "get")
             apidoc = getattr(get_method, "_apidoc", {})
             assert "manual_doc" in apidoc
-            assert apidoc["manual_doc"]["operationId"] == "listCompanie"
+            assert apidoc["manual_doc"]["operationId"] == "listCompanies"
 
     def test_operation_id_generation_for_get_endpoint(self) -> None:
         """Test operationId generation for GET single item endpoint."""

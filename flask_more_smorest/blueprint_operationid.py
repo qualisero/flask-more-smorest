@@ -75,8 +75,9 @@ class BlueprintOperationIdMixin(Blueprint):
                 operation_id = func.__name__
             else:
                 class_name = method_view_class.__name__
+                # TODO: decide if ending in `/` should be enough to consider it a collection
                 if method_name == "get" and class_name.endswith("s") and rule.endswith("/"):
-                    operation_id = f"list{class_name[:-1]}"
+                    operation_id = f"list{class_name}"
                 else:
                     operation_name = HTTP_METHOD_OPERATION_MAP.get(method_name, method_name)
                     operation_id = f"{operation_name}{class_name}"
