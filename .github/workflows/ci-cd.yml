@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       publish_to_pypi:
-        description: 'Publish to PyPI (requires release)'
+        description: 'Publish to PyPI (manual trigger)'
         required: false
         type: boolean
         default: false
