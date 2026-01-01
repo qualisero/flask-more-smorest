@@ -16,7 +16,7 @@ def test_paginate_rejects_non_positive_page() -> None:
     dummy = DummyPagination()
 
     @dummy.paginate()
-    def handler(*args, **kwargs):  # pragma: no cover - exercised via wrapper
+    def handler(*args: object, **kwargs: object) -> list[object]:  # pragma: no cover - exercised via wrapper
         return []
 
     with pytest.raises(BadRequest):
@@ -27,7 +27,7 @@ def test_paginate_rejects_non_positive_page_size() -> None:
     dummy = DummyPagination()
 
     @dummy.paginate()
-    def handler(*args, **kwargs):  # pragma: no cover - exercised via wrapper
+    def handler(*args: object, **kwargs: object) -> list[object]:  # pragma: no cover - exercised via wrapper
         return []
 
     with pytest.raises(BadRequest):
@@ -38,7 +38,7 @@ def test_paginate_rejects_invalid_types() -> None:
     dummy = DummyPagination()
 
     @dummy.paginate()
-    def handler(*args, **kwargs):  # pragma: no cover - exercised via wrapper
+    def handler(*args: object, **kwargs: object) -> list[object]:  # pragma: no cover - exercised via wrapper
         return []
 
     with pytest.raises(BadRequest):
@@ -49,7 +49,7 @@ def test_paginate_raises_for_invalid_default() -> None:
     dummy = DummyPagination()
 
     @dummy.paginate(page=0)
-    def handler(*args, **kwargs):  # pragma: no cover - exercised via wrapper
+    def handler(*args: object, **kwargs: object) -> list[object]:  # pragma: no cover - exercised via wrapper
         return []
 
     with pytest.raises(BadRequest):

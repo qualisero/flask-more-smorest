@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from http import HTTPStatus
 
+from flask import Flask
+
 from flask_more_smorest.error.exceptions import ApiException, UnauthorizedError
 
 
@@ -16,7 +18,7 @@ class NoTracebackException(ApiException):
     INCLUDE_TRACEBACK = False
 
 
-def test_api_exception_includes_debug_context(app) -> None:
+def test_api_exception_includes_debug_context(app: Flask) -> None:
     with app.app_context():
         try:
             raise DummyException("problem", extra="info")
@@ -30,7 +32,7 @@ def test_api_exception_includes_debug_context(app) -> None:
     assert "traceback" in payload["debug"]["debug_context"]
 
 
-def test_api_exception_trims_traceback_when_disabled(app) -> None:
+def test_api_exception_trims_traceback_when_disabled(app: Flask) -> None:
     with app.app_context():
         try:
             raise NoTracebackException("fail")
@@ -41,7 +43,7 @@ def test_api_exception_trims_traceback_when_disabled(app) -> None:
     assert "traceback" not in payload["debug"]["debug_context"]
 
 
-def test_subclass_without_extra_kwargs(app) -> None:
+def test_subclass_without_extra_kwargs(app: Flask) -> None:
     with app.app_context():
         response = UnauthorizedError("no token").make_error_response()
     payload = response.get_json()["error"]

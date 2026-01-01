@@ -1,3 +1,5 @@
+from collections.abc import Generator
+
 import pytest
 from flask import Flask
 
@@ -5,7 +7,7 @@ from flask_more_smorest import db, init_db, init_jwt
 
 
 @pytest.fixture(scope="function")
-def app() -> Flask:
+def app() -> Generator[Flask, None, None]:
     app = Flask(__name__)
     app.config["TESTING"] = True
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"

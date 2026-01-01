@@ -176,6 +176,14 @@ module = [
 ]
 ignore_missing_imports = true
 
+# Looser rules for tests: allow untyped defs by default and tolerate missing imports
+[[tool.mypy.overrides]]
+module = [
+    "tests.*",
+]
+ignore_missing_imports = true
+check_untyped_defs = false
+
 [tool.bandit]
 exclude_dirs = ["tests"]
 skips = ["B101", "B601"]
