@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-01-02
+
+### Added
+- **Automatic ReadTheDocs Updates**: GitHub Actions now automatically trigger documentation builds on each release
+- `HasUserMixin.__user_backref_name__` configuration option for customizing User relationship backrefs
+  - `None` (default): Auto-generate from tablename (e.g., "articles")
+  - Custom string: Use specified name (e.g., "my_posts")
+  - Empty string: Skip backref creation entirely
+- Comprehensive ReadTheDocs setup guide in `docs/READTHEDOCS_SETUP.md`
+- `trigger-docs` job in CI/CD workflow to call ReadTheDocs API
+- PDF and EPUB documentation formats in ReadTheDocs configuration
+
+### Changed
+- **User Permission Mixins Unified**: Merged `UserCanReadWriteMixin` and `UserOwnedResourceMixin` into single `UserOwnershipMixin`
+  - Use `__delegate_to_user__ = False` for simple ownership (default)
+  - Use `__delegate_to_user__ = True` to delegate to `user._can_write()`
+  - Backwards compatible migration path documented
+- Removed unnecessary `__tablename__` declarations across codebase
+  - All BaseModel subclasses now use auto-generated table names
+  - Updated foreign key references to match auto-generated names
+  - Cleaner, more consistent code style
+
+### Fixed
+- SQLAlchemy warnings about duplicate `TestModel` class names in tests (renamed to unique names)
+- Test models now follow same conventions as production code
+- Domain model foreign key updated from "domains.id" to "domain.id"
+
+### Documentation
+- Enhanced `HasUserMixin` docstring with backref configuration examples
+- Updated all model examples to show auto-generated table names
+- Added USER_OWNERSHIP_MIXIN.md guide for migration
+- Updated README with prominent ReadTheDocs link
+- 5 new tests for backref name configuration
+
 ## [0.2.2] - 2026-01-01
 
 ### Changed
