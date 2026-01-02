@@ -3,12 +3,13 @@
 import warnings
 
 import pytest
+from flask import Flask
 
 from flask_more_smorest.crud.crud_blueprint import CRUDBlueprint, CRUDMethod
 from flask_more_smorest.sqla.base_model import BaseModel
 
 
-def test_methods_list_mode_whitelist(app):
+def test_methods_list_mode_whitelist(app: Flask) -> None:
     """Test that list mode only enables specified methods."""
 
     class TestModelListMode(BaseModel):
@@ -78,7 +79,7 @@ def test_methods_list_mode_whitelist(app):
     assert CRUDMethod.DELETE not in config.methods
 
 
-def test_methods_dict_mode_all_enabled_by_default(app):
+def test_methods_dict_mode_all_enabled_by_default(app: Flask) -> None:
     """Test that dict mode enables all methods by default."""
 
     class TestModelDictMode(BaseModel):
@@ -118,7 +119,7 @@ def test_methods_dict_mode_all_enabled_by_default(app):
     assert config.methods[CRUDMethod.POST].get("schema") == TestModelDictMode.Schema
 
 
-def test_methods_dict_mode_with_false_disables(app):
+def test_methods_dict_mode_with_false_disables(app: Flask) -> None:
     """Test that False in dict mode disables methods."""
 
     class TestModelDictFalse(BaseModel):
@@ -156,7 +157,7 @@ def test_methods_dict_mode_with_false_disables(app):
     assert CRUDMethod.DELETE not in config.methods
 
 
-def test_skip_methods_removes_after_normalization(app):
+def test_skip_methods_removes_after_normalization(app: Flask) -> None:
     """Test that skip_methods removes methods after normalization."""
 
     class TestModelSkip(BaseModel):
@@ -191,7 +192,7 @@ def test_skip_methods_removes_after_normalization(app):
     assert CRUDMethod.DELETE not in config.methods
 
 
-def test_skip_methods_with_list_mode(app):
+def test_skip_methods_with_list_mode(app: Flask) -> None:
     """Test skip_methods can further limit list mode."""
 
     class TestModelSkipList(BaseModel):
@@ -225,7 +226,7 @@ def test_skip_methods_with_list_mode(app):
     assert CRUDMethod.POST not in config.methods
 
 
-def test_redundant_skip_methods_warns(app):
+def test_redundant_skip_methods_warns(app: Flask) -> None:
     """Test that redundant skip_methods usage triggers a warning."""
 
     class TestModelWarn(BaseModel):
@@ -263,7 +264,7 @@ def test_redundant_skip_methods_warns(app):
         assert "PATCH" in str(redundant_warnings[0].message)
 
 
-def test_methods_dict_with_true_value(app):
+def test_methods_dict_with_true_value(app: Flask) -> None:
     """Test that True values in dict mode work correctly."""
 
     class TestModelTrue(BaseModel):
@@ -297,7 +298,7 @@ def test_methods_dict_with_true_value(app):
     assert all(method in config.methods for method in CRUDMethod)
 
 
-def test_methods_dict_invalid_value_raises(app):
+def test_methods_dict_invalid_value_raises(app: Flask) -> None:
     """Test that invalid dict values raise TypeError."""
 
     class TestModelInvalid(BaseModel):
@@ -311,10 +312,10 @@ def test_methods_dict_invalid_value_raises(app):
     )
 
     with pytest.raises(TypeError, match="must be a dict, True, or False"):
-        bp._normalize_methods({CRUDMethod.INDEX: "invalid"})
+        bp._normalize_methods({CRUDMethod.INDEX: "invalid"})  # type: ignore[dict-item]
 
 
-def test_methods_invalid_type_raises(app):
+def test_methods_invalid_type_raises(app: Flask) -> None:
     """Test that invalid methods parameter type raises TypeError."""
 
     class TestModelInvalidType(BaseModel):
@@ -328,10 +329,10 @@ def test_methods_invalid_type_raises(app):
     )
 
     with pytest.raises(TypeError, match="must be a list or a dict"):
-        bp._normalize_methods("invalid")
+        bp._normalize_methods("invalid")  # type: ignore[arg-type]
 
 
-def test_empty_methods_list(app):
+def test_empty_methods_list(app: Flask) -> None:
     """Test that empty methods list creates no routes."""
 
     class TestModelEmpty(BaseModel):
@@ -350,7 +351,7 @@ def test_empty_methods_list(app):
     assert len(config.methods) == 0
 
 
-def test_empty_methods_dict(app):
+def test_empty_methods_dict(app: Flask) -> None:
     """Test that empty methods dict enables all by default."""
 
     class TestModelEmptyDict(BaseModel):

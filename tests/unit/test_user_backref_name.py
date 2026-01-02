@@ -1,12 +1,13 @@
 """Tests for HasUserMixin backref name configuration."""
 
+from flask import Flask
 from sqlalchemy.orm import Mapped, mapped_column
 
 from flask_more_smorest.perms.model_mixins import HasUserMixin
 from flask_more_smorest.sqla import BaseModel, db
 
 
-def test_default_backref_name(app):
+def test_default_backref_name(app: Flask) -> None:
     """Test that default backref name is auto-generated from tablename."""
 
     class TestModelDefault(HasUserMixin, BaseModel):
@@ -16,7 +17,7 @@ def test_default_backref_name(app):
     assert TestModelDefault._user_backref_name() == "test_model_defaults"
 
 
-def test_custom_backref_name(app):
+def test_custom_backref_name(app: Flask) -> None:
     """Test that custom backref name is used when specified."""
 
     class TestModelCustom(HasUserMixin, BaseModel):
@@ -26,7 +27,7 @@ def test_custom_backref_name(app):
     assert TestModelCustom._user_backref_name() == "my_items"
 
 
-def test_empty_string_backref_name(app):
+def test_empty_string_backref_name(app: Flask) -> None:
     """Test that empty string disables backref."""
 
     class TestModelEmptyBackref(HasUserMixin, BaseModel):
@@ -36,7 +37,7 @@ def test_empty_string_backref_name(app):
     assert TestModelEmptyBackref._user_backref_name() == ""
 
 
-def test_none_backref_name(app):
+def test_none_backref_name(app: Flask) -> None:
     """Test that None uses default auto-generation."""
 
     class TestModelNone(HasUserMixin, BaseModel):
@@ -47,7 +48,7 @@ def test_none_backref_name(app):
     assert TestModelNone._user_backref_name() == "test_model_nones"
 
 
-def test_backref_with_custom_field_names(app):
+def test_backref_with_custom_field_names(app: Flask) -> None:
     """Test backref name with custom field and relationship names."""
 
     class TestModelFields(HasUserMixin, BaseModel):
