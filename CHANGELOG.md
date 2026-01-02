@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-01-01
+
+### Changed
+- **BREAKING CLARIFICATION**: When using dict mode for `methods` parameter in `CRUDBlueprint`, all CRUD methods are now explicitly enabled by default. Previously this behavior was undocumented.
+- Simplified README documentation for `methods` parameter, removed `skip_methods` details from main docs
+- Enhanced docstrings in `CRUDBlueprint` with comprehensive examples
+- Improved error messages with type information in method normalization
+
+### Added
+- Warning when both dict `False` and `skip_methods` are used redundantly for the same method
+- Comprehensive test suite for `methods` and `skip_methods` logic (11 new tests)
+- Documentation file `docs/crud_methods_cleanup.md` explaining method resolution
+- GitHub workflows for automated PyPI publishing with Trusted Publishing support
+
+### Fixed
+- Empty methods list no longer attempts to register empty MethodView routes
+- GenericCRUD route only registered when it has at least one method
+
+## [0.2.1] - 2024-12-21
+
 ### Changed
 - Renamed package from `flask-smorest-crud` to `flask-more-smorest`
 - Updated all import statements and references

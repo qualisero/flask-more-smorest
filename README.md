@@ -48,26 +48,44 @@ The blueprint above exposes the usual REST operations (`GET`, `POST`, `PATCH`, `
 
 ### Controlling generated endpoints
 
-Use the `methods` and `skip_methods` parameters to control which CRUD routes are created:
+Control which CRUD routes are created using the `methods` parameter:
 
 ```python
 from flask_more_smorest.crud.crud_blueprint import CRUDMethod
 
+# All methods enabled by default
+users = CRUDBlueprint(
+    "users",
+    __name__,
+    model="User",
+    schema="UserSchema",
+)
+
+# Enable only specific methods (whitelist)
+users = CRUDBlueprint(
+    "users",
+    __name__,
+    model="User",
+    schema="UserSchema",
+    methods=[CRUDMethod.INDEX, CRUDMethod.GET],
+)
+
+# Customize or disable specific methods (all enabled by default with dict)
 users = CRUDBlueprint(
     "users",
     __name__,
     model="User",
     schema="UserSchema",
     methods={
-        CRUDMethod.INDEX: True,            # defaults to GET list
-        CRUDMethod.POST: {"schema": "UserWriteSchema"},
-        CRUDMethod.DELETE: {"admin_only": True},
+        CRUDMethod.POST: {"schema": "UserWriteSchema"},  # Custom schema
+        CRUDMethod.DELETE: {"admin_only": True},         # Admin-only endpoint
+        CRUDMethod.PATCH: False,                         # Disable this method
+        # INDEX and GET not mentioned → enabled with defaults
     },
-    skip_methods=[CRUDMethod.PATCH],
 )
 ```
 
-`methods` accepts either a list of `CRUDMethod` enums or a mapping of enum → config. Each config can override the request/response schema or mark the route as `admin_only`. `skip_methods` is evaluated after `methods`, making it useful for turning off a default route.
+**When using a dict, all methods are enabled by default.** Specify a method to customize it, or set it to `False` to disable.
 
 ## Working with models
 

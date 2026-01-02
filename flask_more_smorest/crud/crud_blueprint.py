@@ -80,13 +80,55 @@ class CRUDBlueprint(CRUDPaginationMixin, Blueprint):
     Args:
         name: Blueprint name (first positional arg)
         import_name: Import name (second positional arg)
-        *pargs, **kwargs: Additional keyword arguments for CRUD configuration passed to CRUDConfig
+        model: Model class or string name to use
+        schema: Schema class or string name to use
+        methods: Controls which CRUD methods to enable. Can be:
+            - List of CRUDMethod: Only these methods are enabled
+            - Dict mapping CRUDMethod to config: All methods enabled by default,
+              unless explicitly set to False or present in skip_methods.
+              Dict values can be:
+                - True: Enable with defaults
+                - False: Disable this method
+                - MethodConfig dict: Enable with custom configuration
+        skip_methods: List of CRUDMethod to explicitly disable.
+            Applied after methods resolution. Useful when using dict-style
+            methods to disable specific defaults.
+        *pargs, **kwargs: Additional keyword arguments for CRUD configuration
 
-    Example:
+    Examples:
+        Basic usage (all methods enabled):
         >>> blueprint = CRUDBlueprint(
         ...     'users', __name__,
         ...     model='User',
         ...     schema='UserSchema'
+        ... )
+
+        Enable only specific methods:
+        >>> blueprint = CRUDBlueprint(
+        ...     'users', __name__,
+        ...     model='User',
+        ...     schema='UserSchema',
+        ...     methods=[CRUDMethod.INDEX, CRUDMethod.GET]
+        ... )
+
+        Configure specific methods (all enabled by default when using dict):
+        >>> blueprint = CRUDBlueprint(
+        ...     'users', __name__,
+        ...     model='User',
+        ...     schema='UserSchema',
+        ...     methods={
+        ...         CRUDMethod.POST: {"schema": "UserWriteSchema"},
+        ...         CRUDMethod.DELETE: {"admin_only": True},
+        ...         CRUDMethod.PATCH: False,  # Explicitly disable
+        ...     }
+        ... )
+
+        All methods except some (using skip_methods):
+        >>> blueprint = CRUDBlueprint(
+        ...     'users', __name__,
+        ...     model='User',
+        ...     schema='UserSchema',
+        ...     skip_methods=[CRUDMethod.DELETE, CRUDMethod.PATCH]
         ... )
     """
 
@@ -166,7 +208,29 @@ class CRUDBlueprint(CRUDPaginationMixin, Blueprint):
         skip_methods: list[CRUDMethod] | None,
         url_prefix: str | None,
     ) -> CRUDConfig:
-        """Build and validate configuration."""
+        """Build and validate configuration.
+
+        Method resolution order:
+        1. Normalize methods parameter (list → dict, or process dict with defaults)
+        2. Apply skip_methods to remove explicitly disabled methods
+        3. Return final enabled methods configuration
+
+        Args:
+            name: Blueprint name
+            import_name: Import name for the blueprint
+            model: Model class or string name
+            schema: Schema class or string name
+            model_import_name: Module path to import model from
+            schema_import_name: Module path to import schema from
+            res_id: Name of the resource ID field on the model
+            res_id_param: Name for the ID parameter in URL routes
+            methods: Methods configuration (list or dict)
+            skip_methods: Methods to explicitly disable after normalization
+            url_prefix: URL prefix for the blueprint
+
+        Returns:
+            Validated CRUDConfig object
+        """
 
         resolved_url_prefix: str = url_prefix or f"/{name}/"
 
@@ -208,10 +272,27 @@ class CRUDBlueprint(CRUDPaginationMixin, Blueprint):
 
         res_id_param_name: str = res_id_param or f"{name.lower()}_id"
 
+        # Step 1: Normalize methods into a dict with configs
         normalized_methods = self._normalize_methods(methods)
 
-        for m in skip_methods or []:
-            normalized_methods.pop(CRUDMethod(m), None)
+        # Step 2: Apply skip_methods to remove explicitly disabled methods
+        # This happens after normalization so it works consistently regardless
+        # of whether methods was a list or dict
+        if skip_methods:
+            for method_to_skip in skip_methods:
+                method_enum = CRUDMethod(method_to_skip)
+                normalized_methods.pop(method_enum, None)
+
+                # Warn if dict already disabled this method (redundant)
+                if isinstance(methods, dict) and methods.get(method_enum) is False:
+                    import warnings
+
+                    warnings.warn(
+                        f"Method {method_enum.value} is set to False in 'methods' dict "
+                        f"and also appears in 'skip_methods'. The skip_methods entry is redundant.",
+                        UserWarning,
+                        stacklevel=3,
+                    )
 
         return CRUDConfig(
             name=name,
@@ -232,29 +313,61 @@ class CRUDBlueprint(CRUDPaginationMixin, Blueprint):
         self,
         methods_raw: list[CRUDMethod] | MethodConfigMapping,
     ) -> dict[CRUDMethod, MethodConfig]:
-        """Normalize different method inputs into a standard dict."""
+        """Normalize different method inputs into a standard dict.
 
+        Behavior:
+        - If methods_raw is a list: Only those methods are enabled (explicit whitelist)
+        - If methods_raw is a dict: All methods are enabled by default, unless:
+            - Explicitly set to False in the dict
+            - Will be removed later by skip_methods
+
+        Args:
+            methods_raw: Either a list of methods to enable, or a dict mapping
+                        methods to their configuration
+
+        Returns:
+            Normalized dict mapping enabled methods to their configuration
+
+        Raises:
+            TypeError: If methods_raw is not a list or dict, or if dict values
+                      are invalid
+        """
         normalized: dict[CRUDMethod, MethodConfig] = {}
 
         if isinstance(methods_raw, list):
+            # List mode: explicit whitelist - only these methods are enabled
             for item in methods_raw:
                 key = CRUDMethod(item)
                 normalized[key] = {}
             return normalized
 
         if not isinstance(methods_raw, Mapping):
-            raise TypeError("CRUDBlueprint 'methods' argument must be a list or a dict.")
+            raise TypeError(
+                f"CRUDBlueprint 'methods' argument must be a list or a dict, got {type(methods_raw).__name__}"
+            )
 
+        # Dict mode: all methods enabled by default, process overrides
+        # First, enable all methods with default config
+        for method in CRUDMethod:
+            normalized[method] = {}
+
+        # Then apply dict overrides
         for method, config in methods_raw.items():
             key = CRUDMethod(method)
             if config is True:
+                # Explicitly enabled with defaults (redundant but allowed)
                 normalized[key] = {}
             elif config is False:
-                continue
+                # Explicitly disabled - remove from normalized dict
+                normalized.pop(key, None)
             elif isinstance(config, dict):
+                # Custom configuration provided
                 normalized[key] = config
             else:
-                raise TypeError("CRUDBlueprint method config entries must be dicts, True for defaults, or omitted")
+                raise TypeError(
+                    f"CRUDBlueprint method config for {method} must be a dict, True, or False; "
+                    f"got {type(config).__name__}"
+                )
 
         return normalized
 
@@ -469,7 +582,9 @@ class CRUDBlueprint(CRUDPaginationMixin, Blueprint):
             GenericCRUD, "delete", f"Delete {config.name} by ID.", config.methods.get(CRUDMethod.DELETE, {})
         )
 
-        self.route(f"<{id_type}:{config.res_id_param_name}>")(GenericCRUD)
+        # Only register GenericCRUD if it has at least one method
+        if any(method in config.methods for method in [CRUDMethod.GET, CRUDMethod.PATCH, CRUDMethod.DELETE]):
+            self.route(f"<{id_type}:{config.res_id_param_name}>")(GenericCRUD)
 
     def _configure_endpoint(
         self,
