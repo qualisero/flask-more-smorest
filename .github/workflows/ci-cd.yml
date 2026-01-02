@@ -179,16 +179,23 @@ jobs:
     if: github.event_name == 'release'
     
     steps:
-    - name: Trigger ReadTheDocs build
+    - name: Trigger ReadTheDocs build for all versions
       run: |
+        # Trigger latest (main branch)
         curl -X POST \
           -H "Authorization: Token ${{ secrets.READTHEDOCS_TOKEN }}" \
           https://readthedocs.org/api/v3/projects/flask-more-smorest/versions/latest/builds/
+        
+        # Trigger stable (latest tag - ReadTheDocs auto-updates this)
+        curl -X POST \
+          -H "Authorization: Token ${{ secrets.READTHEDOCS_TOKEN }}" \
+          https://readthedocs.org/api/v3/projects/flask-more-smorest/versions/stable/builds/
     
-    - name: Wait for build to start
+    - name: Wait for builds to start
       run: sleep 10
     
     - name: Check build status
       run: |
-        echo "ReadTheDocs build triggered successfully"
-        echo "Visit https://flask-more-smorest.readthedocs.io to see the updated docs"
+        echo "ReadTheDocs builds triggered successfully"
+        echo "Visit https://flask-more-smorest.readthedocs.io/en/stable/ for release docs"
+        echo "Visit https://flask-more-smorest.readthedocs.io/en/latest/ for dev docs"

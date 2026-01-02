@@ -184,12 +184,51 @@ curl -X POST \
 
 ## Versioning Strategy
 
-ReadTheDocs will automatically:
-- Build `latest` from the `main` branch
-- Build `stable` from the most recent tag
-- Build individual versions for each tag (e.g., `v0.2.2`, `v0.2.3`)
+ReadTheDocs provides multiple documentation versions:
 
-Users can switch between versions using the version selector in the docs.
+### Version Types
+
+**`latest`** (Development Documentation)
+- Tracks: `main` branch
+- Updates: On every push to main
+- Contains: Unreleased features and changes
+- URL: `https://flask-more-smorest.readthedocs.io/en/latest/`
+- Use case: Developers working on the project
+
+**`stable`** (Production Documentation)
+- Tracks: Most recent release tag
+- Updates: Only when a new release is created
+- Contains: Current production version
+- URL: `https://flask-more-smorest.readthedocs.io/en/stable/`
+- Use case: End users installing from PyPI
+
+**Tagged Versions** (e.g., `v0.2.3`, `v0.2.4`)
+- Tracks: Specific release tags
+- Updates: Never (frozen at release time)
+- Contains: Documentation for that specific version
+- URL: `https://flask-more-smorest.readthedocs.io/en/v0.2.3/`
+- Use case: Users on older versions
+
+### Recommended Links
+
+For users in README/documentation:
+```markdown
+📚 **Documentation**: https://flask-more-smorest.readthedocs.io/en/stable/
+```
+
+For developers:
+```markdown
+🔧 **Dev Docs**: https://flask-more-smorest.readthedocs.io/en/latest/
+```
+
+### What GitHub Actions Triggers
+
+When you create a release, the workflow triggers builds for:
+1. ✅ `latest` - Rebuilds from main branch
+2. ✅ `stable` - Rebuilds from latest release tag
+3. ✅ ReadTheDocs automatically builds the new tag version
+
+This ensures all documentation is up-to-date after a release.
 
 ## Additional Resources
 

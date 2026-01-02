@@ -137,7 +137,7 @@ class Employee(User, ProfileMixin, TimestampMixin):
 
 ## Learn more
 
-- 📚 **Documentation**: [ReadTheDocs](https://flask-more-smorest.readthedocs.io) (automatically updated on each release)
+- 📚 **Documentation**: [ReadTheDocs](https://flask-more-smorest.readthedocs.io/en/stable/) (stable) or [latest](https://flask-more-smorest.readthedocs.io/en/latest/) (dev)
 - 🔧 **API Reference**: Full API documentation and guides available online
 - 💡 **Examples**: The `tests/` directory demonstrates filters, permissions, and pagination end-to-end
 
