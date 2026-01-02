@@ -14,8 +14,6 @@ from flask_more_smorest.sqla.base_model import BaseModel
 class QueryTestModel(BaseModel):
     """Test model for filtering tests."""
 
-    __tablename__ = "query_test_model"
-
     name = Column(String(50))
     birth_date = Column(Date)
     is_active = Column(Boolean)

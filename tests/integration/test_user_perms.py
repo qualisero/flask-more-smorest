@@ -81,8 +81,6 @@ class CustomUser(User):
     - is_verified: Whether the user has been verified
     """
 
-    __tablename__ = "custom_users"
-
     bio: Mapped[str | None] = mapped_column(sa.String(500), nullable=True)
     phone_number: Mapped[str | None] = mapped_column(sa.String(20), nullable=True)
     is_verified: Mapped[bool] = mapped_column(sa.Boolean(), default=False)

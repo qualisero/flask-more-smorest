@@ -61,13 +61,11 @@ def product_model(app: Flask) -> type[BaseModel]:
 
     rand_str = uuid.uuid4().hex
     class_name = f"Product_{rand_str}"
-    table_name = f"products_{rand_str}"
 
     ProductModel = type(
         class_name,
         (BaseModel,),
         {
-            "__tablename__": table_name,
             "__module__": __name__,
             "name": db.Column(db.String(100), nullable=False),
             "description": db.Column(db.String(500)),

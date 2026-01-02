@@ -29,8 +29,6 @@ def app() -> Flask:
 class Product(BaseModel):
     """A simple product model for testing."""
 
-    __tablename__ = "products"
-
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.String(500))
     count = db.Column(db.Integer, default=0)
@@ -42,13 +40,11 @@ def test_model(app: Flask) -> type[Product]:
 
     rand_str = uuid.uuid4().hex
     class_name = f"Product_{rand_str}"
-    table_name = f"products_{rand_str}"
 
     TestItem = type(
         class_name,
         (Product,),
         {
-            "__tablename__": table_name,
             "__module__": __name__,
         },
     )
@@ -235,7 +231,6 @@ class TestDatabaseInitialization:
         """Test creating multiple model classes."""
 
         class Model1(BaseModel):
-            __tablename__ = "model1"
             field1 = db.Column(db.String(50))
 
             def _can_read(self) -> bool:
@@ -248,7 +243,6 @@ class TestDatabaseInitialization:
                 return True
 
         class Model2(BaseModel):
-            __tablename__ = "model2"
             field2 = db.Column(db.Integer)
 
             def _can_read(self) -> bool:

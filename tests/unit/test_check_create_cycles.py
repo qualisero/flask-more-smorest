@@ -13,11 +13,10 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 class Node(BasePermsModel):
-    __tablename__ = "node_check_create_cycle"
     __allow_unmapped__ = True
 
     id = db.Column(sa.Integer, primary_key=True)
-    parent_id = db.Column(sa.Integer, sa.ForeignKey("node_check_create_cycle.id"))
+    parent_id = db.Column(sa.Integer, sa.ForeignKey("node.id"))
     parent = db.relationship("Node", remote_side=[id], backref="children")
 
 

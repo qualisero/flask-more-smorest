@@ -8,8 +8,6 @@ from flask_more_smorest import BaseModel, db
 
 
 class SimpleModel(BaseModel):
-    __tablename__ = "simple_model"
-
     name: Mapped[str] = mapped_column(sa.String(50))
 
 

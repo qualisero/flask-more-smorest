@@ -13,14 +13,12 @@ from flask_more_smorest.error.exceptions import ForbiddenError
 
 @pytest.fixture(scope="function")
 def dummy_perms_model(app: Flask) -> type[BasePermsModel]:
-    table_name = f"dummy_perms_models_{uuid.uuid4().hex}"
     class_name = f"DummyPermsModel_{uuid.uuid4().hex}"
 
     Dummy = type(
         class_name,
         (BasePermsModel,),
         {
-            "__tablename__": table_name,
             "__module__": __name__,
             "name": db.Column(db.String(30), nullable=False),
         },
