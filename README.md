@@ -137,7 +137,9 @@ class Employee(User, ProfileMixin, TimestampMixin):
 
 ## Learn more
 
-- API reference and guides: [project documentation](https://github.com/qualisero/flask-more-smorest#readme)
-- Examples and tests under the `tests/` directory demonstrate filters, permissions, and pagination end-to-end.
+- 📚 **Documentation**: [ReadTheDocs](https://flask-more-smorest.readthedocs.io) (automatically updated on each release)
+- 🔧 **API Reference**: Full API documentation and guides available online
+- 💡 **Examples**: The `tests/` directory demonstrates filters, permissions, and pagination end-to-end
+- 🚀 **Release Process**: See [docs/READTHEDOCS_SETUP.md](docs/READTHEDOCS_SETUP.md) for CI/CD and documentation automation
 
 Contributions and feedback are welcome—see [CONTRIBUTING.md](CONTRIBUTING.md) for details.

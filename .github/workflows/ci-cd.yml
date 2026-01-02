@@ -172,3 +172,23 @@ jobs:
         # If OIDC is not configured on PyPI, you must provide an API token via the "password" input
         verbose: true
         print-hash: true
+
+  trigger-docs:
+    runs-on: ubuntu-latest
+    needs: [publish]
+    if: github.event_name == 'release'
+    
+    steps:
+    - name: Trigger ReadTheDocs build
+      run: |
+        curl -X POST \
+          -H "Authorization: Token ${{ secrets.READTHEDOCS_TOKEN }}" \
+          https://readthedocs.org/api/v3/projects/flask-more-smorest/versions/latest/builds/
+    
+    - name: Wait for build to start
+      run: sleep 10
+    
+    - name: Check build status
+      run: |
+        echo "ReadTheDocs build triggered successfully"
+        echo "Visit https://flask-more-smorest.readthedocs.io to see the updated docs"

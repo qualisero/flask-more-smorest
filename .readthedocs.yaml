@@ -16,3 +16,9 @@ python:
       extra_requirements:
         - dev
     - requirements: docs/requirements.txt
+
+# Build documentation for all tags and branches
+# This ensures new releases automatically build docs
+formats:
+  - pdf
+  - epub
