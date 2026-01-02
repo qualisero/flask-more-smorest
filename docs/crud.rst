@@ -13,10 +13,10 @@ Create a CRUD blueprint by specifying a model and schema:
    from flask_more_smorest.crud.crud_blueprint import CRUDBlueprint
 
    users = CRUDBlueprint(
-       "users",                    # Blueprint name
+       "critters",                    # Blueprint name
        __name__,                   # Import name
-       model="User",               # Model class or string
-       schema="UserSchema",        # Schema class or string
+       model="Critter",               # Model class or string
+       schema="CritterSchema",        # Schema class or string
        url_prefix="/api/users/",   # URL prefix
    )
 
@@ -41,24 +41,24 @@ Models and schemas can be specified as:
    .. code-block:: python
 
       CRUDBlueprint(
-          "users",
+          "critters",
           __name__,
-          model="User",        # Resolves to models.User
-          schema="UserSchema", # Resolves to schemas.UserSchema
+          model="Critter",        # Resolves to models.Critter
+          schema="CritterSchema", # Resolves to schemas.CritterSchema
       )
 
 2. **Classes** (direct reference):
 
    .. code-block:: python
 
-      from myapp.models import User
-      from myapp.schemas import UserSchema
+      from myapp.models import Critter
+      from myapp.schemas import CritterSchema
 
       CRUDBlueprint(
-          "users",
+          "critters",
           __name__,
-          model=User,
-          schema=UserSchema,
+          model=Critter,
+          schema=CritterSchema,
       )
 
 3. **Custom import paths**:
@@ -66,10 +66,10 @@ Models and schemas can be specified as:
    .. code-block:: python
 
       CRUDBlueprint(
-          "users",
+          "critters",
           __name__,
-          model="User",
-          schema="UserSchema",
+          model="Critter",
+          schema="CritterSchema",
           model_import_name="myapp.resources.models",
           schema_import_name="myapp.resources.schemas",
       )
@@ -85,10 +85,10 @@ Enable only specific methods using a list:
 
    # Only create list and get endpoints
    users = CRUDBlueprint(
-       "users",
+       "critters",
        __name__,
-       model="User",
-       schema="UserSchema",
+       model="Critter",
+       schema="CritterSchema",
        methods=[CRUDMethod.INDEX, CRUDMethod.GET],
    )
 
@@ -97,10 +97,10 @@ Configure methods using a dict (all methods enabled by default):
 .. code-block:: python
 
    users = CRUDBlueprint(
-       "users",
+       "critters",
        __name__,
-       model="User",
-       schema="UserSchema",
+       model="Critter",
+       schema="CritterSchema",
        methods={
            CRUDMethod.POST: {"schema": "UserWriteSchema"},   # Custom schema
            CRUDMethod.DELETE: {"admin_only": True},          # Admin-only
@@ -127,10 +127,10 @@ By default, resources are accessed by ``id``. You can customize this:
 .. code-block:: python
 
    users = CRUDBlueprint(
-       "users",
+       "critters",
        __name__,
-       model="User",
-       schema="UserSchema",
+       model="Critter",
+       schema="CritterSchema",
        res_id="username",           # Field name on model
        res_id_param="user_name",    # Parameter name in URL
    )
@@ -240,10 +240,10 @@ Use different schemas for different operations:
 .. code-block:: python
 
    users = CRUDBlueprint(
-       "users",
+       "critters",
        __name__,
-       model="User",
-       schema="UserSchema",  # Default schema for most operations
+       model="Critter",
+       schema="CritterSchema",  # Default schema for most operations
        methods={
            CRUDMethod.INDEX: {"schema": "UserListSchema"},    # List view
            CRUDMethod.GET: {"schema": "UserDetailSchema"},    # Detail view
@@ -265,10 +265,10 @@ Mark specific endpoints as admin-only:
    from flask_more_smorest.perms import CRUDBlueprint
 
    users = CRUDBlueprint(
-       "users",
+       "critters",
        __name__,
-       model="User",
-       schema="UserSchema",
+       model="Critter",
+       schema="CritterSchema",
        methods={
            CRUDMethod.DELETE: {"admin_only": True},
            CRUDMethod.PATCH: {"admin_only": True},
@@ -286,10 +286,10 @@ Create nested resource routes:
 
    # Parent resource
    users = CRUDBlueprint(
-       "users",
+       "critters",
        __name__,
-       model="User",
-       schema="UserSchema",
+       model="Critter",
+       schema="CritterSchema",
        url_prefix="/api/users/",
    )
 
@@ -318,10 +318,10 @@ Add custom endpoints to your CRUD blueprint:
 .. code-block:: python
 
    users = CRUDBlueprint(
-       "users",
+       "critters",
        __name__,
-       model="User",
-       schema="UserSchema",
+       model="Critter",
+       schema="CritterSchema",
    )
 
    @users.route("/stats/")
@@ -333,7 +333,7 @@ Add custom endpoints to your CRUD blueprint:
        }
 
    @users.route("/<uuid:user_id>/activate/", methods=["POST"])
-   @users.response(200, UserSchema)
+   @users.response(200, CritterSchema)
    def activate_user(user_id):
        """Custom endpoint: POST /api/users/<user_id>/activate/"""
        user = User.get_by_or_404(id=user_id)

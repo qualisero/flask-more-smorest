@@ -4,14 +4,14 @@
 [![Python Support](https://img.shields.io/pypi/pyversions/flask-more-smorest.svg?v=0.2.2)](https://pypi.org/project/flask-more-smorest/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Flask-More-Smorest extends **Flask-Smorest** with batteries-included CRUD blueprints, SQLAlchemy helpers, and an opinionated user/permission system.
+Flask-More-Smorest extends **Flask-Smorest** with a number of enhancements and goodies, with the sole goal of drastically reducing boilerplate and complexity when creating a new REST API.
 
 ## Highlights
 
 - Automatic CRUD endpoints with filtering and pagination
-- Blueprint mixins for public/admin annotations and operation IDs
-- SQLAlchemy base model with Marshmallow schemas and permission hooks
-- Optional JWT-powered user, role, and token models
+- SQLAlchemy base model with Marshmallow schemas
+- User management
+- Resource-based permission management
 
 ## Quick Start
 
@@ -33,18 +33,18 @@ app.config.update(
 init_db(app)          # sets up SQLAlchemy
 api = Api(app)        # registers JWT + permission hooks
 
-users = CRUDBlueprint(
-    "users",
+critters = CRUDBlueprint(
+    "critters",
     __name__,
-    model="User",        # resolved from your models module
-    schema="UserSchema",  # resolved from your schemas module
-    url_prefix="/api/users/",
+    model="Critter",        # resolved from your models module
+    schema="CritterSchema",  # resolved from your schemas module
+    url_prefix="/api/critters/",
 )
 
-api.register_blueprint(users)
+api.register_blueprint(critters)
 ```
 
-The blueprint above exposes the usual REST operations (`GET`, `POST`, `PATCH`, `DELETE`) plus automatic filtering (`/api/users/?created_at__from=...`).
+The blueprint above exposes the usual REST operations (`GET`, `POST`, `PATCH`, `DELETE`) plus automatic filtering (`/api/critters/?created_at__from=...`).
 
 ### Controlling generated endpoints
 
@@ -54,32 +54,32 @@ Control which CRUD routes are created using the `methods` parameter:
 from flask_more_smorest.crud.crud_blueprint import CRUDMethod
 
 # All methods enabled by default
-users = CRUDBlueprint(
-    "users",
+critters = CRUDBlueprint(
+    "critters",
     __name__,
-    model="User",
-    schema="UserSchema",
+    model="Critter",
+    schema="CritterSchema",
 )
 
 # Enable only specific methods (whitelist)
-users = CRUDBlueprint(
-    "users",
+critters = CRUDBlueprint(
+    "critters",
     __name__,
-    model="User",
-    schema="UserSchema",
+    model="Critter",
+    schema="CritterSchema",
     methods=[CRUDMethod.INDEX, CRUDMethod.GET],
 )
 
 # Customize or disable specific methods (all enabled by default with dict)
-users = CRUDBlueprint(
-    "users",
+critters = CRUDBlueprint(
+    "critters",
     __name__,
-    model="User",
-    schema="UserSchema",
+    model="Critter",
+    schema="CritterSchema",
     methods={
-        CRUDMethod.POST: {"schema": "UserWriteSchema"},  # Custom schema
-        CRUDMethod.DELETE: {"admin_only": True},         # Admin-only endpoint
-        CRUDMethod.PATCH: False,                         # Disable this method
+        CRUDMethod.POST: {"schema": "CritterWriteSchema"},  # Custom schema
+        CRUDMethod.DELETE: {"admin_only": True},            # Admin-only endpoint
+        CRUDMethod.PATCH: False,                            # Disable this method
         # INDEX and GET not mentioned → enabled with defaults
     },
 )
@@ -96,17 +96,18 @@ from flask_more_smorest import BaseModel
 from flask_more_smorest.sqla import db
 from sqlalchemy.orm import Mapped, mapped_column
 
-class Article(BaseModel):
-    # __tablename__ auto-generated as "article"
+class Critter(BaseModel):
+    # __tablename__ auto-generated as "critter"
     
-    title: Mapped[str] = mapped_column(db.String(200), nullable=False)
-    body: Mapped[str] = mapped_column(db.Text, nullable=False)
+    name: Mapped[str] = mapped_column(db.String(100), nullable=False)
+    species: Mapped[str] = mapped_column(db.String(50), nullable=False)
+    cuteness_level: Mapped[int] = mapped_column(db.Integer, default=10)
 
     def _can_write(self) -> bool:  # optional permission hook
         return self.is_current_user_admin()
 ```
 
-`Article.Schema()` instantly provides a Marshmallow schema (including an `is_writable` field) ready for use in blueprints.
+`Critter.Schema()` instantly provides a Marshmallow schema (including an `is_writable` field) ready for use in blueprints.
 
 ## Built-in user system
 

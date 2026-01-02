@@ -39,27 +39,27 @@ Here's a minimal example to get you started:
    api = Api(app)
 
    # Create a CRUD blueprint
-   users = CRUDBlueprint(
-       "users",
+   critters = CRUDBlueprint(
+       "critters",
        __name__,
-       model="User",        # resolved from your models module
-       schema="UserSchema",  # resolved from your schemas module
-       url_prefix="/api/users/",
+       model="Critter",        # resolved from your models module
+       schema="CritterSchema",  # resolved from your schemas module
+       url_prefix="/api/critters/",
    )
 
    # Register blueprint
-   api.register_blueprint(users)
+   api.register_blueprint(critters)
 
    if __name__ == "__main__":
        app.run(debug=True)
 
 This automatically creates the following endpoints:
 
-- ``GET /api/users/`` - List all users (with pagination and filtering)
-- ``POST /api/users/`` - Create a new user
-- ``GET /api/users/<id>`` - Get a specific user
-- ``PATCH /api/users/<id>`` - Update a user
-- ``DELETE /api/users/<id>`` - Delete a user
+- ``GET /api/critters/`` - List all critters (with pagination and filtering)
+- ``POST /api/critters/`` - Create a new critter
+- ``GET /api/critters/<id>`` - Get a specific critter
+- ``PATCH /api/critters/<id>`` - Update a critter
+- ``DELETE /api/critters/<id>`` - Delete a critter
 
 Creating Models
 ---------------
@@ -72,20 +72,20 @@ Use ``BaseModel`` to create models with automatic features:
    from flask_more_smorest.sqla import db
    from sqlalchemy.orm import Mapped, mapped_column
 
-   class User(BaseModel):
-       # __tablename__ is automatically set to "user" (snake_case of class name)
-       # You can override it if needed: __tablename__ = "custom_users"
+   class Critter(BaseModel):
+       # __tablename__ is automatically set to "critter" (snake_case of class name)
+       # You can override it if needed: __tablename__ = "custom_critters"
 
-       username: Mapped[str] = mapped_column(db.String(80), unique=True, nullable=False)
-       email: Mapped[str] = mapped_column(db.String(120), unique=True, nullable=False)
-       is_active: Mapped[bool] = mapped_column(db.Boolean, default=True)
+       name: Mapped[str] = mapped_column(db.String(100), nullable=False)
+       species: Mapped[str] = mapped_column(db.String(50), nullable=False)
+       cuteness_level: Mapped[int] = mapped_column(db.Integer, default=10)
 
 ``BaseModel`` automatically provides:
 
 - UUID primary key (``id``)
 - Timestamps (``created_at``, ``updated_at``)
 - CRUD helper methods (``save()``, ``update()``, ``delete()``, ``get_by()``, ``get_by_or_404()``)
-- Automatic Marshmallow schema generation (``User.Schema``)
+- Automatic Marshmallow schema generation (``Critter.Schema``)
 - **Automatic table naming** (class name converted to snake_case)
 
 .. note::
@@ -93,7 +93,7 @@ Use ``BaseModel`` to create models with automatic features:
    The ``__tablename__`` attribute is **optional**. SQLAlchemy automatically generates 
    table names by converting your class name to snake_case. For example:
    
-   - ``User`` → ``user``
+   - ``Critter`` → ``critter``
    - ``UserProfile`` → ``user_profile``
    - ``ArticleComment`` → ``article_comment``
    
@@ -109,24 +109,24 @@ You can customize which endpoints are created:
    from flask_more_smorest.crud.crud_blueprint import CRUDMethod
 
    # Enable only specific methods
-   users = CRUDBlueprint(
-       "users",
+   critters = CRUDBlueprint(
+       "critters",
        __name__,
-       model="User",
-       schema="UserSchema",
+       model="Critter",
+       schema="CritterSchema",
        methods=[CRUDMethod.INDEX, CRUDMethod.GET],  # Only list and get
    )
 
    # Or customize specific methods
-   users = CRUDBlueprint(
-       "users",
+   critters = CRUDBlueprint(
+       "critters",
        __name__,
-       model="User",
-       schema="UserSchema",
+       model="Critter",
+       schema="CritterSchema",
        methods={
-           CRUDMethod.POST: {"schema": "UserWriteSchema"},  # Custom schema for POST
-           CRUDMethod.DELETE: {"admin_only": True},         # Admin-only endpoint
-           CRUDMethod.PATCH: False,                         # Disable PATCH
+           CRUDMethod.POST: {"schema": "CritterWriteSchema"},  # Custom schema for POST
+           CRUDMethod.DELETE: {"admin_only": True},            # Admin-only endpoint
+           CRUDMethod.PATCH: False,                            # Disable PATCH
        },
    )
 
@@ -140,16 +140,16 @@ CRUD endpoints automatically support filtering and pagination:
 .. code-block:: bash
 
    # Filter by field values
-   GET /api/users/?username=john&is_active=true
+   GET /api/critters/?species=cat&cuteness_level=10
 
    # Date range filtering
-   GET /api/users/?created_at__from=2024-01-01&created_at__to=2024-12-31
+   GET /api/critters/?created_at__from=2024-01-01&created_at__to=2024-12-31
 
    # Pagination
-   GET /api/users/?page=2&page_size=20
+   GET /api/critters/?page=2&page_size=20
 
    # String matching
-   GET /api/users/?email__like=%@example.com
+   GET /api/critters/?name__like=%fluffy%
 
 Next Steps
 ----------

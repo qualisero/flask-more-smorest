@@ -102,7 +102,7 @@ The cleanup maintains backward compatibility. Existing code will work exactly as
 # Unclear: Are other methods enabled or not?
 bp = CRUDBlueprint(
     "users", __name__,
-    model="User",
+    model="Critter",
     methods={CRUDMethod.POST: {"schema": "UserWriteSchema"}}
 )
 ```
@@ -112,7 +112,7 @@ bp = CRUDBlueprint(
 # Clear: All methods enabled, POST customized
 bp = CRUDBlueprint(
     "users", __name__,
-    model="User",
+    model="Critter",
     methods={CRUDMethod.POST: {"schema": "UserWriteSchema"}}
 )
 # Result: INDEX, GET, POST (custom), PATCH, DELETE all created
@@ -122,7 +122,7 @@ bp = CRUDBlueprint(
 ```python
 bp = CRUDBlueprint(
     "users", __name__,
-    model="User",
+    model="Critter",
     methods={CRUDMethod.PATCH: False},
     skip_methods=[CRUDMethod.PATCH]  # Redundant!
 )

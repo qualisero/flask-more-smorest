@@ -25,12 +25,12 @@ BasePermsModel
    from flask_more_smorest.sqla import db
    from sqlalchemy.orm import Mapped, mapped_column
 
-   class Article(BasePermsModel):
-       # Table name automatically set to "article"
+   class Critter(BasePermsModel):
+       # Table name automatically set to "critter"
        
-       title: Mapped[str] = mapped_column(db.String(200), nullable=False)
-       body: Mapped[str] = mapped_column(db.Text, nullable=False)
-       published: Mapped[bool] = mapped_column(db.Boolean, default=False)
+       name: Mapped[str] = mapped_column(db.String(100), nullable=False)
+       species: Mapped[str] = mapped_column(db.String(50), nullable=False)
+       is_adoptable: Mapped[bool] = mapped_column(db.Boolean, default=True)
 
        def _can_write(self) -> bool:
            """Custom write permission logic"""
@@ -38,10 +38,10 @@ BasePermsModel
 
        def _can_read(self) -> bool:
            """Custom read permission logic"""
-           # Anyone can read published articles
-           if self.published:
+           # Anyone can read adoptable critters
+           if self.is_adoptable:
                return True
-           # Only admin can read unpublished
+           # Only admin can see non-adoptable ones
            return self.is_current_user_admin()
 
 Permission Hooks
@@ -100,10 +100,11 @@ Adds a ``user_id`` foreign key and ``user`` relationship:
 
    from flask_more_smorest.perms import BasePermsModel, HasUserMixin
 
-   class Article(HasUserMixin, BasePermsModel):
-       # Table name automatically set to "article"
+   class Critter(HasUserMixin, BasePermsModel):
+       # Table name automatically set to "critter"
        
-       title: Mapped[str] = mapped_column(db.String(200))
+       name: Mapped[str] = mapped_column(db.String(100))
+       species: Mapped[str] = mapped_column(db.String(50))
        # user_id and user relationship automatically added
 
 UserOwnershipMixin
@@ -117,16 +118,17 @@ Unified mixin for user-owned resources with two configurable modes:
 
    from flask_more_smorest.perms import BasePermsModel, UserOwnershipMixin
 
-   class Comment(UserOwnershipMixin, BasePermsModel):
+   class Toy(UserOwnershipMixin, BasePermsModel):
        # Uses default: __delegate_to_user__ = False
        
-       text: Mapped[str] = mapped_column(db.Text)
-       # Users can read/write only their own comments (simple user_id check)
-       # Admins can access all comments (admin bypass in BasePermsModel)
+       name: Mapped[str] = mapped_column(db.String(100))
+       color: Mapped[str] = mapped_column(db.String(50))
+       # Users can read/write only their own toys (simple user_id check)
+       # Admins can access all toys (admin bypass in BasePermsModel)
 
 **Implementation**: Checks if ``user_id == current_user_id``
 
-**Use for**: Simple user-owned resources (notes, posts, comments, documents)
+**Use for**: Simple user-owned resources (toys, notes, posts, comments)
 
 **Delegated Permissions Mode** (``__delegate_to_user__ = True``):
 
@@ -289,22 +291,22 @@ Here's a complete example of a blog with permission controls:
    from flask_more_smorest.sqla import db
    from sqlalchemy.orm import Mapped, mapped_column
 
-   class Article(HasUserMixin, BasePermsModel):
-       # Table name automatically set to "article"
+   class Critter(HasUserMixin, BasePermsModel):
+       # Table name automatically set to "critter"
 
-       title: Mapped[str] = mapped_column(db.String(200), nullable=False)
-       body: Mapped[str] = mapped_column(db.Text, nullable=False)
-       published: Mapped[bool] = mapped_column(db.Boolean, default=False)
+       name: Mapped[str] = mapped_column(db.String(100), nullable=False)
+       species: Mapped[str] = mapped_column(db.String(50), nullable=False)
+       is_adoptable: Mapped[bool] = mapped_column(db.Boolean, default=True)
 
        def _can_read(self) -> bool:
-           # Anyone can read published articles
-           if self.published:
+           # Anyone can read adoptable critters
+           if self.is_adoptable:
                return True
-           # Authors and admins can read drafts
+           # Owners and admins can see non-adoptable ones
            return self.is_current_user_owner() or self.is_current_user_admin()
 
        def _can_write(self) -> bool:
-           # Only author or admin can edit
+           # Only owner or admin can edit
            return self.is_current_user_owner() or self.is_current_user_admin()
 
        def _can_delete(self) -> bool:
