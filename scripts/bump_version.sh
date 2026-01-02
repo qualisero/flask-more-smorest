@@ -1,5 +1,5 @@
 #!/bin/bash
-# Bump version and update badge version parameters in README.md
+# Bump version and create a GitHub release
 # Usage: ./scripts/bump_version.sh [patch|minor|major]
 
 set -e
@@ -29,11 +29,17 @@ echo "✅ Badges updated"
 
 echo ""
 echo "📝 Next steps:"
-echo "   1. Update CHANGELOG.md with release notes"
+echo "   1. Update CHANGELOG.md with release notes for v$NEW_VERSION"
 echo "   2. Review changes: git diff"
-echo "   3. Commit: git add -A && git commit -m 'Bump version to $NEW_VERSION'"
-echo "   4. Push: git push origin main"
-echo "   5. Release: gh release create v$NEW_VERSION --generate-notes"
+echo "   3. Commit and tag:"
+echo "      git add pyproject.toml CHANGELOG.md README.md"
+echo "      git commit -m 'Bump version to $NEW_VERSION'"
+echo "      git tag v$NEW_VERSION"
+echo "      git push origin main --tags"
+echo "   4. Create GitHub release (triggers PyPI publish + docs update):"
+echo "      gh release create v$NEW_VERSION --title 'v$NEW_VERSION' --notes-file RELEASE_NOTES.md"
 echo ""
-echo "Or use the automated release:"
-echo "   gh release create v$NEW_VERSION --title 'Release v$NEW_VERSION' --notes '...'"
+echo "✨ After release, CI/CD will automatically:"
+echo "   - Run tests and linting"
+echo "   - Publish to PyPI"
+echo "   - Update ReadTheDocs (if token configured)"

@@ -140,6 +140,14 @@ class Employee(User, ProfileMixin, TimestampMixin):
 - 📚 **Documentation**: [ReadTheDocs](https://flask-more-smorest.readthedocs.io) (automatically updated on each release)
 - 🔧 **API Reference**: Full API documentation and guides available online
 - 💡 **Examples**: The `tests/` directory demonstrates filters, permissions, and pagination end-to-end
-- 🚀 **Release Process**: See [docs/READTHEDOCS_SETUP.md](docs/READTHEDOCS_SETUP.md) for CI/CD and documentation automation
+
+## Release Process
+
+**Creating a new release:**
+```bash
+./scripts/bump_version.sh [patch|minor|major]  # Updates version and provides next steps
+# Then: update CHANGELOG.md, commit, tag, and create GitHub release
+```
+GitHub Actions automatically publishes to PyPI and updates ReadTheDocs.
 
 Contributions and feedback are welcome—see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
