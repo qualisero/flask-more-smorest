@@ -19,7 +19,6 @@ Example response:
 import logging
 import sys
 import traceback
-import uuid
 from http import HTTPStatus
 from pprint import pformat
 from typing import TYPE_CHECKING, Any
@@ -132,36 +131,20 @@ class ApiException(Exception):
     def get_debug_context(self, **kwargs: str | int | bool | None) -> dict[str, str | int | bool | dict | None]:
         """Get debugging context information.
 
+        Note: User context is intentionally NOT collected here to avoid model conflicts.
+        Applications that want user context in error responses should override this method.
+
         Args:
             **kwargs: Additional context information to include
 
         Returns:
-            Dictionary containing debug context including user information
+            Dictionary containing debug context (without user information)
         """
         debug_context: dict[str, str | int | bool | dict | None] = dict()
         debug_context.update(kwargs)
-
-        # Only collect user context in debug mode to avoid performance overhead
-        if _is_debug_mode():
-            from ..perms.user_models import get_current_user, get_current_user_id
-
-            try:
-                user_id: uuid.UUID | None = get_current_user_id()
-                user = get_current_user()
-                if user_id and user:
-                    debug_context["user"] = {
-                        "id": str(user_id),
-                        "roles": [r.role for r in user.roles],
-                    }
-                else:
-                    debug_context["user"] = {
-                        "id": None,
-                        "roles": None,
-                        "msg": "Current user not authenticated",
-                    }
-            except Exception:
-                debug_context["error"] = {"msg": "Error getting current user context"}
-
+        # Note: User context collection removed to avoid SQLAlchemy model conflicts
+        # when applications have their own User/UserRole models with the same table names.
+        # Override this method in your application if you need user context.
         return debug_context
 
     def _should_include_traceback(self) -> bool:

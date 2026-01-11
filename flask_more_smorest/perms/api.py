@@ -139,9 +139,9 @@ class Api(ApiOrig):
                     raise UnauthorizedError(f"Invalid token ({e})")
 
                 if admin_endpoint:
-                    from .user_models import User
+                    from .user_context import is_current_user_admin
 
-                    if not User.is_current_user_admin():
+                    if not is_current_user_admin():
                         raise ForbiddenError("Admin access only")
 
             extensions_state["require_login_registered"] = True

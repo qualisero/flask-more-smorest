@@ -18,6 +18,12 @@ from .model_mixins import (
 )
 from .perms_blueprint import PermsBlueprint, PermsBlueprintMixin
 from .user_blueprints import UserBlueprint
+from .user_context import (
+    UserProtocol,
+    register_get_current_user,
+    register_get_current_user_id,
+    register_is_current_user_admin,
+)
 
 # Type stubs for lazy-loaded objects
 if TYPE_CHECKING:
@@ -61,6 +67,11 @@ __all__ = [
     "PermsBlueprint",
     "UserBlueprint",
     "init_jwt",
+    # User context configuration
+    "register_get_current_user",
+    "register_get_current_user_id",
+    "register_is_current_user_admin",
+    "UserProtocol",
 ]
 
 
