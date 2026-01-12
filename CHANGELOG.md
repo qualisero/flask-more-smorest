@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-01-12
+
+### Added
+- **Configurable User Context System**: Pluggable authentication system allowing applications to use custom User models
+  - Three-tier resolution: Flask config > global registration > built-in fallback
+  - `register_get_current_user()`, `register_get_current_user_id()`, `register_is_current_user_admin()` functions
+  - `UserProtocol` for type-safe custom User models
+  - Flask config options: `FMS_GET_CURRENT_USER`, `FMS_GET_CURRENT_USER_ID`, `FMS_IS_CURRENT_USER_ADMIN`
+  - Comprehensive documentation with integration examples (Flask-Login, JWT, OAuth, multi-tenant)
+  - Solves SQLAlchemy table name conflicts when applications have existing User models
+- **User Context in Error Responses**: Restored user context collection in debug mode error responses
+  - Uses configurable user context system (no model conflicts)
+  - Shows user ID and roles in debug/testing mode only
+  - Works with both built-in and custom User models
+  - Gracefully handles missing roles attribute
+
+### Changed
+- Permission system now uses configurable user context throughout
+- Updated `is_current_user_admin()` to use new user context system
+- Error debug context now includes user information via abstracted user context
+
+### Documentation
+- New comprehensive guide: Custom User Context (docs/custom-user-context.rst)
+- Updated permissions.rst with custom user context cross-reference
+- Added concise example in README
+- Multiple real-world integration examples
+
+### Tests
+- Added 26 unit tests for user context system (253 tests total)
+- Tests cover registration, resolution order, Flask config, and edge cases
+- Added tests for user context in error responses
+
 ## [0.6.0] - 2026-01-11
 
 ### Added
