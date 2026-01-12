@@ -251,110 +251,30 @@ Permission Models provide several helper methods:
    from flask_more_smorest.perms import get_current_user
    user = get_current_user()  # Safely loads from JWT
 
-Custom User Context
--------------------
+Using Your Own User Model
+--------------------------
 
 If your application already has its own User model or authentication system, you can configure flask-more-smorest to use it instead of the built-in user models. This avoids SQLAlchemy table name conflicts and integrates seamlessly with your existing auth system.
 
-Configuration Options
-^^^^^^^^^^^^^^^^^^^^^
-
-Configure user context via Flask config:
-
-.. code-block:: python
-
-   from flask import Flask
-   from my_app.auth import get_my_current_user, get_my_current_user_id
-   
-   app = Flask(__name__)
-   app.config['FMS_GET_CURRENT_USER'] = get_my_current_user
-   app.config['FMS_GET_CURRENT_USER_ID'] = get_my_current_user_id
-   app.config['FMS_IS_CURRENT_USER_ADMIN'] = lambda: get_my_current_user().is_admin
-
-Or register functions directly:
-
-.. code-block:: python
-
-   from flask_more_smorest.perms import (
-       register_get_current_user,
-       register_get_current_user_id,
-       register_is_current_user_admin,
-   )
-   from my_app.auth import get_my_current_user, get_my_current_user_id
-   
-   register_get_current_user(get_my_current_user)
-   register_get_current_user_id(get_my_current_user_id)
-   register_is_current_user_admin(lambda: get_my_current_user().is_admin)
-
-User Protocol
+Quick Example
 ^^^^^^^^^^^^^
 
-Your custom User model should conform to ``UserProtocol`` for type safety:
-
 .. code-block:: python
 
-   import uuid
-   from flask_more_smorest.perms import UserProtocol
+   from flask_more_smorest.perms import register_get_current_user, register_get_current_user_id
+   from my_app.auth import get_my_current_user, get_my_current_user_id
    
-   class MyUser:
-       """Custom User model conforming to UserProtocol."""
-       
-       def __init__(self, id: uuid.UUID, email: str, is_admin: bool):
-           self.id = id
-           self.email = email
-           self._is_admin = is_admin
-       
-       @property
-       def is_admin(self) -> bool:
-           return self._is_admin
-
-Complete Example
-^^^^^^^^^^^^^^^^
-
-Here's a complete example integrating with an existing authentication system:
-
-.. code-block:: python
-
-   from flask import Flask
-   from flask_jwt_extended import get_jwt_identity
-   from flask_more_smorest.perms import (
-       register_get_current_user,
-       register_get_current_user_id,
-       BasePermsModel,
-   )
-   from my_app.models import User  # Your existing User model
-   
-   app = Flask(__name__)
-   
-   # Configure custom user context
-   def get_my_current_user():
-       user_id = get_jwt_identity()
-       return User.query.get(user_id) if user_id else None
-   
-   def get_my_current_user_id():
-       return get_jwt_identity()
-   
+   # Register your custom user context functions
    register_get_current_user(get_my_current_user)
    register_get_current_user_id(get_my_current_user_id)
    
-   # Now permission models use your User model
-   class Article(BasePermsModel):
-       title: Mapped[str] = mapped_column(db.String(200))
-       
-       def _can_write(self) -> bool:
-           # Uses your custom get_current_user under the hood
-           return self.is_current_user_admin()
+   # Now all permission checks use your User model
 
-Resolution Order
-^^^^^^^^^^^^^^^^
+.. seealso::
 
-User context functions are resolved in this order:
-
-1. **Flask Config**: ``app.config['FMS_GET_CURRENT_USER']`` (highest priority)
-2. **Global Registration**: ``register_get_current_user()``
-3. **Built-in Fallback**: ``flask_more_smorest.perms.user_models.get_current_user`` (default)
-
-This allows per-application configuration while maintaining backward compatibility.
+   :doc:`custom-user-context`
+      Complete guide with configuration options, multiple integration examples 
+      (Flask-Login, JWT, OAuth), best practices, and troubleshooting.
 
 Integration with CRUD Blueprints
 ---------------------------------

@@ -3,22 +3,48 @@ Custom User Context
 
 Flask-More-Smorest provides a pluggable user context system that allows you to integrate your own User models and authentication systems while still leveraging the permission system.
 
+.. tip:: **Quick Start**
+
+   Already have a User model? Just register your functions:
+   
+   .. code-block:: python
+   
+      from flask_more_smorest.perms import register_get_current_user, register_get_current_user_id
+      
+      register_get_current_user(my_get_current_user)
+      register_get_current_user_id(my_get_current_user_id)
+   
+   See :ref:`quick-start-custom-user` below for a complete example.
+
+.. seealso::
+
+   :doc:`permissions`
+      Learn about the permission system and how it works with user context.
+   
+   :doc:`user-models`
+      Documentation for the built-in User models (if not using custom context).
+
 .. contents:: Table of Contents
    :local:
    :depth: 2
 
-Why Custom User Context?
--------------------------
+When to Use Custom User Context
+--------------------------------
 
-You might want to use custom user context when:
+Use custom user context when you need to:
 
-- Your application already has a User model with its own table structure
-- You're integrating flask-more-smorest into an existing application
-- You have custom authentication logic (OAuth, SAML, etc.)
-- You want to avoid SQLAlchemy table name conflicts
-- You need integration with third-party user management systems
+- **Integrate with existing apps** - Your application already has User/UserRole models
+- **Avoid table conflicts** - Prevent SQLAlchemy "table already defined" errors
+- **Use external auth** - Integrate with OAuth, SAML, LDAP, or other providers
+- **Support multi-tenant** - Different user models per tenant/organization
 
-Without configuration, flask-more-smorest uses its built-in ``User`` and ``UserRole`` models. This can cause table name conflicts if your application defines models with the same table names.
+.. note::
+
+   Without configuration, flask-more-smorest uses its built-in ``User`` and ``UserRole`` 
+   models (see :doc:`user-models`). The custom user context system allows you to replace 
+   these with your own implementation.
+
+.. _quick-start-custom-user:
 
 Quick Start
 -----------
@@ -50,7 +76,8 @@ Now all permission checks use your custom user context.
 Configuration Options
 ---------------------
 
-There are three ways to configure user context, listed in order of precedence:
+There are three ways to configure user context, listed in order of precedence 
+(highest to lowest):
 
 1. Flask Config (Highest Priority)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -107,7 +134,8 @@ Register functions globally using registration API:
 3. Built-in Fallback (Default)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-If neither config nor registration is set, flask-more-smorest uses its built-in user models:
+If neither config nor registration is set, flask-more-smorest uses its built-in user models 
+(see :doc:`user-models` for details).
 
 .. code-block:: python
 
@@ -117,21 +145,19 @@ If neither config nor registration is set, flask-more-smorest uses its built-in 
        get_current_user_id,
    )
 
-**Pros:**
+**Pros:** Zero configuration, works out of the box  
+**Cons:** May conflict with existing User models
 
-- Zero configuration
-- Works out of the box
-- Good for new projects
+.. tip::
 
-**Cons:**
-
-- May conflict with existing User models
-- Less flexible
+   For new projects without existing auth, use the built-in models. 
+   For integration with existing apps, use Flask config or global registration.
 
 User Protocol
 -------------
 
-Your custom User model should conform to ``UserProtocol`` for type safety:
+Your custom User model should conform to ``UserProtocol`` for type safety. This ensures 
+your user objects work correctly with permission models (see :doc:`permissions`).
 
 .. code-block:: python
 
@@ -153,20 +179,26 @@ Your custom User model should conform to ``UserProtocol`` for type safety:
 
 **Required Attributes:**
 
-- ``id: uuid.UUID`` - Unique user identifier
-- ``is_admin: bool`` - Property indicating admin status
+``id: uuid.UUID``
+   Unique user identifier used by permission models
+
+``is_admin: bool``
+   Property indicating admin status (used by ``is_current_user_admin()`` and permission checks)
 
 .. note::
 
-   ``UserProtocol`` is a :py:class:`typing.Protocol`, so you don't need to explicitly inherit from it. Any class with matching attributes will be considered conforming.
+   ``UserProtocol`` is a :py:class:`typing.Protocol`, so you don't need to explicitly 
+   inherit from it. Any class with matching attributes will be considered conforming.
 
-Complete Examples
------------------
+Integration Examples
+--------------------
+
+The following examples show how to integrate custom user context with popular 
+authentication libraries. After configuration, all permission checks in 
+:doc:`permissions` will use your custom user context.
 
 Example 1: Flask-Login Integration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Integrate with Flask-Login:
 
 .. code-block:: python
 
@@ -315,21 +347,21 @@ Different user models per tenant:
    
    app.config['FMS_GET_CURRENT_USER'] = get_current_user
 
+.. _testing-custom-user-context:
+
 Testing Custom User Context
 ----------------------------
 
-When testing, you can provide mock user context:
+When testing permission models (see :doc:`permissions`), provide mock user context:
 
 .. code-block:: python
 
    import pytest
-   from flask_more_smorest.perms import (
-       register_get_current_user,
-       clear_registrations,
-   )
+   import uuid
+   from flask_more_smorest.perms import register_get_current_user, clear_registrations
    
    class MockUser:
-       def __init__(self, id, is_admin=False):
+       def __init__(self, id: uuid.UUID, is_admin: bool = False):
            self.id = id
            self.is_admin = is_admin
    
@@ -339,12 +371,16 @@ When testing, you can provide mock user context:
        user = MockUser(id=uuid.uuid4(), is_admin=True)
        register_get_current_user(lambda: user)
        yield user
-       clear_registrations()  # Clean up after test
+       clear_registrations()  # Important: clean up after test
    
    def test_admin_access(mock_admin_user):
        # Test uses mock admin user
        result = some_protected_function()
        assert result.success
+
+.. seealso::
+
+   See the **Troubleshooting** section below for common testing issues.
 
 Best Practices
 --------------
@@ -439,7 +475,8 @@ Issue: Tests fail with "Working outside request context"
 
 **Problem:** Tests fail because user context requires request/app context.
 
-**Solution:** Use test fixtures with proper context or mock user functions:
+**Solution:** Use test fixtures with proper context or mock user functions 
+(see :ref:`Testing Custom User Context <testing-custom-user-context>` above for examples):
 
 .. code-block:: python
 
@@ -490,9 +527,23 @@ API Reference
       
       Whether user has admin privileges (must be a property).
 
-Next Steps
-----------
+See Also
+--------
 
-- See :doc:`permissions` for using custom users with permission models
-- Check :doc:`user-models` for built-in user model documentation
-- Review :doc:`configuration` for Flask config options
+Related Documentation
+^^^^^^^^^^^^^^^^^^^^^
+
+:doc:`permissions`
+   Learn how permission models work with custom user context, including 
+   ``BasePermsModel``, permission hooks, and mixins.
+
+:doc:`user-models`
+   Documentation for the built-in User, UserRole, and related models 
+   (used when custom context is not configured).
+
+:doc:`crud`
+   CRUD blueprints automatically enforce permissions using the configured 
+   user context.
+
+:doc:`configuration`
+   Complete Flask configuration reference, including user context config keys.
