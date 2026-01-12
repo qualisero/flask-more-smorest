@@ -183,7 +183,7 @@ class BasePermsModel(SQLABaseModel):
 
         Logs permission denials at WARNING level for debugging access issues.
         """
-        from .user_models import get_current_user_id
+        from .user_context import get_current_user_id
 
         permission_methods = {
             "write": (self.can_write, "modify"),
@@ -251,13 +251,18 @@ class BasePermsModel(SQLABaseModel):
     def is_current_user_admin(cls) -> bool:
         """Check if current user is an admin.
 
+        Uses the configurable user context system, allowing applications
+        to provide their own admin check logic via:
+        - app.config['FMS_IS_CURRENT_USER_ADMIN']
+        - register_is_current_user_admin()
+
         Returns:
             True if current user is admin, False otherwise
         """
-        from .user_models import get_current_user
+        from .user_context import is_current_user_admin
 
         try:
-            user = get_current_user()
+            return is_current_user_admin()
         except RuntimeError as exc:
             logger.debug(
                 "Runtime error during admin check (likely outside request context): %s",
@@ -267,8 +272,6 @@ class BasePermsModel(SQLABaseModel):
         except Exception as exc:  # pragma: no cover - defensive guard
             logger.warning("Unexpected error during admin check: %s", exc, exc_info=True)
             return False
-
-        return bool(user and user.is_admin)
 
     def check_create(self, val: list | set | tuple | object, _visited: set[int] | None = None) -> None:
         """Recursively check that all BaseModel instances can be created.

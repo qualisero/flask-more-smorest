@@ -19,7 +19,6 @@ Example response:
 import logging
 import sys
 import traceback
-import uuid
 from http import HTTPStatus
 from pprint import pformat
 from typing import TYPE_CHECKING, Any
@@ -132,26 +131,31 @@ class ApiException(Exception):
     def get_debug_context(self, **kwargs: str | int | bool | None) -> dict[str, str | int | bool | dict | None]:
         """Get debugging context information.
 
+        Collects user context via the configurable user context system, which works
+        with both built-in and custom User models.
+
         Args:
             **kwargs: Additional context information to include
 
         Returns:
-            Dictionary containing debug context including user information
+            Dictionary containing debug context including user information (in debug mode)
         """
         debug_context: dict[str, str | int | bool | dict | None] = dict()
         debug_context.update(kwargs)
 
         # Only collect user context in debug mode to avoid performance overhead
         if _is_debug_mode():
-            from ..perms.user_models import get_current_user, get_current_user_id
+            from ..perms.user_context import get_current_user, get_current_user_id
 
             try:
-                user_id: uuid.UUID | None = get_current_user_id()
+                user_id = get_current_user_id()
                 user = get_current_user()
                 if user_id and user:
+                    # Try to get roles if available (works with built-in User model)
+                    roles = getattr(user, "roles", None)
                     debug_context["user"] = {
                         "id": str(user_id),
-                        "roles": [r.role for r in user.roles],
+                        "roles": [r.role for r in roles] if roles else None,
                     }
                 else:
                     debug_context["user"] = {

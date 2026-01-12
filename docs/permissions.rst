@@ -251,6 +251,31 @@ Permission Models provide several helper methods:
    from flask_more_smorest.perms import get_current_user
    user = get_current_user()  # Safely loads from JWT
 
+Using Your Own User Model
+--------------------------
+
+If your application already has its own User model or authentication system, you can configure flask-more-smorest to use it instead of the built-in user models. This avoids SQLAlchemy table name conflicts and integrates seamlessly with your existing auth system.
+
+Quick Example
+^^^^^^^^^^^^^
+
+.. code-block:: python
+
+   from flask_more_smorest.perms import register_get_current_user, register_get_current_user_id
+   from my_app.auth import get_my_current_user, get_my_current_user_id
+   
+   # Register your custom user context functions
+   register_get_current_user(get_my_current_user)
+   register_get_current_user_id(get_my_current_user_id)
+   
+   # Now all permission checks use your User model
+
+.. seealso::
+
+   :doc:`custom-user-context`
+      Complete guide with configuration options, multiple integration examples 
+      (Flask-Login, JWT, OAuth), best practices, and troubleshooting.
+
 Integration with CRUD Blueprints
 ---------------------------------
 
