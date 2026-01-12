@@ -131,20 +131,41 @@ class ApiException(Exception):
     def get_debug_context(self, **kwargs: str | int | bool | None) -> dict[str, str | int | bool | dict | None]:
         """Get debugging context information.
 
-        Note: User context is intentionally NOT collected here to avoid model conflicts.
-        Applications that want user context in error responses should override this method.
+        Collects user context via the configurable user context system, which works
+        with both built-in and custom User models.
 
         Args:
             **kwargs: Additional context information to include
 
         Returns:
-            Dictionary containing debug context (without user information)
+            Dictionary containing debug context including user information (in debug mode)
         """
         debug_context: dict[str, str | int | bool | dict | None] = dict()
         debug_context.update(kwargs)
-        # Note: User context collection removed to avoid SQLAlchemy model conflicts
-        # when applications have their own User/UserRole models with the same table names.
-        # Override this method in your application if you need user context.
+
+        # Only collect user context in debug mode to avoid performance overhead
+        if _is_debug_mode():
+            from ..perms.user_context import get_current_user, get_current_user_id
+
+            try:
+                user_id = get_current_user_id()
+                user = get_current_user()
+                if user_id and user:
+                    # Try to get roles if available (works with built-in User model)
+                    roles = getattr(user, "roles", None)
+                    debug_context["user"] = {
+                        "id": str(user_id),
+                        "roles": [r.role for r in roles] if roles else None,
+                    }
+                else:
+                    debug_context["user"] = {
+                        "id": None,
+                        "roles": None,
+                        "msg": "Current user not authenticated",
+                    }
+            except Exception:
+                debug_context["error"] = {"msg": "Error getting current user context"}
+
         return debug_context
 
     def _should_include_traceback(self) -> bool:

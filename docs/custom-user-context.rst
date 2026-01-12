@@ -44,6 +44,16 @@ Use custom user context when you need to:
    models (see :doc:`user-models`). The custom user context system allows you to replace 
    these with your own implementation.
 
+Benefits
+^^^^^^^^
+
+Custom user context provides:
+
+- **Automatic debug info** - User context included in error responses (debug mode only)
+- **Permission integration** - Works seamlessly with :doc:`permissions` system
+- **Flexible configuration** - Use Flask config, global registration, or built-in fallback
+- **Type safety** - ``UserProtocol`` ensures your User model is compatible
+
 .. _quick-start-custom-user:
 
 Quick Start
@@ -185,10 +195,22 @@ your user objects work correctly with permission models (see :doc:`permissions`)
 ``is_admin: bool``
    Property indicating admin status (used by ``is_current_user_admin()`` and permission checks)
 
+**Optional Attributes:**
+
+``roles``
+   If present, roles will be included in error debug context (debug mode only). 
+   Each role should have a ``role`` attribute containing the role name.
+
 .. note::
 
    ``UserProtocol`` is a :py:class:`typing.Protocol`, so you don't need to explicitly 
    inherit from it. Any class with matching attributes will be considered conforming.
+
+.. tip::
+
+   In debug mode, user context (including roles if available) is automatically included 
+   in API error responses for easier debugging. This works with both built-in and custom 
+   User models via the configurable user context system.
 
 Integration Examples
 --------------------

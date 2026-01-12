@@ -193,3 +193,99 @@ def test_content_type_is_problem_json() -> None:
         response = DummyException("test").make_error_response()
 
     assert response.content_type == "application/problem+json"
+
+
+def test_user_context_included_in_debug_mode() -> None:
+    """Test that user context is included in debug mode using configurable user context."""
+    import uuid
+
+    from flask_more_smorest.perms.user_context import (
+        clear_registrations,
+        register_get_current_user,
+        register_get_current_user_id,
+    )
+
+    app = Flask(__name__)
+    app.config["DEBUG"] = True
+
+    # Set up mock user context
+    test_user_id = uuid.uuid4()
+
+    class MockUser:
+        def __init__(self):
+            self.id = test_user_id
+            self.is_admin = True
+            self.roles = [type("Role", (), {"role": "admin"})]
+
+    def get_mock_user():
+        return MockUser()
+
+    def get_mock_user_id():
+        return test_user_id
+
+    register_get_current_user(get_mock_user)
+    register_get_current_user_id(get_mock_user_id)
+
+    try:
+        with app.app_context():
+            try:
+                raise DummyException("test error")
+            except DummyException as exc:
+                response = exc.make_error_response()
+
+        payload = response.get_json()
+
+        # Should have debug context in debug mode
+        assert "debug" in payload
+        assert "context" in payload["debug"]
+        assert "user" in payload["debug"]["context"]
+
+        # User context should be populated
+        user_context = payload["debug"]["context"]["user"]
+        assert user_context["id"] == str(test_user_id)
+        assert user_context["roles"] == ["admin"]
+
+    finally:
+        clear_registrations()
+
+
+def test_user_context_not_included_in_production() -> None:
+    """Test that user context is not included in production mode."""
+    import uuid
+
+    from flask_more_smorest.perms.user_context import (
+        clear_registrations,
+        register_get_current_user,
+        register_get_current_user_id,
+    )
+
+    app = Flask(__name__)
+    app.config["DEBUG"] = False
+    app.config["TESTING"] = False
+
+    # Set up mock user context
+    test_user_id = uuid.uuid4()
+
+    def get_mock_user():
+        return type("User", (), {"id": test_user_id, "is_admin": True})()
+
+    def get_mock_user_id():
+        return test_user_id
+
+    register_get_current_user(get_mock_user)
+    register_get_current_user_id(get_mock_user_id)
+
+    try:
+        with app.app_context():
+            try:
+                raise DummyException("test error")
+            except DummyException as exc:
+                response = exc.make_error_response()
+
+        payload = response.get_json()
+
+        # Debug context should NOT be included in production
+        assert "debug" not in payload
+
+    finally:
+        clear_registrations()
