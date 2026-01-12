@@ -102,6 +102,7 @@ Documentation Contents
    getting-started
    configuration
    permissions
+   custom-user-context
    crud
    user-models
 

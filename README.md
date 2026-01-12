@@ -178,6 +178,21 @@ class PublicUser(User):
 public_bp = UserBlueprint(model=PublicUser, schema=PublicUser.Schema)
 ```
 
+### Using your own User model
+
+If you already have a User model, configure flask-more-smorest to use it:
+
+```python
+from flask_more_smorest.perms import register_get_current_user, register_get_current_user_id
+from my_app.auth import get_current_user, get_current_user_id
+
+register_get_current_user(get_current_user)
+register_get_current_user_id(get_current_user_id)
+# Permission system now uses your User model
+```
+
+See [Custom User Context](https://flask-more-smorest.readthedocs.io/en/latest/permissions.html#custom-user-context) for details.
+
 ## Production Features
 
 ### Health Check Endpoint
