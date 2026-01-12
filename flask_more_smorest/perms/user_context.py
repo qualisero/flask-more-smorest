@@ -29,12 +29,9 @@ Configuration:
 import logging
 import uuid
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from flask import current_app, has_app_context
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 

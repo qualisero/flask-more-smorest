@@ -191,7 +191,7 @@ register_get_current_user_id(get_current_user_id)
 # Permission system now uses your User model
 ```
 
-See [Custom User Context](https://flask-more-smorest.readthedocs.io/en/latest/permissions.html#custom-user-context) for details.
+See [Custom User Context](https://flask-more-smorest.readthedocs.io/en/latest/custom-user-context.html) for details.
 
 ## Production Features
 

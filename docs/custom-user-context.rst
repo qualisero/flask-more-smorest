@@ -226,12 +226,14 @@ Example 1: Flask-Login Integration
 
    from flask import Flask
    from flask_login import LoginManager, current_user
+   from flask_sqlalchemy import SQLAlchemy
    from flask_more_smorest.perms import (
        register_get_current_user,
        register_get_current_user_id,
    )
    
    app = Flask(__name__)
+   db = SQLAlchemy(app)
    login_manager = LoginManager(app)
    
    # Your existing User model
@@ -266,7 +268,7 @@ Use custom JWT claims for user context:
    app = Flask(__name__)
    jwt = JWTManager(app)
    
-   # Custom User model
+   # Custom User model (simplified example - replace with your actual User model/ORM)
    class User:
        def __init__(self, id, email, is_admin):
            self.id = id
@@ -275,7 +277,8 @@ Use custom JWT claims for user context:
    
        @staticmethod
        def get(user_id):
-           # Load from database or cache
+           # Replace with your actual user lookup logic
+           # e.g., db.session.query(User).get(user_id) or User.query.get(user_id)
            return User.query.get(user_id)
    
    # Add custom claims to JWT
@@ -320,7 +323,7 @@ Integrate with external authentication providers:
        def __init__(self, oauth_data):
            self.id = oauth_data['sub']  # OAuth subject claim
            self.email = oauth_data['email']
-           self.is_admin = oauth_data.get('roles', []).contains('admin')
+           self.is_admin = 'admin' in oauth_data.get('roles', [])
    
    def get_current_user():
        oauth_data = session.get('oauth_user')
@@ -340,6 +343,8 @@ Different user models per tenant:
 
 .. code-block:: python
 
+   import uuid
+   
    from flask import Flask, g
    from flask_more_smorest.perms import UserProtocol
    
