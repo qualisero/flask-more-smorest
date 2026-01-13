@@ -124,11 +124,13 @@ Register functions globally using registration API:
        register_get_current_user,
        register_get_current_user_id,
        register_is_current_user_admin,
+       register_is_current_user_superadmin,
    )
    
    register_get_current_user(get_my_user)
    register_get_current_user_id(get_my_user_id)
    register_is_current_user_admin(lambda: get_my_user().is_admin)
+   register_is_current_user_superadmin(lambda: get_my_user().is_superadmin)
 
 **Pros:**
 
@@ -186,6 +188,11 @@ your user objects work correctly with permission models (see :doc:`permissions`)
        def is_admin(self) -> bool:
            """Required by UserProtocol."""
            return self._is_admin
+       
+       @property
+       def is_superadmin(self) -> bool:
+           """Required by UserProtocol."""
+           return self._is_superadmin
 
 **Required Attributes:**
 
@@ -194,6 +201,9 @@ your user objects work correctly with permission models (see :doc:`permissions`)
 
 ``is_admin: bool``
    Property indicating admin status (used by ``is_current_user_admin()`` and permission checks)
+
+``is_superadmin: bool``
+   Property indicating superadmin status (used by ``is_current_user_superadmin()`` and permission checks)
 
 **Optional Attributes:**
 
@@ -536,6 +546,13 @@ API Reference
    :param func: Function that returns True if current user is admin
    :type func: Callable[[], bool]
 
+.. py:function:: register_is_current_user_superadmin(func: Callable[[], bool]) -> None
+
+   Register a function to check if current user is superadmin.
+   
+   :param func: Function that returns True if current user is superadmin
+   :type func: Callable[[], bool]
+
 .. py:function:: clear_registrations() -> None
 
    Clear all registered user context functions. Useful for testing.
@@ -553,6 +570,11 @@ API Reference
       :type: bool
       
       Whether user has admin privileges (must be a property).
+   
+   .. py:attribute:: is_superadmin
+      :type: bool
+      
+      Whether user has superadmin privileges (must be a property).
 
 See Also
 --------
