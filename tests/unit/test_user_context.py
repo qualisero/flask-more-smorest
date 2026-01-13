@@ -9,14 +9,17 @@ from flask_more_smorest.perms.user_context import (
     GetCurrentUserFunc,
     GetCurrentUserIdFunc,
     IsCurrentUserAdminFunc,
+    IsCurrentUserSuperadminFunc,
     UserProtocol,
     clear_registrations,
     get_current_user,
     get_current_user_id,
     is_current_user_admin,
+    is_current_user_superadmin,
     register_get_current_user,
     register_get_current_user_id,
     register_is_current_user_admin,
+    register_is_current_user_superadmin,
 )
 
 
@@ -33,6 +36,10 @@ class TestUserProtocol:
             @property
             def is_admin(self) -> bool:
                 return True
+
+            @property
+            def is_superadmin(self) -> bool:
+                return False
 
         user = ValidUser()
         assert isinstance(user, UserProtocol)
@@ -106,6 +113,17 @@ class TestRegistrationFunctions:
         # Should use registered function
         assert is_current_user_admin() is True
 
+    def test_register_is_current_user_superadmin(self) -> None:
+        """Test registering custom is_current_user_superadmin function."""
+
+        def my_superadmin_check() -> bool:
+            return True
+
+        register_is_current_user_superadmin(my_superadmin_check)
+
+        # Should use registered function
+        assert is_current_user_superadmin() is True
+
     def test_clear_registrations_removes_all(self) -> None:
         """Test that clear_registrations removes all registered functions."""
 
@@ -115,6 +133,7 @@ class TestRegistrationFunctions:
         register_get_current_user(my_func)
         register_get_current_user_id(my_func)  # type: ignore
         register_is_current_user_admin(my_func)  # type: ignore
+        register_is_current_user_superadmin(my_func)  # type: ignore
 
         clear_registrations()
 
@@ -338,6 +357,95 @@ class TestIsCurrentUserAdmin:
         assert result is False
 
 
+class TestIsCurrentUserSuperadmin:
+    """Test is_current_user_superadmin resolution."""
+
+    def setup_method(self) -> None:
+        """Clear registrations before each test."""
+        clear_registrations()
+
+    def teardown_method(self) -> None:
+        """Clear registrations after each test."""
+        clear_registrations()
+
+    def test_flask_config_takes_precedence(self, app: Flask) -> None:
+        """Test that Flask config takes precedence over global registration."""
+
+        def config_func() -> bool:
+            return True
+
+        def global_func() -> bool:
+            return False
+
+        register_is_current_user_superadmin(global_func)
+        app.config["FMS_IS_CURRENT_USER_SUPERADMIN"] = config_func
+
+        with app.app_context():
+            result = is_current_user_superadmin()
+            assert result is True
+
+    def test_global_registration_used_when_no_config(self) -> None:
+        """Test that global registration is used when no Flask config."""
+
+        def superadmin_check() -> bool:
+            return True
+
+        register_is_current_user_superadmin(superadmin_check)
+
+        result = is_current_user_superadmin()
+        assert result is True
+
+    def test_fallback_checks_user_is_superadmin_attribute(self) -> None:
+        """Test fallback checks user.is_superadmin when no registration."""
+
+        class MockUser:
+            is_superadmin = True
+
+        def get_user() -> MockUser:
+            return MockUser()
+
+        register_get_current_user(get_user)
+
+        result = is_current_user_superadmin()
+        assert result is True
+
+    def test_fallback_returns_false_when_no_is_superadmin(self) -> None:
+        """Test fallback returns False when user has no is_superadmin attribute."""
+
+        class MockUser:
+            pass
+
+        def get_user() -> MockUser:
+            return MockUser()
+
+        register_get_current_user(get_user)
+
+        result = is_current_user_superadmin()
+        assert result is False
+
+    def test_fallback_returns_false_when_no_user(self) -> None:
+        """Test fallback returns False when no user authenticated."""
+
+        def get_user() -> None:
+            return None
+
+        register_get_current_user(get_user)
+
+        result = is_current_user_superadmin()
+        assert result is False
+
+    def test_exception_handling_returns_false(self) -> None:
+        """Test that exceptions in fallback return False."""
+
+        def failing_get_user() -> Any:
+            raise ValueError("Test error")
+
+        register_get_current_user(failing_get_user)
+
+        result = is_current_user_superadmin()
+        assert result is False
+
+
 class TestIntegrationWithFlaskConfig:
     """Test integration with Flask application configuration."""
 
@@ -420,4 +528,14 @@ class TestTypeSafety:
 
         # Should be assignable
         func: IsCurrentUserAdminFunc = valid_func
+        assert callable(func)
+
+    def test_is_current_user_superadmin_func_type(self) -> None:
+        """Test IsCurrentUserSuperadminFunc type annotation."""
+
+        def valid_func() -> bool:
+            return False
+
+        # Should be assignable
+        func: IsCurrentUserSuperadminFunc = valid_func
         assert callable(func)

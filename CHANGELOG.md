@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-01-13
+
+### Added
+- **Superadmin User Context Support**: Complete superadmin support in the user context system
+  - `is_current_user_superadmin()` function for checking superadmin status
+  - `register_is_current_user_superadmin()` for custom superadmin check registration
+  - `BasePermsModel.is_current_user_superadmin()` class method
+  - Flask config option: `FMS_IS_CURRENT_USER_SUPERADMIN`
+  - Updated `UserProtocol` to include `is_superadmin` property
+  - Follows same patterns as existing admin support
+
+### Tests
+- Added 10 unit tests for superadmin user context functions
+- Added 4 integration tests for superadmin role permissions
+- Verifies security boundary: only superadmins can create/modify admin roles
+
 ## [0.7.0] - 2026-01-12
 
 ### Added

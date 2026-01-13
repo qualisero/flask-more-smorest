@@ -273,6 +273,32 @@ class BasePermsModel(SQLABaseModel):
             logger.warning("Unexpected error during admin check: %s", exc, exc_info=True)
             return False
 
+    @classmethod
+    def is_current_user_superadmin(cls) -> bool:
+        """Check if current user is a superadmin.
+
+        Uses the configurable user context system, allowing applications
+        to provide their own superadmin check logic via:
+        - app.config['FMS_IS_CURRENT_USER_SUPERADMIN']
+        - register_is_current_user_superadmin()
+
+        Returns:
+            True if current user is superadmin, False otherwise
+        """
+        from .user_context import is_current_user_superadmin
+
+        try:
+            return is_current_user_superadmin()
+        except RuntimeError as exc:
+            logger.debug(
+                "Runtime error during superadmin check (likely outside request context): %s",
+                exc,
+            )
+            return False
+        except Exception as exc:  # pragma: no cover - defensive guard
+            logger.warning("Unexpected error during superadmin check: %s", exc, exc_info=True)
+            return False
+
     def check_create(self, val: list | set | tuple | object, _visited: set[int] | None = None) -> None:
         """Recursively check that all BaseModel instances can be created.
 
