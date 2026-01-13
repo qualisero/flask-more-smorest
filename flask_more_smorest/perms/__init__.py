@@ -23,6 +23,7 @@ from .user_context import (
     register_get_current_user,
     register_get_current_user_id,
     register_is_current_user_admin,
+    register_is_current_user_superadmin,
 )
 
 # Type stubs for lazy-loaded objects
@@ -71,6 +72,7 @@ __all__ = [
     "register_get_current_user",
     "register_get_current_user_id",
     "register_is_current_user_admin",
+    "register_is_current_user_superadmin",
     "UserProtocol",
 ]
 

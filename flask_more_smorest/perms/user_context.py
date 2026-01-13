@@ -11,6 +11,7 @@ Configuration:
     app.config['FMS_GET_CURRENT_USER'] = my_get_current_user
     app.config['FMS_GET_CURRENT_USER_ID'] = my_get_current_user_id
     app.config['FMS_IS_CURRENT_USER_ADMIN'] = my_is_admin_check
+    app.config['FMS_IS_CURRENT_USER_SUPERADMIN'] = my_is_superadmin_check
     ```
 
     Or by calling the registration functions:
@@ -20,9 +21,11 @@ Configuration:
         register_get_current_user,
         register_get_current_user_id,
         register_is_current_user_admin,
+        register_is_current_user_superadmin,
     )
 
     register_get_current_user(my_get_current_user)
+    register_is_current_user_superadmin(my_is_superadmin_check)
     ```
 """
 
@@ -39,11 +42,13 @@ logger = logging.getLogger(__name__)
 GetCurrentUserFunc = Callable[[], Any]
 GetCurrentUserIdFunc = Callable[[], uuid.UUID | None]
 IsCurrentUserAdminFunc = Callable[[], bool]
+IsCurrentUserSuperadminFunc = Callable[[], bool]
 
 # Global registrations (used when no app context or config not set)
 _global_get_current_user: GetCurrentUserFunc | None = None
 _global_get_current_user_id: GetCurrentUserIdFunc | None = None
 _global_is_current_user_admin: IsCurrentUserAdminFunc | None = None
+_global_is_current_user_superadmin: IsCurrentUserSuperadminFunc | None = None
 
 
 @runtime_checkable
@@ -58,7 +63,12 @@ class UserProtocol(Protocol):
 
     @property
     def is_admin(self) -> bool:
-        """Whether the user has admin privileges."""
+        """Whether the user has admin privileges (includes superadmin)."""
+        ...
+
+    @property
+    def is_superadmin(self) -> bool:
+        """Whether the user has superadmin privileges."""
         ...
 
 
@@ -90,6 +100,16 @@ def register_is_current_user_admin(func: IsCurrentUserAdminFunc) -> None:
     """
     global _global_is_current_user_admin
     _global_is_current_user_admin = func
+
+
+def register_is_current_user_superadmin(func: IsCurrentUserSuperadminFunc) -> None:
+    """Register a custom function to check if current user is superadmin.
+
+    Args:
+        func: Function that returns True if current user is superadmin
+    """
+    global _global_is_current_user_superadmin
+    _global_is_current_user_superadmin = func
 
 
 def get_current_user() -> Any:
@@ -177,9 +197,44 @@ def is_current_user_admin() -> bool:
         return False
 
 
+def is_current_user_superadmin() -> bool:
+    """Check if the current user is a superadmin.
+
+    Resolution order:
+    1. App config 'FMS_IS_CURRENT_USER_SUPERADMIN' if set
+    2. Globally registered function via register_is_current_user_superadmin()
+    3. Default: Check user.is_superadmin via get_current_user()
+
+    Returns:
+        True if current user is superadmin, False otherwise
+    """
+    # Check app config first
+    if has_app_context():
+        config_func = current_app.config.get("FMS_IS_CURRENT_USER_SUPERADMIN")
+        if config_func is not None:
+            result: bool = config_func()
+            return result
+
+    # Check global registration
+    if _global_is_current_user_superadmin is not None:
+        return _global_is_current_user_superadmin()
+
+    # Fall back to checking user.is_superadmin
+    try:
+        user = get_current_user()
+        return bool(user and getattr(user, "is_superadmin", False))
+    except Exception:
+        return False
+
+
 def clear_registrations() -> None:
     """Clear all global registrations. Useful for testing."""
-    global _global_get_current_user, _global_get_current_user_id, _global_is_current_user_admin
+    global \
+        _global_get_current_user, \
+        _global_get_current_user_id, \
+        _global_is_current_user_admin, \
+        _global_is_current_user_superadmin
     _global_get_current_user = None
     _global_get_current_user_id = None
     _global_is_current_user_admin = None
+    _global_is_current_user_superadmin = None

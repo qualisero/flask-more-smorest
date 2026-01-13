@@ -717,3 +717,109 @@ class TestCustomPermissionRules:
             forced_doc.save()
 
         assert db_session.get(Document, forced_doc.id) is not None
+
+
+class TestSuperadminRolePermissions:
+    """Test that superadmin permissions work for role management."""
+
+    def test_admin_cannot_create_admin_role(self, user_perms_app: Flask, db_session: "scoped_session") -> None:
+        """Test that regular admins cannot create admin roles."""
+        # Create an admin user (not superadmin)
+        admin_user = CustomUser(email="admin@test.com", password="password")
+        admin_user.save()
+        admin_role = UserRole(user_id=admin_user.id, role=DefaultUserRole.ADMIN)
+        with UserRole.bypass_perms():
+            admin_role.save()
+
+        # Create a regular user to grant admin role to
+        target_user = CustomUser(email="target@test.com", password="password")
+        target_user.save()
+
+        # Try to create an admin role as an admin (should fail)
+        admin_token = create_access_token(identity=admin_user.id)
+        with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {admin_token}"}):
+            new_role = UserRole(user_id=target_user.id, role=DefaultUserRole.ADMIN)
+            assert not new_role.can_create()
+            with pytest.raises(ForbiddenError):
+                new_role.save()
+
+    def test_superadmin_can_create_admin_role(self, user_perms_app: Flask, db_session: "scoped_session") -> None:
+        """Test that superadmins can create admin roles."""
+        # Create a superadmin user
+        superadmin_user = CustomUser(email="superadmin@test.com", password="password")
+        superadmin_user.save()
+        superadmin_role = UserRole(user_id=superadmin_user.id, role=DefaultUserRole.SUPERADMIN)
+        with UserRole.bypass_perms():
+            superadmin_role.save()
+
+        # Create a regular user to grant admin role to
+        target_user = CustomUser(email="target2@test.com", password="password")
+        target_user.save()
+
+        # Create an admin role as a superadmin (should succeed)
+        superadmin_token = create_access_token(identity=superadmin_user.id)
+        with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {superadmin_token}"}):
+            new_role = UserRole(user_id=target_user.id, role=DefaultUserRole.ADMIN)
+            assert new_role.can_create()
+            new_role.save()
+
+        # Verify the role was created
+        created_role = (
+            db_session.query(UserRole).filter_by(user_id=target_user.id, _role=DefaultUserRole.ADMIN.value).first()
+        )
+        assert created_role is not None
+
+    def test_admin_can_create_regular_roles(self, user_perms_app: Flask, db_session: "scoped_session") -> None:
+        """Test that admins can create non-admin roles."""
+        # Create an admin user
+        admin_user = CustomUser(email="admin2@test.com", password="password")
+        admin_user.save()
+        admin_role = UserRole(user_id=admin_user.id, role=DefaultUserRole.ADMIN)
+        with UserRole.bypass_perms():
+            admin_role.save()
+
+        # Create a regular user to grant USER role to
+        target_user = CustomUser(email="target3@test.com", password="password")
+        target_user.save()
+
+        # Create a USER role as an admin (should succeed)
+        admin_token = create_access_token(identity=admin_user.id)
+        with user_perms_app.test_request_context(headers={"Authorization": f"Bearer {admin_token}"}):
+            new_role = UserRole(user_id=target_user.id, role=DefaultUserRole.USER)
+            assert new_role.can_create()
+            new_role.save()
+
+        # Verify the role was created
+        created_role = (
+            db_session.query(UserRole).filter_by(user_id=target_user.id, _role=DefaultUserRole.USER.value).first()
+        )
+        assert created_role is not None
+
+    def test_user_is_admin_includes_superadmin(self, user_perms_app: Flask, db_session: "scoped_session") -> None:
+        """Test that is_admin property includes superadmins."""
+        # Create a superadmin user
+        superadmin_user = CustomUser(email="superadmin2@test.com", password="password")
+        superadmin_user.save()
+        superadmin_role = UserRole(user_id=superadmin_user.id, role=DefaultUserRole.SUPERADMIN)
+        with UserRole.bypass_perms():
+            superadmin_role.save()
+
+        # Refresh to load relationships
+        db_session.refresh(superadmin_user)
+
+        # Verify superadmin has is_admin = True
+        assert superadmin_user.is_superadmin
+        assert superadmin_user.is_admin  # is_admin includes superadmin
+
+        # Create a regular admin for comparison
+        admin_user = CustomUser(email="admin3@test.com", password="password")
+        admin_user.save()
+        admin_role = UserRole(user_id=admin_user.id, role=DefaultUserRole.ADMIN)
+        with UserRole.bypass_perms():
+            admin_role.save()
+
+        db_session.refresh(admin_user)
+
+        # Verify admin has is_admin = True but is_superadmin = False
+        assert not admin_user.is_superadmin
+        assert admin_user.is_admin
