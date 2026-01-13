@@ -113,6 +113,66 @@ class ProfileUser(User, ProfileMixin):
         return self.full_name or self.display_name or self.email
 ```
 
+#### Overriding display_name with Custom Logic
+
+ProfileMixin provides `display_name` as a stored column, but you can override it with a property for dynamic generation:
+
+```python
+from flask_more_smorest.user import ProfileMixin
+
+class User(User, ProfileMixin):
+    """User with custom display_name logic."""
+    
+    @property
+    def display_name(self) -> str:  # type: ignore[override]
+        """Generate display name with initials (e.g., 'John D.')."""
+        if self.first_name and self.last_name:
+            # Use first name + last name initial(s)
+            initials = "".join(w[0] for w in self.last_name.split() if w)
+            return f"{self.first_name} {initials}."
+        elif self.first_name:
+            return self.first_name
+        elif self.last_name:
+            return self.last_name
+        # Fallback to email username
+        return self.email.split("@")[0] if "@" in self.email else self.email
+```
+
+**Note:** Use `# type: ignore[override]` when overriding a column with a property to suppress type checker warnings.
+
+#### Parsing full_name During Registration
+
+Many registration forms use a single "full name" field. Parse it automatically in `__init__`:
+
+```python
+from flask_more_smorest.user import ProfileMixin
+
+class User(User, ProfileMixin):
+    """User with automatic full_name parsing."""
+    
+    def __init__(self, **kwargs):
+        """Parse full_name into first_name and last_name if provided."""
+        full_name = kwargs.pop("full_name", None)
+        if full_name and "first_name" not in kwargs and "last_name" not in kwargs:
+            parts = full_name.split()
+            if len(parts) == 1:
+                kwargs["first_name"] = parts[0]
+            elif len(parts) >= 2:
+                kwargs["first_name"] = parts[0]
+                kwargs["last_name"] = " ".join(parts[1:])
+        
+        super().__init__(**kwargs)
+
+# Now registration API can accept full_name:
+user = User(
+    email="john@example.com",
+    full_name="John Smith",  # Automatically parsed
+    password="secret123"
+)
+# user.first_name == "John"
+# user.last_name == "Smith"
+```
+
 ### TimestampMixin - Additional Timestamps
 
 ```python
