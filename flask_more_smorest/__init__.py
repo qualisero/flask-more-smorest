@@ -109,10 +109,13 @@ if TYPE_CHECKING:
         user_bp,
     )
 
+    # Testing helpers
+    from .testing import as_admin, as_user, clear_registration
+
 logger = logging.getLogger(__name__)
 
 
-__version__ = "0.8.0"
+__version__ = "0.8.1"
 __author__ = "Dave <david@qualisero.com>"
 __email__ = "david@qualisero.com"
 __description__ = "Enhanced Flask-Smorest blueprints with automatic CRUD operations and extensible user management"
@@ -156,6 +159,10 @@ __all__ = [
     "generate_filter_schema",
     "get_statements_from_filters",
     "convert_snake_to_camel",
+    # Testing helpers
+    "as_user",
+    "as_admin",
+    "clear_registration",
     "__version__",
 ]
 
@@ -173,9 +180,43 @@ def __getattr__(name: str) -> object:
         "get_current_user",
         "get_current_user_id",
         "user_bp",
+        # Testing helpers
+        "as_user",
+        "as_admin",
+        "clear_registration",
     }
 
     if name in delegated_names:
+        # Testing helpers come from testing module
+        if name in {"as_user", "as_admin"}:
+            try:
+                from . import testing as testing_module
+
+                value = getattr(testing_module, name)
+                globals()[name] = value
+                return value
+            except ImportError as exc:  # pragma: no cover - defensive
+                logger.error("Failed to import testing module for %s: %s", name, exc)
+                raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from exc
+            except AttributeError as exc:
+                logger.error("Attribute %s not found in testing module: %s", name, exc)
+                raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from exc
+
+        # clear_registration is proxied from user_context
+        if name == "clear_registration":
+            try:
+                from .testing import clear_registration as _clear_registration
+
+                globals()[name] = _clear_registration
+                return _clear_registration
+            except ImportError as exc:  # pragma: no cover - defensive
+                logger.error("Failed to import testing module for %s: %s", name, exc)
+                raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from exc
+            except AttributeError as exc:
+                logger.error("Attribute %s not found in testing module: %s", name, exc)
+                raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from exc
+
+        # Everything else comes from perms module
         try:
             from . import perms as perms_module
 

@@ -27,6 +27,14 @@ class TestUserProtocol:
         class ValidUser:
             id = uuid.uuid4()
 
+            @property
+            def is_admin(self) -> bool:
+                return False
+
+            @property
+            def is_superadmin(self) -> bool:
+                return False
+
             def has_role(self, role: AdminRole) -> bool:
                 return role == ROLE_ADMIN
 
@@ -47,6 +55,14 @@ class TestRegistrationFunctions:
         class MyUser:
             def __init__(self, user_id: uuid.UUID) -> None:
                 self.id = user_id
+
+            @property
+            def is_admin(self) -> bool:
+                return False
+
+            @property
+            def is_superadmin(self) -> bool:
+                return False
 
             def has_role(self, role: AdminRole) -> bool:
                 return False
@@ -72,6 +88,14 @@ class TestRegistrationFunctions:
         class MyUser:
             def __init__(self, user_id: uuid.UUID) -> None:
                 self.id = user_id
+
+            @property
+            def is_admin(self) -> bool:
+                return False
+
+            @property
+            def is_superadmin(self) -> bool:
+                return False
 
             def has_role(self, role: AdminRole) -> bool:
                 return False
@@ -102,6 +126,14 @@ class TestGetCurrentUser:
             def __init__(self, user_id: uuid.UUID) -> None:
                 self.id = user_id
 
+            @property
+            def is_admin(self) -> bool:
+                return False
+
+            @property
+            def is_superadmin(self) -> bool:
+                return False
+
             def has_role(self, role: AdminRole) -> bool:
                 return False
 
@@ -131,6 +163,14 @@ class TestGetCurrentUser:
             def __init__(self, user_id: uuid.UUID) -> None:
                 self.id = user_id
 
+            @property
+            def is_admin(self) -> bool:
+                return False
+
+            @property
+            def is_superadmin(self) -> bool:
+                return False
+
             def has_role(self, role: AdminRole) -> bool:
                 return False
 
@@ -140,6 +180,14 @@ class TestGetCurrentUser:
         class OtherUser:
             def __init__(self, user_id: uuid.UUID) -> None:
                 self.id = user_id
+
+            @property
+            def is_admin(self) -> bool:
+                return False
+
+            @property
+            def is_superadmin(self) -> bool:
+                return False
 
             def has_role(self, role: AdminRole) -> bool:
                 return False
@@ -172,6 +220,14 @@ class TestGetCurrentUserId:
             def __init__(self, value: uuid.UUID) -> None:
                 self.id = value
 
+            @property
+            def is_admin(self) -> bool:
+                return False
+
+            @property
+            def is_superadmin(self) -> bool:
+                return False
+
             def has_role(self, role: AdminRole) -> bool:
                 return False
 
@@ -197,6 +253,14 @@ class TestIsCurrentUserAdmin:
         class RoleUser:
             id = uuid.uuid4()
 
+            @property
+            def is_admin(self) -> bool:
+                return False
+
+            @property
+            def is_superadmin(self) -> bool:
+                return False
+
             def has_role(self, role: AdminRole) -> bool:
                 return role == ROLE_ADMIN
 
@@ -211,6 +275,14 @@ class TestIsCurrentUserAdmin:
 
         class RoleUser:
             id = uuid.uuid4()
+
+            @property
+            def is_admin(self) -> bool:
+                return False
+
+            @property
+            def is_superadmin(self) -> bool:
+                return False
 
             def has_role(self, role: AdminRole) -> bool:
                 return role == ROLE_SUPERADMIN
@@ -227,6 +299,14 @@ class TestIsCurrentUserAdmin:
         class RoleUser:
             id = uuid.uuid4()
 
+            @property
+            def is_admin(self) -> bool:
+                return False
+
+            @property
+            def is_superadmin(self) -> bool:
+                return False
+
             def has_role(self, role: AdminRole) -> bool:
                 return False
 
@@ -241,6 +321,14 @@ class TestIsCurrentUserAdmin:
 
         class MockUser:
             id = uuid.uuid4()
+
+            @property
+            def is_admin(self) -> bool:
+                return False
+
+            @property
+            def is_superadmin(self) -> bool:
+                return False
 
             def has_role(self, role: AdminRole) -> bool:
                 return False
@@ -262,6 +350,14 @@ class TestIsCurrentUserSuperadmin:
         class RoleUser:
             id = uuid.uuid4()
 
+            @property
+            def is_admin(self) -> bool:
+                return False
+
+            @property
+            def is_superadmin(self) -> bool:
+                return False
+
             def has_role(self, role: AdminRole) -> bool:
                 return role == ROLE_SUPERADMIN
 
@@ -277,6 +373,14 @@ class TestIsCurrentUserSuperadmin:
         class RoleUser:
             id = uuid.uuid4()
 
+            @property
+            def is_admin(self) -> bool:
+                return False
+
+            @property
+            def is_superadmin(self) -> bool:
+                return False
+
             def has_role(self, role: AdminRole) -> bool:
                 return role == ROLE_ADMIN
 
@@ -291,6 +395,14 @@ class TestIsCurrentUserSuperadmin:
 
         class MockUser:
             id = uuid.uuid4()
+
+            @property
+            def is_admin(self) -> bool:
+                return False
+
+            @property
+            def is_superadmin(self) -> bool:
+                return False
 
             def has_role(self, role: AdminRole) -> bool:
                 return False
@@ -312,6 +424,14 @@ class TestTypeSafety:
         class ValidUser:
             id = uuid.uuid4()
 
+            @property
+            def is_admin(self) -> bool:
+                return False
+
+            @property
+            def is_superadmin(self) -> bool:
+                return False
+
             def has_role(self, role: AdminRole) -> bool:
                 return role == ROLE_ADMIN
 
@@ -327,6 +447,14 @@ class TestTypeSafety:
         class ObjectUser:
             def __init__(self) -> None:
                 self.id = uuid.uuid4()
+
+            @property
+            def is_admin(self) -> bool:
+                return False
+
+            @property
+            def is_superadmin(self) -> bool:
+                return False
 
             def has_role(self, role: AdminRole) -> bool:
                 return role == ROLE_ADMIN

@@ -275,6 +275,36 @@ def log_stats(response):
     return response
 ```
 
+## Testing
+
+Flask-More-Smorest provides testing helpers for authenticated endpoints:
+
+```python
+from flask_more_smorest import User
+from flask_more_smorest.testing import as_user, as_admin
+from flask_more_smorest.perms.models import DefaultUserRole, UserRole
+
+# Create test user
+with User.bypass_perms():
+    user = User(email="test@example.com", password="password123")
+    user.save()
+
+# Test authenticated endpoint
+with as_user(client, str(user.id)):
+    response = client.get("/api/users/me/")
+    assert response.status_code == 200
+
+# Test admin endpoint
+admin = User(email="admin@example.com", password="password123")
+admin.roles.append(UserRole(user=admin, role=DefaultUserRole.ADMIN))
+
+with as_admin(client, str(admin.id)):
+    response = client.get("/api/users/")
+    assert response.status_code == 200
+```
+
+See the [Testing Guide](https://flask-more-smorest.readthedocs.io/en/latest/testing.html) for more examples.
+
 ## Learn more
 
 - 📚 **Documentation**: https://flask-more-smorest.readthedocs.io/

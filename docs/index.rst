@@ -106,6 +106,7 @@ Documentation Contents
    custom-user-context
    crud
    user-models
+   testing
 
 .. toctree::
    :maxdepth: 3

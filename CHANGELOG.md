@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-01-21
+
+### Added
+- **Testing Helpers Module**: Context managers to simplify testing authenticated endpoints
+  - `as_user(client, user_id, additional_claims)` - JWT authentication for users
+  - `as_admin(client, user_id, additional_claims, roles)` - JWT authentication for admins
+  - `clear_registration()` - Reset user context registration
+  - Properly sets `HTTP_AUTHORIZATION` header in Flask test client
+- **UserProtocol Admin Attributes**: Extended protocol with admin properties
+  - `is_admin: bool` - Check if user has admin privileges
+  - `is_superadmin: bool` - Check if user has superadmin privileges
+  - Ensures type safety for admin checks across custom user implementations
+
+### Fixed
+- **Single Table Inheritance (STI) Support**: Fixed automatic `extend_existing=True` injection
+  - Removed overly strict check for `has_custom_mapper_args` in `User.__init_subclass__()`
+  - Subclasses can now define `__mapper_args__` (e.g., for `polymorphic_identity`)
+  - Resolves "Table 'user' is already defined" errors when using STI with custom mapper args
+- Removed backward compatibility code: post-super() injection in `User.__init_subclass__()`
+
+### Documentation
+- **Testing Guide**: Comprehensive documentation for testing helpers in `docs/testing.rst`
+  - Context manager usage examples
+  - Testing with fixtures
+  - Testing permissions
+  - Common patterns for authenticated endpoint testing
+- Updated README.md with Testing section and quick examples
+- Updated index.rst to include testing guide in table of contents
+
 ## [0.8.0] - 2026-01-21
 
 ### Added

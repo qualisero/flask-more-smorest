@@ -66,6 +66,16 @@ class UserProtocol(Protocol):
         """Return the user's identifier."""
         ...
 
+    @property
+    def is_admin(self) -> bool:
+        """Check if user has admin privileges."""
+        ...
+
+    @property
+    def is_superadmin(self) -> bool:
+        """Check if user has superadmin privileges."""
+        ...
+
     def has_role(self, role: AdminRole) -> bool:
         """Check if user has the specified role."""
         ...
