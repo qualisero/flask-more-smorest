@@ -840,3 +840,181 @@ class TestSuperadminRolePermissions:
         # Verify admin has is_admin = True but is_superadmin = False
         assert not admin_user.is_superadmin
         assert admin_user.is_admin
+
+
+class TestCustomRoleExtension:
+    """Test extending the role system with custom role enums.
+
+    Demonstrates how to create custom role taxonomies beyond
+    the built-in admin/superadmin/user roles.
+    """
+
+    def test_custom_role_enum_usage(self, user_perms_app: Flask, db_session: "scoped_session") -> None:
+        """Test creating and using custom role enum values."""
+
+        # Define a custom role enum for a content management system
+        from enum import Enum as PyEnum
+
+        class ContentRole(str, PyEnum):
+            """Custom roles for content management."""
+
+            EDITOR = "editor"
+            AUTHOR = "author"
+            MODERATOR = "moderator"
+            GUEST = "guest"
+
+        # Create users with custom roles
+        editor_user = CustomUserModel(email="editor@test.com", password="password")
+        editor_user.save()
+
+        author_user = CustomUserModel(email="author@test.com", password="password")
+        author_user.save()
+
+        guest_user = CustomUserModel(email="guest@test.com", password="password")
+        guest_user.save()
+
+        # Assign custom roles using the enum
+        with UserRole.bypass_perms():
+            UserRole(user_id=editor_user.id, role=ContentRole.EDITOR).save()
+            UserRole(user_id=author_user.id, role=ContentRole.AUTHOR).save()
+            UserRole(user_id=guest_user.id, role=ContentRole.GUEST).save()
+
+        # Refresh to load relationships
+        db_session.refresh(editor_user)
+        db_session.refresh(author_user)
+        db_session.refresh(guest_user)
+
+        # Verify roles were assigned correctly using has_role()
+        assert editor_user.has_role(ContentRole.EDITOR)
+        assert not editor_user.has_role(ContentRole.AUTHOR)
+        assert not editor_user.has_role(ContentRole.GUEST)
+
+        assert author_user.has_role(ContentRole.AUTHOR)
+        assert not author_user.has_role(ContentRole.EDITOR)
+
+        assert guest_user.has_role(ContentRole.GUEST)
+        assert not guest_user.has_role(ContentRole.EDITOR)
+
+    def test_custom_role_with_string_values(self, user_perms_app: Flask, db_session: "scoped_session") -> None:
+        """Test creating roles with string values instead of enums."""
+
+        # Create roles using strings directly
+        user1 = CustomUserModel(email="user1@test.com", password="password")
+        user1.save()
+
+        user2 = CustomUserModel(email="user2@test.com", password="password")
+        user2.save()
+
+        # Assign roles using strings
+        with UserRole.bypass_perms():
+            UserRole(user_id=user1.id, role="contributor").save()
+            UserRole(user_id=user2.id, role="reviewer").save()
+
+        # Refresh to load relationships
+        db_session.refresh(user1)
+        db_session.refresh(user2)
+
+        # Verify string-based roles work with has_role()
+        assert user1.has_role("contributor")
+        assert not user1.has_role("reviewer")
+
+        assert user2.has_role("reviewer")
+        assert not user2.has_role("contributor")
+
+    def test_custom_role_list_roles(self, user_perms_app: Flask, db_session: "scoped_session") -> None:
+        """Test that list_roles() includes custom role values."""
+
+        # Create a user with multiple custom roles
+        user = CustomUserModel(email="multirole@test.com", password="password")
+        user.save()
+
+        # Assign multiple custom roles
+        with UserRole.bypass_perms():
+            UserRole(user_id=user.id, role="editor").save()
+            UserRole(user_id=user.id, role="author").save()
+
+        # Refresh to load relationships
+        db_session.refresh(user)
+
+        # Verify all custom roles are listed
+        roles = user.list_roles()
+        assert "editor" in roles
+        assert "author" in roles
+        assert len(roles) == 2
+
+    def test_custom_role_enum_to_string_conversion(self, user_perms_app: Flask, db_session: "scoped_session") -> None:
+        """Test that enum roles can be converted back from stored strings."""
+
+        from enum import Enum as PyEnum
+
+        class BlogRole(str, PyEnum):
+            """Roles for a blog system."""
+
+            PUBLISHER = "publisher"
+            WRITER = "writer"
+            SUBSCRIBER = "subscriber"
+
+        # Create a user with an enum role
+        user = CustomUserModel(email="bloguser@test.com", password="password")
+        user.save()
+
+        with UserRole.bypass_perms():
+            UserRole(user_id=user.id, role=BlogRole.PUBLISHER).save()
+
+        # Retrieve the role and convert it back to enum
+        db_session.refresh(user)
+
+        # Get the user's roles
+        roles = UserRole.query.filter_by(user_id=user.id).all()
+        assert len(roles) == 1
+
+        # Convert stored string back to enum
+        stored_role = roles[0].role  # Returns string "publisher"
+        assert stored_role == BlogRole.PUBLISHER.value
+
+        # Convert back to enum
+        role_enum = BlogRole(stored_role)
+        assert role_enum == BlogRole.PUBLISHER
+
+    def test_mixed_default_and_custom_roles(self, user_perms_app: Flask, db_session: "scoped_session") -> None:
+        """Test that default roles and custom roles can coexist."""
+
+        from enum import Enum as PyEnum
+
+        class CustomAppRole(str, PyEnum):
+            """Custom application roles."""
+
+            VIP = "vip"
+            BETA_TESTER = "beta_tester"
+
+        # Create a superadmin (default role)
+        superadmin = CustomUserModel(email="superadmin@test.com", password="password")
+        superadmin.save()
+
+        # Create a regular user with both default and custom roles
+        user = CustomUserModel(email="vipuser@test.com", password="password")
+        user.save()
+
+        with UserRole.bypass_perms():
+            UserRole(user_id=superadmin.id, role=DefaultUserRole.SUPERADMIN).save()
+            UserRole(user_id=user.id, role=DefaultUserRole.USER).save()
+            UserRole(user_id=user.id, role=CustomAppRole.VIP).save()
+
+        # Refresh to load relationships
+        db_session.refresh(superadmin)
+        db_session.refresh(user)
+
+        # Verify default roles work
+        assert superadmin.is_superadmin
+        assert superadmin.has_role(DefaultUserRole.SUPERADMIN)
+
+        assert user.has_role(DefaultUserRole.USER)
+
+        # Verify custom roles work
+        assert user.has_role(CustomAppRole.VIP)
+        assert not user.has_role(CustomAppRole.BETA_TESTER)
+
+        # Verify list_roles includes both
+        user_roles = user.list_roles()
+        assert "user" in user_roles
+        assert "vip" in user_roles
