@@ -52,7 +52,7 @@ class UserBlueprint(PermsBlueprint):
         import_name: Import name (default: __name__)
         model: Model class or string (default: User)
         schema: Schema class or string (default: UserSchema)
-        url_prefix: URL prefix for all routes (default: "/api/users/")
+        url_prefix: URL prefix for all routes (default: "/api/user/")
         methods: CRUD methods to enable (default: all methods)
         skip_methods: CRUD methods to disable (default: None)
         **kwargs: Additional arguments passed to CRUDBlueprint
@@ -63,7 +63,7 @@ class UserBlueprint(PermsBlueprint):
 
         >>> # With custom configuration
         >>> user_bp = UserBlueprint(
-        ...     url_prefix="/api/v2/users/",
+        ...     url_prefix="/api/v2/user/",
         ...     skip_methods=[CRUDMethod.DELETE]
         ... )
 
