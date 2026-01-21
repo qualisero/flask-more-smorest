@@ -34,7 +34,6 @@ from flask_more_smorest.perms.base_perms_model import BasePermsModel
 from flask_more_smorest.perms.model_mixins import ProfileMixin, UserOwnershipMixin
 
 if TYPE_CHECKING:
-    from flask.testing import FlaskClient
     from sqlalchemy.orm import scoped_session
 
 
