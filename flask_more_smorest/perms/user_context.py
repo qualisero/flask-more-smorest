@@ -1,240 +1,312 @@
 """Configurable user context for flask-more-smorest.
 
-This module provides a pluggable system for user authentication context,
-allowing applications to use their own User models while still leveraging
-flask-more-smorest's permission system.
+Simple function-based registration system with type enforcement.
 
-Configuration:
-    Applications can configure custom user context providers via Flask config:
+**Quick Start:**
 
-    ```python
-    app.config['FMS_GET_CURRENT_USER'] = my_get_current_user
-    app.config['FMS_GET_CURRENT_USER_ID'] = my_get_current_user_id
-    app.config['FMS_IS_CURRENT_USER_ADMIN'] = my_is_admin_check
-    app.config['FMS_IS_CURRENT_USER_SUPERADMIN'] = my_is_superadmin_check
-    ```
+For most use cases with flask-more-smorest's built-in User model,
+no configuration is needed. Just use the class method:
 
-    Or by calling the registration functions:
+    .. code-block:: python
 
-    ```python
-    from flask_more_smorest.perms.user_context import (
-        register_get_current_user,
-        register_get_current_user_id,
-        register_is_current_user_admin,
-        register_is_current_user_superadmin,
-    )
+        from flask_more_smorest import User
 
-    register_get_current_user(my_get_current_user)
-    register_is_current_user_superadmin(my_is_superadmin_check)
-    ```
+        user = User.get_current_user()  # Returns User | None
+
+For custom User models or external auth systems, register your user class
+(and optionally a custom getter):
+
+    .. code-block:: python
+
+        from flask_more_smorest.perms import register_user_class
+
+        def my_get_user():
+            from flask import session
+
+            user_id = session.get("user_id")
+            return MyUser.query.get(user_id) if user_id else None
+
+        # Register - everything else derives from this!
+        register_user_class(MyUser, get_current_user=my_get_user)
+
+        # Now use the class method for typed access
+        user = MyUser.get_current_user()  # Returns MyUser | None
+
+**That's it!** No classes, no ABC, no multiple methods to override.
 """
+
+from __future__ import annotations
 
 import logging
 import uuid
 from collections.abc import Callable
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeVar, cast, overload, runtime_checkable
 
 from flask import current_app, has_app_context
 
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Mapped
+
 logger = logging.getLogger(__name__)
 
-# Type for user context functions
-GetCurrentUserFunc = Callable[[], Any]
-GetCurrentUserIdFunc = Callable[[], uuid.UUID | None]
-IsCurrentUserAdminFunc = Callable[[], bool]
-IsCurrentUserSuperadminFunc = Callable[[], bool]
+# Admin role type - constrained to valid admin roles only
+AdminRole = Literal["admin", "superadmin"]
 
-# Global registrations (used when no app context or config not set)
-_global_get_current_user: GetCurrentUserFunc | None = None
-_global_get_current_user_id: GetCurrentUserIdFunc | None = None
-_global_is_current_user_admin: IsCurrentUserAdminFunc | None = None
-_global_is_current_user_superadmin: IsCurrentUserSuperadminFunc | None = None
+# Role constants
+ROLE_ADMIN: AdminRole = "admin"
+ROLE_SUPERADMIN: AdminRole = "superadmin"
 
 
 @runtime_checkable
 class UserProtocol(Protocol):
-    """Protocol defining the minimum interface for a User object.
-
-    Applications using custom User models should ensure their User class
-    implements these properties/methods for compatibility with the permission system.
-    """
-
-    id: uuid.UUID
+    """User interface required by the permissions system."""
 
     @property
-    def is_admin(self) -> bool:
-        """Whether the user has admin privileges (includes superadmin)."""
+    def id(self) -> uuid.UUID | Mapped[uuid.UUID]:
+        """Return the user's identifier."""
         ...
 
-    @property
-    def is_superadmin(self) -> bool:
-        """Whether the user has superadmin privileges."""
+    def has_role(self, role: AdminRole) -> bool:
+        """Check if user has the specified role."""
+        ...
+
+    def list_roles(self) -> list[str]:
+        """List user roles as strings."""
         ...
 
 
-def register_get_current_user(func: GetCurrentUserFunc) -> None:
-    """Register a custom function to get the current user.
+# TypeVar for generic user functions
+UserT = TypeVar("UserT", bound=UserProtocol)
+
+# Type for user context function
+GetCurrentUserFunc = Callable[[], UserProtocol | None]
+
+# Global registration (fallback when no app context)
+_get_current_user_func: GetCurrentUserFunc | None = None
+_registered_user_class: type[UserProtocol] | None = None
+
+_USER_CONTEXT_STATE_KEY = "user_context"
+
+
+def _get_app_state() -> dict[str, Any]:
+    extensions_state = current_app.extensions.setdefault("flask-more-smorest", {})
+    return cast(
+        dict[str, Any],
+        extensions_state.setdefault(
+            _USER_CONTEXT_STATE_KEY,
+            {"get_current_user_func": None, "user_class": None},
+        ),
+    )
+
+
+def _get_state() -> tuple[dict[str, Any], bool]:
+    if has_app_context():
+        return _get_app_state(), True
+
+    return {
+        "get_current_user_func": _get_current_user_func,
+        "user_class": _registered_user_class,
+    }, False
+
+
+def register_user_class(
+    user_cls: type[UserT],
+    *,
+    get_current_user: Callable[[], UserT | None] | None = None,
+) -> None:
+    """Register a custom user class for the application.
+
+    This is the primary customization point. All user-related functionality
+    (JWT authentication, permissions, etc.) will use this class.
 
     Args:
-        func: Function that returns the current user or None
+        user_cls: User subclass to use throughout the application
+        get_current_user: Optional custom getter function.
+            If provided, uses this instead of JWT.
+            If not provided, JWT will load instances of user_cls.
+
+    Example:
+
+    .. code-block:: python
+
+        class MyUser(User):
+            employee_id = mapped_column(db.String(50))
+
+        # Use JWT authentication with MyUser
+        register_user_class(MyUser)
+
+        # Or provide custom getter
+        def my_get_user() -> MyUser | None:
+            ...
+
+        register_user_class(MyUser, get_current_user=my_get_user)
     """
-    global _global_get_current_user
-    _global_get_current_user = func
+    state, is_app_state = _get_state()
+    state["user_class"] = user_cls
+    if get_current_user is not None:
+        state["get_current_user_func"] = get_current_user
+
+    if not is_app_state:
+        global _get_current_user_func, _registered_user_class  # noqa: PLW0603
+        _registered_user_class = user_cls
+        if get_current_user is not None:
+            _get_current_user_func = get_current_user
 
 
-def register_get_current_user_id(func: GetCurrentUserIdFunc) -> None:
-    """Register a custom function to get the current user ID.
-
-    Args:
-        func: Function that returns the current user's UUID or None
-    """
-    global _global_get_current_user_id
-    _global_get_current_user_id = func
+@overload
+def get_current_user() -> UserProtocol | None: ...
 
 
-def register_is_current_user_admin(func: IsCurrentUserAdminFunc) -> None:
-    """Register a custom function to check if current user is admin.
-
-    Args:
-        func: Function that returns True if current user is admin
-    """
-    global _global_is_current_user_admin
-    _global_is_current_user_admin = func
+@overload
+def get_current_user(user_type: type[UserT]) -> UserT | None: ...
 
 
-def register_is_current_user_superadmin(func: IsCurrentUserSuperadminFunc) -> None:
-    """Register a custom function to check if current user is superadmin.
-
-    Args:
-        func: Function that returns True if current user is superadmin
-    """
-    global _global_is_current_user_superadmin
-    _global_is_current_user_superadmin = func
-
-
-def get_current_user() -> Any:
+def get_current_user(user_type: type[UserT] | None = None) -> UserProtocol | None:
     """Get the current authenticated user.
 
+    **Preferred approach:** Use the class method on your User subclass:
+
+        .. code-block:: python
+
+            from flask_more_smorest import User
+
+            # Untyped access
+            user = User.get_current_user()
+
+            # Typed access with custom user class
+            class MyUser(User):
+                employee_id = mapped_column(db.String(32))
+
+            user = MyUser.get_current_user()  # Returns MyUser | None
+
+    This module-level function is useful for advanced use cases where you need to:
+    - Dynamically determine the user class at runtime
+    - Test custom getter registration
+    - Work with UserProtocol without knowing the concrete type
+
     Resolution order:
-    1. App config 'FMS_GET_CURRENT_USER' if set
-    2. Globally registered function via register_get_current_user()
-    3. Default: flask-more-smorest's built-in user_models.get_current_user
+    1. Registered custom getter (via register_user_class)
+    2. Default: JWT-based authentication (built-in)
+
+    Args:
+        user_type: Optional user class for typed return.
+            If None, returns UserProtocol | None.
 
     Returns:
         Current user instance if authenticated, None otherwise
     """
-    # Check app config first
-    if has_app_context():
-        config_func = current_app.config.get("FMS_GET_CURRENT_USER")
-        if config_func is not None:
-            return config_func()
+    state, _ = _get_state()
+    get_user_func = cast(GetCurrentUserFunc | None, state.get("get_current_user_func"))
 
-    # Check global registration
-    if _global_get_current_user is not None:
-        return _global_get_current_user()
+    if get_user_func is not None:
+        user = get_user_func()
+    else:
+        # Fall back to built-in JWT authentication
+        from .models import _get_jwt_current_user
 
-    # Fall back to built-in
-    from .user_models import get_current_user as builtin_get_current_user
+        user = _get_jwt_current_user()
 
-    return builtin_get_current_user()
+    if user_type is not None:
+        if user is None:
+            return None
+        if not isinstance(user, user_type):
+            return None
+        return user
+
+    return user
+
+
+def _get_registered_user_class() -> type[UserProtocol] | None:
+    """Get the registered user class (internal helper).
+
+    Returns:
+        Registered User subclass or None if not registered
+    """
+    state, _ = _get_state()
+    return state.get("user_class")
 
 
 def get_current_user_id() -> uuid.UUID | None:
     """Get the current authenticated user's ID.
 
-    Resolution order:
-    1. App config 'FMS_GET_CURRENT_USER_ID' if set
-    2. Globally registered function via register_get_current_user_id()
-    3. Default: flask-more-smorest's built-in user_models.get_current_user_id
+    Automatically extracts the `id` attribute from the result of `get_current_user()`.
+    Handles both UUID and Mapped[UUID] types.
 
     Returns:
         Current user's UUID if authenticated, None otherwise
     """
-    # Check app config first
-    if has_app_context():
-        config_func = current_app.config.get("FMS_GET_CURRENT_USER_ID")
-        if config_func is not None:
-            result: uuid.UUID | None = config_func()
-            return result
+    user = get_current_user()
+    if user is None:
+        return None
 
-    # Check global registration
-    if _global_get_current_user_id is not None:
-        return _global_get_current_user_id()
+    user_id = getattr(user, "id", None)
+    if user_id is None:
+        return None
 
-    # Fall back to built-in
-    from .user_models import get_current_user_id as builtin_get_current_user_id
+    # Handle Mapped[UUID] by extracting the value
+    try:
+        from sqlalchemy.orm.attributes import InstrumentedAttribute
 
-    return builtin_get_current_user_id()
+        if isinstance(user_id, InstrumentedAttribute):
+            return cast(uuid.UUID, user_id.property.class_.impl.type.python_type(user_id))
+    except Exception:  # noqa: S110  # Intentionally swallow errors during type checking
+        pass
+
+    return cast(uuid.UUID, user_id)
 
 
 def is_current_user_admin() -> bool:
     """Check if the current user is an admin.
 
-    Resolution order:
-    1. App config 'FMS_IS_CURRENT_USER_ADMIN' if set
-    2. Globally registered function via register_is_current_user_admin()
-    3. Default: Check user.is_admin via get_current_user()
+    Uses the user's role-based access via `has_role`.
 
     Returns:
         True if current user is admin, False otherwise
     """
-    # Check app config first
-    if has_app_context():
-        config_func = current_app.config.get("FMS_IS_CURRENT_USER_ADMIN")
-        if config_func is not None:
-            result: bool = config_func()
-            return result
-
-    # Check global registration
-    if _global_is_current_user_admin is not None:
-        return _global_is_current_user_admin()
-
-    # Fall back to checking user.is_admin
-    try:
-        user = get_current_user()
-        return bool(user and getattr(user, "is_admin", False))
-    except Exception:
+    user = get_current_user()
+    if user is None:
         return False
+
+    return bool(user.has_role(ROLE_ADMIN) or user.has_role(ROLE_SUPERADMIN))
 
 
 def is_current_user_superadmin() -> bool:
     """Check if the current user is a superadmin.
 
-    Resolution order:
-    1. App config 'FMS_IS_CURRENT_USER_SUPERADMIN' if set
-    2. Globally registered function via register_is_current_user_superadmin()
-    3. Default: Check user.is_superadmin via get_current_user()
+    Uses the user's role-based access via `has_role`.
 
     Returns:
         True if current user is superadmin, False otherwise
     """
-    # Check app config first
-    if has_app_context():
-        config_func = current_app.config.get("FMS_IS_CURRENT_USER_SUPERADMIN")
-        if config_func is not None:
-            result: bool = config_func()
-            return result
-
-    # Check global registration
-    if _global_is_current_user_superadmin is not None:
-        return _global_is_current_user_superadmin()
-
-    # Fall back to checking user.is_superadmin
-    try:
-        user = get_current_user()
-        return bool(user and getattr(user, "is_superadmin", False))
-    except Exception:
+    user = get_current_user()
+    if user is None:
         return False
 
+    return bool(user.has_role(ROLE_SUPERADMIN))
 
-def clear_registrations() -> None:
-    """Clear all global registrations. Useful for testing."""
-    global \
-        _global_get_current_user, \
-        _global_get_current_user_id, \
-        _global_is_current_user_admin, \
-        _global_is_current_user_superadmin
-    _global_get_current_user = None
-    _global_get_current_user_id = None
-    _global_is_current_user_admin = None
-    _global_is_current_user_superadmin = None
+
+def clear_registration() -> None:
+    """Clear the custom user registration.
+
+    Clears both the custom get_current_user function and the registered user class,
+    resetting to default JWT authentication with base User model.
+
+    Useful for testing to reset to default behavior.
+
+    Example:
+
+        .. code-block:: python
+
+            def test_with_custom_user():
+                register_user_class(MyUser)
+                # ... test ...
+                clear_registration()  # Reset for next test
+    """
+    state, is_app_state = _get_state()
+    state["get_current_user_func"] = None
+    state["user_class"] = None
+
+    if not is_app_state:
+        global _get_current_user_func, _registered_user_class  # noqa: PLW0603
+        _get_current_user_func = None
+        _registered_user_class = None

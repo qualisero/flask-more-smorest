@@ -32,11 +32,11 @@ def dummy_perms_model(app: Flask) -> type[BasePermsModel]:
 def test_check_permission_raises_for_create(
     app: Flask, dummy_perms_model: type[BasePermsModel], monkeypatch: MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(BasePermsModel, "is_current_user_admin", classmethod(lambda cls: False))
+    monkeypatch.setattr("flask_more_smorest.perms.user_context.is_current_user_admin", lambda: False)
 
     with app.app_context():
         instance = dummy_perms_model(name="value")
-        instance._can_create = lambda: False  # type: ignore[method-assign]
+        instance._can_create = lambda current_user: False  # type: ignore[method-assign]
 
     with app.test_request_context("/"):
         with pytest.raises(ForbiddenError):
@@ -46,13 +46,13 @@ def test_check_permission_raises_for_create(
 def test_can_write_uses_can_create_when_transient(
     app: Flask, dummy_perms_model: type[BasePermsModel], monkeypatch: MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(BasePermsModel, "is_current_user_admin", classmethod(lambda cls: False))
+    monkeypatch.setattr("flask_more_smorest.perms.user_context.is_current_user_admin", lambda: False)
     with app.app_context():
         instance = dummy_perms_model(name="value")
 
     called: list[str] = []
-    instance._can_create = lambda: called.append("create") or True  # type: ignore[method-assign,func-returns-value]
-    instance._can_write = lambda: False  # type: ignore[method-assign]
+    instance._can_create = lambda current_user: called.append("create") or True  # type: ignore[method-assign,func-returns-value]
+    instance._can_write = lambda current_user: False  # type: ignore[method-assign]
 
     def fake_inspect(obj: object) -> object:
         @dataclass
@@ -73,13 +73,13 @@ def test_can_write_uses_can_create_when_transient(
 def test_can_write_uses_write_when_persisted(
     app: Flask, dummy_perms_model: type[BasePermsModel], monkeypatch: MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(BasePermsModel, "is_current_user_admin", classmethod(lambda cls: False))
+    monkeypatch.setattr("flask_more_smorest.perms.user_context.is_current_user_admin", lambda: False)
     with app.app_context():
         instance = dummy_perms_model(name="value")
 
     called: list[str] = []
-    instance._can_create = lambda: False  # type: ignore[method-assign]
-    instance._can_write = lambda: called.append("write") or True  # type: ignore[method-assign,func-returns-value]
+    instance._can_create = lambda current_user: False  # type: ignore[method-assign]
+    instance._can_write = lambda current_user: called.append("write") or True  # type: ignore[method-assign,func-returns-value]
 
     def fake_inspect(obj: object) -> object:
         @dataclass
@@ -95,15 +95,3 @@ def test_can_write_uses_write_when_persisted(
         assert instance.can_write()
 
     assert called == ["write"]
-
-
-def test_is_current_user_admin_handles_runtime_error(monkeypatch: MonkeyPatch) -> None:
-    def raise_runtime_error(*_args: object, **_kwargs: object) -> None:
-        raise RuntimeError("no context")
-
-    monkeypatch.setattr(
-        "flask_more_smorest.perms.user_models.get_current_user",
-        lambda: (_ for _ in ()).throw(RuntimeError("no context")),
-    )
-
-    assert BasePermsModel.is_current_user_admin() is False

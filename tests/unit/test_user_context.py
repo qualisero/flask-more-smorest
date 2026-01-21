@@ -1,25 +1,20 @@
-"""Unit tests for flask_more_smorest.perms.user_context module."""
+"""Unit tests for flask-more-smorest.perms.user_context module."""
 
 import uuid
-from typing import Any
 
-from flask import Flask
+import pytest
 
 from flask_more_smorest.perms.user_context import (
-    GetCurrentUserFunc,
-    GetCurrentUserIdFunc,
-    IsCurrentUserAdminFunc,
-    IsCurrentUserSuperadminFunc,
+    ROLE_ADMIN,
+    ROLE_SUPERADMIN,
+    AdminRole,
     UserProtocol,
-    clear_registrations,
+    clear_registration,
     get_current_user,
     get_current_user_id,
     is_current_user_admin,
     is_current_user_superadmin,
-    register_get_current_user,
-    register_get_current_user_id,
-    register_is_current_user_admin,
-    register_is_current_user_superadmin,
+    register_user_class,
 )
 
 
@@ -30,512 +25,314 @@ class TestUserProtocol:
         """Test that UserProtocol correctly identifies conforming objects."""
 
         class ValidUser:
-            def __init__(self) -> None:
-                self.id = uuid.uuid4()
+            id = uuid.uuid4()
 
-            @property
-            def is_admin(self) -> bool:
-                return True
+            def has_role(self, role: AdminRole) -> bool:
+                return role == ROLE_ADMIN
 
-            @property
-            def is_superadmin(self) -> bool:
-                return False
+            def list_roles(self) -> list[str]:
+                return [ROLE_ADMIN]
 
         user = ValidUser()
         assert isinstance(user, UserProtocol)
 
-    def test_user_protocol_rejects_invalid_user(self) -> None:
-        """Test that UserProtocol rejects non-conforming objects."""
 
-        class InvalidUser:
-            def __init__(self) -> None:
-                self.email = "test@example.com"
-
-        user = InvalidUser()
-        assert not isinstance(user, UserProtocol)
-
-    def test_user_protocol_checks_is_admin_property(self) -> None:
-        """Test that UserProtocol requires is_admin as property."""
-
-        class UserWithoutIsAdmin:
-            def __init__(self) -> None:
-                self.id = uuid.uuid4()
-
-        user = UserWithoutIsAdmin()
-        assert not isinstance(user, UserProtocol)
-
-
+@pytest.mark.usefixtures("reset_user_context")
 class TestRegistrationFunctions:
     """Test registration functions for user context."""
 
-    def setup_method(self) -> None:
-        """Clear registrations before each test."""
-        clear_registrations()
+    def test_register_user_class(self) -> None:
+        """Test registering custom user class with custom getter."""
 
-    def teardown_method(self) -> None:
-        """Clear registrations after each test."""
-        clear_registrations()
+        class MyUser:
+            def __init__(self, user_id: uuid.UUID) -> None:
+                self.id = user_id
 
-    def test_register_get_current_user(self) -> None:
-        """Test registering custom get_current_user function."""
-        test_user = {"id": "test-user"}
+            def has_role(self, role: AdminRole) -> bool:
+                return False
 
-        def my_get_user() -> Any:
+            def list_roles(self) -> list[str]:
+                return []
+
+        user_id = uuid.uuid4()
+        test_user = MyUser(user_id)
+
+        def my_get_user() -> MyUser | None:
             return test_user
 
-        register_get_current_user(my_get_user)
+        register_user_class(MyUser, get_current_user=my_get_user)
 
         # Get current user should use registered function
-        result = get_current_user()
-        assert result == test_user
+        result = get_current_user(MyUser)
+        assert result is test_user
 
-    def test_register_get_current_user_id(self) -> None:
-        """Test registering custom get_current_user_id function."""
-        test_id = uuid.uuid4()
+    def test_clear_registration_removes_registration(self) -> None:
+        """Test that clear_registration removes registered function."""
 
-        def my_get_user_id() -> uuid.UUID | None:
-            return test_id
+        class MyUser:
+            def __init__(self, user_id: uuid.UUID) -> None:
+                self.id = user_id
 
-        register_get_current_user_id(my_get_user_id)
+            def has_role(self, role: AdminRole) -> bool:
+                return False
 
-        # Should use registered function
-        result = get_current_user_id()
-        assert result == test_id
+            def list_roles(self) -> list[str]:
+                return []
 
-    def test_register_is_current_user_admin(self) -> None:
-        """Test registering custom is_current_user_admin function."""
+        def my_func() -> MyUser | None:
+            return MyUser(uuid.uuid4())
 
-        def my_admin_check() -> bool:
-            return True
+        register_user_class(MyUser, get_current_user=my_func)
+        clear_registration()
 
-        register_is_current_user_admin(my_admin_check)
-
-        # Should use registered function
-        assert is_current_user_admin() is True
-
-    def test_register_is_current_user_superadmin(self) -> None:
-        """Test registering custom is_current_user_superadmin function."""
-
-        def my_superadmin_check() -> bool:
-            return True
-
-        register_is_current_user_superadmin(my_superadmin_check)
-
-        # Should use registered function
-        assert is_current_user_superadmin() is True
-
-    def test_clear_registrations_removes_all(self) -> None:
-        """Test that clear_registrations removes all registered functions."""
-
-        def my_func() -> Any:
-            return "test"
-
-        register_get_current_user(my_func)
-        register_get_current_user_id(my_func)  # type: ignore
-        register_is_current_user_admin(my_func)  # type: ignore
-        register_is_current_user_superadmin(my_func)  # type: ignore
-
-        clear_registrations()
-
-        # Should fall back to built-in behavior (returns None outside request context)
-        result = get_current_user()
+        # Call clear_registration to verify it removes registration
+        # Should fall back to built-in (returns None outside Flask context)
+        result = get_current_user(MyUser)
         assert result is None
 
 
+@pytest.mark.usefixtures("reset_user_context")
 class TestGetCurrentUser:
     """Test get_current_user resolution."""
 
-    def setup_method(self) -> None:
-        """Clear registrations before each test."""
-        clear_registrations()
+    def test_global_registration_used_when_registered(self) -> None:
+        """Test that global registration is used when registered."""
 
-    def teardown_method(self) -> None:
-        """Clear registrations after each test."""
-        clear_registrations()
+        class MyUser:
+            def __init__(self, user_id: uuid.UUID) -> None:
+                self.id = user_id
 
-    def test_flask_config_takes_precedence(self, app: Flask) -> None:
-        """Test that Flask config takes precedence over global registration."""
-        config_user = {"id": "config-user"}
-        global_user = {"id": "global-user"}
+            def has_role(self, role: AdminRole) -> bool:
+                return False
 
-        def config_func() -> Any:
-            return config_user
+            def list_roles(self) -> list[str]:
+                return []
 
-        def global_func() -> Any:
-            return global_user
+        test_user = MyUser(uuid.uuid4())
 
-        register_get_current_user(global_func)
-        app.config["FMS_GET_CURRENT_USER"] = config_func
-
-        with app.app_context():
-            result = get_current_user()
-            assert result == config_user
-
-    def test_global_registration_used_when_no_config(self) -> None:
-        """Test that global registration is used when no Flask config."""
-        test_user = {"id": "global-user"}
-
-        def global_func() -> Any:
+        def global_func() -> MyUser | None:
             return test_user
 
-        register_get_current_user(global_func)
+        register_user_class(MyUser, get_current_user=global_func)
 
-        result = get_current_user()
-        assert result == test_user
+        result = get_current_user(MyUser)
+        assert result is test_user
 
     def test_fallback_to_builtin_when_no_registration(self) -> None:
-        """Test fallback to built-in user_models when nothing registered."""
-        # Outside request context, built-in returns None
+        """Test fallback to built-in models when nothing registered."""
+        # Outside Flask context, built-in returns None
         result = get_current_user()
         assert result is None
 
-    def test_config_none_value_skipped(self, app: Flask) -> None:
-        """Test that None config value doesn't override registration."""
-        test_user = {"id": "global-user"}
+    def test_user_type_filter_returns_none_on_mismatch(self) -> None:
+        """Test that providing user_type returns None if user is not that type."""
 
-        def global_func() -> Any:
+        class MyUser:
+            def __init__(self, user_id: uuid.UUID) -> None:
+                self.id = user_id
+
+            def has_role(self, role: AdminRole) -> bool:
+                return False
+
+            def list_roles(self) -> list[str]:
+                return []
+
+        class OtherUser:
+            def __init__(self, user_id: uuid.UUID) -> None:
+                self.id = user_id
+
+            def has_role(self, role: AdminRole) -> bool:
+                return False
+
+            def list_roles(self) -> list[str]:
+                return []
+
+        test_user = MyUser(uuid.uuid4())
+
+        def my_get_user() -> MyUser | None:
             return test_user
 
-        register_get_current_user(global_func)
-        app.config["FMS_GET_CURRENT_USER"] = None
+        # Register MyUser but request OtherUser type
+        register_user_class(MyUser, get_current_user=my_get_user)
 
-        with app.app_context():
-            # Should skip None config and use global
-            result = get_current_user()
-            assert result == test_user
+        # Requesting specific type should return None
+        result = get_current_user(OtherUser)
+        assert result is None
 
 
+@pytest.mark.usefixtures("reset_user_context")
 class TestGetCurrentUserId:
-    """Test get_current_user_id resolution."""
+    """Test get_current_user_id extraction from user."""
 
-    def setup_method(self) -> None:
-        """Clear registrations before each test."""
-        clear_registrations()
+    def test_get_current_user_id(self) -> None:
+        """Test get_current_user_id extracts ID correctly."""
+        user_id = uuid.uuid4()
 
-    def teardown_method(self) -> None:
-        """Clear registrations after each test."""
-        clear_registrations()
+        class User:
+            def __init__(self, value: uuid.UUID) -> None:
+                self.id = value
 
-    def test_flask_config_takes_precedence(self, app: Flask) -> None:
-        """Test that Flask config takes precedence over global registration."""
-        config_id = uuid.uuid4()
-        global_id = uuid.uuid4()
+            def has_role(self, role: AdminRole) -> bool:
+                return False
 
-        def config_func() -> uuid.UUID:
-            return config_id
+            def list_roles(self) -> list[str]:
+                return []
 
-        def global_func() -> uuid.UUID:
-            return global_id
+        def my_get_user() -> User | None:
+            return User(user_id)
 
-        register_get_current_user_id(global_func)
-        app.config["FMS_GET_CURRENT_USER_ID"] = config_func
-
-        with app.app_context():
-            result = get_current_user_id()
-            assert result == config_id
-
-    def test_global_registration_used_when_no_config(self) -> None:
-        """Test that global registration is used when no Flask config."""
-        test_id = uuid.uuid4()
-
-        def global_func() -> uuid.UUID:
-            return test_id
-
-        register_get_current_user_id(global_func)
+        register_user_class(User, get_current_user=my_get_user)
 
         result = get_current_user_id()
-        assert result == test_id
-
-    def test_returns_none_when_no_user(self) -> None:
-        """Test that None is returned when no user authenticated."""
-
-        def no_user_func() -> None:
-            return None
-
-        register_get_current_user_id(no_user_func)
-
-        result = get_current_user_id()
-        assert result is None
-
-    def test_fallback_to_builtin_when_no_registration(self) -> None:
-        """Test fallback to built-in user_models when nothing registered."""
-        # Outside request context, built-in returns None
-        result = get_current_user_id()
-        assert result is None
+        assert result == user_id
 
 
+@pytest.mark.usefixtures("reset_user_context")
 class TestIsCurrentUserAdmin:
-    """Test is_current_user_admin resolution."""
+    """Test is_current_user_admin extraction from user."""
 
-    def setup_method(self) -> None:
-        """Clear registrations before each test."""
-        clear_registrations()
+    def test_is_current_user_admin_with_has_role_admin(self) -> None:
+        """Test is_current_user_admin uses has_role for admin."""
 
-    def teardown_method(self) -> None:
-        """Clear registrations after each test."""
-        clear_registrations()
+        class RoleUser:
+            id = uuid.uuid4()
 
-    def test_flask_config_takes_precedence(self, app: Flask) -> None:
-        """Test that Flask config takes precedence over global registration."""
+            def has_role(self, role: AdminRole) -> bool:
+                return role == ROLE_ADMIN
 
-        def config_func() -> bool:
-            return True
+            def list_roles(self) -> list[str]:
+                return []
 
-        def global_func() -> bool:
-            return False
+        register_user_class(RoleUser, get_current_user=lambda: RoleUser())
+        assert is_current_user_admin() is True
 
-        register_is_current_user_admin(global_func)
-        app.config["FMS_IS_CURRENT_USER_ADMIN"] = config_func
+    def test_is_current_user_admin_with_has_role_superadmin(self) -> None:
+        """Test is_current_user_admin returns True for superadmin role."""
 
-        with app.app_context():
-            result = is_current_user_admin()
-            assert result is True
+        class RoleUser:
+            id = uuid.uuid4()
 
-    def test_global_registration_used_when_no_config(self) -> None:
-        """Test that global registration is used when no Flask config."""
+            def has_role(self, role: AdminRole) -> bool:
+                return role == ROLE_SUPERADMIN
 
-        def admin_check() -> bool:
-            return True
+            def list_roles(self) -> list[str]:
+                return []
 
-        register_is_current_user_admin(admin_check)
+        register_user_class(RoleUser, get_current_user=lambda: RoleUser())
+        assert is_current_user_admin() is True
 
-        result = is_current_user_admin()
-        assert result is True
+    def test_is_current_user_admin_with_has_role_none(self) -> None:
+        """Test is_current_user_admin returns False when no admin roles."""
 
-    def test_fallback_checks_user_is_admin_attribute(self) -> None:
-        """Test fallback checks user.is_admin when no registration."""
+        class RoleUser:
+            id = uuid.uuid4()
 
-        class MockUser:
-            is_admin = True
+            def has_role(self, role: AdminRole) -> bool:
+                return False
 
-        def get_user() -> MockUser:
-            return MockUser()
+            def list_roles(self) -> list[str]:
+                return []
 
-        register_get_current_user(get_user)
+        register_user_class(RoleUser, get_current_user=lambda: RoleUser())
+        assert is_current_user_admin() is False
 
-        result = is_current_user_admin()
-        assert result is True
-
-    def test_fallback_returns_false_when_no_is_admin(self) -> None:
-        """Test fallback returns False when user has no is_admin attribute."""
+    def test_is_current_user_admin_no_user(self) -> None:
+        """Test is_current_user_admin returns False when no user is present."""
 
         class MockUser:
-            pass
+            id = uuid.uuid4()
 
-        def get_user() -> MockUser:
-            return MockUser()
+            def has_role(self, role: AdminRole) -> bool:
+                return False
 
-        register_get_current_user(get_user)
+            def list_roles(self) -> list[str]:
+                return []
 
-        result = is_current_user_admin()
-        assert result is False
-
-    def test_fallback_returns_false_when_no_user(self) -> None:
-        """Test fallback returns False when no user authenticated."""
-
-        def get_user() -> None:
-            return None
-
-        register_get_current_user(get_user)
-
-        result = is_current_user_admin()
-        assert result is False
-
-    def test_exception_handling_returns_false(self) -> None:
-        """Test that exceptions in fallback (not registration) return False."""
-        # Test the fallback's exception handling by using get_current_user
-        # that raises an exception
-
-        def failing_get_user() -> Any:
-            raise ValueError("Test error")
-
-        register_get_current_user(failing_get_user)
-        # Don't register is_current_user_admin, so it uses fallback
-
-        # Fallback will call get_current_user (which raises), catch it, return False
-        result = is_current_user_admin()
-        assert result is False
+        register_user_class(MockUser, get_current_user=lambda: None)
+        assert is_current_user_admin() is False
 
 
+@pytest.mark.usefixtures("reset_user_context")
 class TestIsCurrentUserSuperadmin:
-    """Test is_current_user_superadmin resolution."""
+    """Test is_current_user_superadmin extraction from user."""
 
-    def setup_method(self) -> None:
-        """Clear registrations before each test."""
-        clear_registrations()
+    def test_is_current_user_superadmin_with_has_role(self) -> None:
+        """Test is_current_user_superadmin uses has_role when available."""
 
-    def teardown_method(self) -> None:
-        """Clear registrations after each test."""
-        clear_registrations()
+        class RoleUser:
+            id = uuid.uuid4()
 
-    def test_flask_config_takes_precedence(self, app: Flask) -> None:
-        """Test that Flask config takes precedence over global registration."""
+            def has_role(self, role: AdminRole) -> bool:
+                return role == ROLE_SUPERADMIN
 
-        def config_func() -> bool:
-            return True
+            def list_roles(self) -> list[str]:
+                return []
 
-        def global_func() -> bool:
-            return False
+        register_user_class(RoleUser, get_current_user=lambda: RoleUser())
+        assert is_current_user_superadmin() is True
 
-        register_is_current_user_superadmin(global_func)
-        app.config["FMS_IS_CURRENT_USER_SUPERADMIN"] = config_func
+    def test_is_current_user_superadmin_with_has_role_admin_only(self) -> None:
+        """Test is_current_user_superadmin returns False for admin-only role."""
 
-        with app.app_context():
-            result = is_current_user_superadmin()
-            assert result is True
+        class RoleUser:
+            id = uuid.uuid4()
 
-    def test_global_registration_used_when_no_config(self) -> None:
-        """Test that global registration is used when no Flask config."""
+            def has_role(self, role: AdminRole) -> bool:
+                return role == ROLE_ADMIN
 
-        def superadmin_check() -> bool:
-            return True
+            def list_roles(self) -> list[str]:
+                return []
 
-        register_is_current_user_superadmin(superadmin_check)
+        register_user_class(RoleUser, get_current_user=lambda: RoleUser())
+        assert is_current_user_superadmin() is False
 
-        result = is_current_user_superadmin()
-        assert result is True
-
-    def test_fallback_checks_user_is_superadmin_attribute(self) -> None:
-        """Test fallback checks user.is_superadmin when no registration."""
+    def test_is_current_user_superadmin_no_user(self) -> None:
+        """Test is_current_user_superadmin returns False when no user is present."""
 
         class MockUser:
-            is_superadmin = True
+            id = uuid.uuid4()
 
-        def get_user() -> MockUser:
-            return MockUser()
+            def has_role(self, role: AdminRole) -> bool:
+                return False
 
-        register_get_current_user(get_user)
+            def list_roles(self) -> list[str]:
+                return []
 
-        result = is_current_user_superadmin()
-        assert result is True
-
-    def test_fallback_returns_false_when_no_is_superadmin(self) -> None:
-        """Test fallback returns False when user has no is_superadmin attribute."""
-
-        class MockUser:
-            pass
-
-        def get_user() -> MockUser:
-            return MockUser()
-
-        register_get_current_user(get_user)
-
-        result = is_current_user_superadmin()
-        assert result is False
-
-    def test_fallback_returns_false_when_no_user(self) -> None:
-        """Test fallback returns False when no user authenticated."""
-
-        def get_user() -> None:
-            return None
-
-        register_get_current_user(get_user)
-
-        result = is_current_user_superadmin()
-        assert result is False
-
-    def test_exception_handling_returns_false(self) -> None:
-        """Test that exceptions in fallback return False."""
-
-        def failing_get_user() -> Any:
-            raise ValueError("Test error")
-
-        register_get_current_user(failing_get_user)
-
-        result = is_current_user_superadmin()
-        assert result is False
+        register_user_class(MockUser, get_current_user=lambda: None)
+        assert is_current_user_superadmin() is False
 
 
-class TestIntegrationWithFlaskConfig:
-    """Test integration with Flask application configuration."""
-
-    def setup_method(self) -> None:
-        """Clear registrations before each test."""
-        clear_registrations()
-
-    def teardown_method(self) -> None:
-        """Clear registrations after each test."""
-        clear_registrations()
-
-    def test_all_three_config_options_work_together(self, app: Flask) -> None:
-        """Test that all three config options can be set together."""
-        test_user = {"id": "test-user", "is_admin": True}
-        test_id = uuid.uuid4()
-
-        def get_user() -> dict:
-            return test_user
-
-        def get_id() -> uuid.UUID:
-            return test_id
-
-        def check_admin() -> bool:
-            return True
-
-        app.config["FMS_GET_CURRENT_USER"] = get_user
-        app.config["FMS_GET_CURRENT_USER_ID"] = get_id
-        app.config["FMS_IS_CURRENT_USER_ADMIN"] = check_admin
-
-        with app.app_context():
-            assert get_current_user() == test_user
-            assert get_current_user_id() == test_id
-            assert is_current_user_admin() is True
-
-    def test_partial_config_uses_fallback_for_rest(self, app: Flask) -> None:
-        """Test that partial config uses fallback for unset options."""
-        test_id = uuid.uuid4()
-
-        def get_id() -> uuid.UUID:
-            return test_id
-
-        app.config["FMS_GET_CURRENT_USER_ID"] = get_id
-        # Don't set the other two
-
-        with app.app_context():
-            assert get_current_user_id() == test_id
-            # These should use built-in fallback (returns None outside request context)
-            result = get_current_user()
-            assert result is None
-
-
+@pytest.mark.usefixtures("reset_user_context")
 class TestTypeSafety:
-    """Test type annotations and signatures."""
+    """Test type safety with UserProtocol."""
 
-    def test_get_current_user_func_type(self) -> None:
-        """Test GetCurrentUserFunc type annotation."""
+    def test_user_protocol_with_valid_user(self) -> None:
+        """Test UserProtocol with valid user."""
 
-        def valid_func() -> Any:
-            return None
+        class ValidUser:
+            id = uuid.uuid4()
 
-        # Should be assignable
-        func: GetCurrentUserFunc = valid_func
-        assert callable(func)
+            def has_role(self, role: AdminRole) -> bool:
+                return role == ROLE_ADMIN
 
-    def test_get_current_user_id_func_type(self) -> None:
-        """Test GetCurrentUserIdFunc type annotation."""
+            def list_roles(self) -> list[str]:
+                return []
 
-        def valid_func() -> uuid.UUID | None:
-            return None
+        register_user_class(ValidUser, get_current_user=lambda: ValidUser())
+        assert get_current_user() is not None
 
-        # Should be assignable
-        func: GetCurrentUserIdFunc = valid_func
-        assert callable(func)
+    def test_user_protocol_with_object_user(self) -> None:
+        """Test UserProtocol works with object attribute access."""
 
-    def test_is_current_user_admin_func_type(self) -> None:
-        """Test IsCurrentUserAdminFunc type annotation."""
+        class ObjectUser:
+            def __init__(self) -> None:
+                self.id = uuid.uuid4()
 
-        def valid_func() -> bool:
-            return False
+            def has_role(self, role: AdminRole) -> bool:
+                return role == ROLE_ADMIN
 
-        # Should be assignable
-        func: IsCurrentUserAdminFunc = valid_func
-        assert callable(func)
+            def list_roles(self) -> list[str]:
+                return []
 
-    def test_is_current_user_superadmin_func_type(self) -> None:
-        """Test IsCurrentUserSuperadminFunc type annotation."""
-
-        def valid_func() -> bool:
-            return False
-
-        # Should be assignable
-        func: IsCurrentUserSuperadminFunc = valid_func
-        assert callable(func)
+        register_user_class(ObjectUser, get_current_user=lambda: ObjectUser())
+        assert get_current_user() is not None

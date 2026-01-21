@@ -40,9 +40,9 @@ User Authentication Example:
     ...     employee_id: Mapped[str] = mapped_column(sa.String(50))
     ...     department: Mapped[str] = mapped_column(sa.String(100))
     ...
-    ...     def _can_write(self) -> bool:
+    ...     def _can_write(self, current_user) -> bool:
     ...         # Custom permission logic
-    ...         return self.is_admin or self.id == get_current_user_id()
+    ...         return self.is_admin or (current_user is not None and self.id == current_user.id)
     >>>
     >>> # Create authentication blueprint
     >>> auth_bp = UserBlueprint(

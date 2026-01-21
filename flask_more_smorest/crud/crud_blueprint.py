@@ -170,41 +170,61 @@ class CRUDBlueprint(CRUDPaginationMixin, BlueprintOperationIdMixin, Blueprint):
         *pargs, **kwargs: Additional keyword arguments for CRUD configuration
 
     Examples:
+
+
+
         Basic usage (all methods enabled):
-        >>> from myapp.models import Product
-        >>> blueprint = CRUDBlueprint(
-        ...     'products', __name__,
-        ...     model=Product,           # Use class (preferred)
-        ...     schema=Product.Schema    # Auto-generated schema
-        ... )
+
+        .. code-block:: python
+
+            from myapp.models import Product
+
+            blueprint = CRUDBlueprint(
+                "products",
+                __name__,
+                model=Product,  # Use class (preferred)
+                schema=Product.Schema,  # Auto-generated schema
+            )
 
         Enable only specific methods:
-        >>> blueprint = CRUDBlueprint(
-        ...     'products', __name__,
-        ...     model=Product,
-        ...     schema=Product.Schema,
-        ...     methods=[CRUDMethod.INDEX, CRUDMethod.GET]  # Read-only
-        ... )
+
+        .. code-block:: python
+
+            blueprint = CRUDBlueprint(
+                "products",
+                __name__,
+                model=Product,
+                schema=Product.Schema,
+                methods=[CRUDMethod.INDEX, CRUDMethod.GET],  # Read-only
+            )
 
         Disable specific methods:
-        >>> blueprint = CRUDBlueprint(
-        ...     'products', __name__,
-        ...     model=Product,
-        ...     schema=Product.Schema,
-        ...     skip_methods=[CRUDMethod.DELETE]  # All except delete
-        ... )
+
+        .. code-block:: python
+
+            blueprint = CRUDBlueprint(
+                "products",
+                __name__,
+                model=Product,
+                schema=Product.Schema,
+                skip_methods=[CRUDMethod.DELETE],  # All except delete
+            )
 
         Advanced configuration (custom schemas, admin-only):
-        >>> blueprint = CRUDBlueprint(
-        ...     'products', __name__,
-        ...     model=Product,
-        ...     schema=Product.Schema,
-        ...     methods={
-        ...         CRUDMethod.POST: {"schema": ProductCreateSchema},
-        ...         CRUDMethod.DELETE: {"admin_only": True},
-        ...         CRUDMethod.PATCH: False,  # Explicitly disable
-        ...     }
-        ... )
+
+        .. code-block:: python
+
+            blueprint = CRUDBlueprint(
+                "products",
+                __name__,
+                model=Product,
+                schema=Product.Schema,
+                methods={
+                    CRUDMethod.POST: {"schema": ProductCreateSchema},
+                    CRUDMethod.DELETE: {"admin_only": True},
+                    CRUDMethod.PATCH: False,  # Explicitly disable
+                },
+            )
     """
 
     _db_session: Session | scoped_session[Session]

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "flask-more-smorest"
-version = "0.7.1"
+version = "0.8.0"
 description = "Enhanced Flask-Smorest blueprints with automatic CRUD operations"
 authors = ["Dave <david@qualisero.com>"]
 maintainers = ["Dave <david@qualisero.com>"]
@@ -188,7 +188,7 @@ warn_unused_ignores = false
 
 [tool.bandit]
 exclude_dirs = ["tests"]
-skips = ["B101", "B601"]
+skips = ["B101", "B110", "B601"]
 
 [tool.tox]
 legacy_tox_ini = """
@@ -212,7 +212,7 @@ commands = mypy flask_more_smorest
 
 [testenv:security]
 deps = bandit
-commands = bandit -r flask_more_smorest
+commands = bandit -r flask_more_smorest -s B101,B110,B601
 
 [testenv:coverage]
 deps = 

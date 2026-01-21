@@ -1,23 +1,17 @@
 Permissions System
 ==================
 
-Flask-More-Smorest provides a powerful permissions system based on ``BasePermsModel`` that integrates seamlessly with CRUD operations.
+Flask-More-Smorest provides a permissions system via ``BasePermsModel`` that integrates with CRUD operations.
 
 Overview
 --------
 
-The permissions system allows you to:
-
-- Control who can read, write, create, and delete resources
-- Implement custom permission logic via hooks
-- Use pre-built mixins for common patterns (user ownership, role-based access)
-- Return 404 instead of 403 for unauthorized access (security by obscurity)
-- Bypass permissions when needed (e.g., for system operations)
+Control who can read, write, create, and delete resources by overriding permission hooks.
 
 BasePermsModel
 --------------
 
-``BasePermsModel`` extends ``BaseModel`` with permission checking:
+Extends ``BaseModel`` with permission checking:
 
 .. code-block:: python
 
@@ -25,34 +19,30 @@ BasePermsModel
    from flask_more_smorest.sqla import db
    from sqlalchemy.orm import Mapped, mapped_column
 
-   class Critter(BasePermsModel):
-       # Table name automatically set to "critter"
-       
-       name: Mapped[str] = mapped_column(db.String(100), nullable=False)
-       species: Mapped[str] = mapped_column(db.String(50), nullable=False)
-       is_adoptable: Mapped[bool] = mapped_column(db.Boolean, default=True)
+   class Article(BasePermsModel):
+       title: Mapped[str] = mapped_column(db.String(100))
+       content: Mapped[str] = mapped_column(db.Text)
 
-       def _can_write(self) -> bool:
-           """Custom write permission logic"""
-           return self.is_current_user_admin()
+       def _can_write(self, current_user) -> bool:
+           """Only owner or admin can write."""
+           if not current_user:
+               return False
+           return self.user_id == current_user.id or current_user.is_admin
 
-       def _can_read(self) -> bool:
-           """Custom read permission logic"""
-           # Anyone can read adoptable critters
-           if self.is_adoptable:
+       def _can_read(self, current_user) -> bool:
+           """Anyone can read public articles."""
+           if self.is_public:
                return True
-           # Only admin can see non-adoptable ones
-           return self.is_current_user_admin()
+           return self.user_id == current_user.id if current_user else False
 
 Permission Hooks
 ----------------
 
-Override these methods to implement custom permission logic:
+Override these methods to implement custom permissions. The ``current_user`` parameter contains the authenticated user or ``None``.
 
-- ``_can_read() -> bool``: Called when reading a resource
-- ``_can_write() -> bool``: Called when updating a resource
-- ``_can_create() -> bool``: Called when creating a resource (class method)
-- ``_can_delete() -> bool``: Called when deleting a resource
+- ``_can_read(self, current_user) -> bool``: Called when reading a resource
+- ``_can_write(self, current_user) -> bool``: Called when updating a resource
+- ``_can_create(self, current_user) -> bool``: Called when creating a resource (class method)
 
 Public API methods that enforce permissions:
 
@@ -60,255 +50,123 @@ Public API methods that enforce permissions:
 - ``can_write() -> bool``: Check if current user can write to this resource
 - ``can_create() -> bool``: Check if current user can create resources (class method)
 - ``get_by(**filters) -> Self | None``: Get resource with permission check
-- ``get_by_or_404(**filters) -> Self``: Get resource or return 404 if not found or no permission
 
 Return 404 vs 403
 -----------------
 
-By default, when a user doesn't have permission to access a resource, a 404 is returned instead of 403. This prevents information leakage (security by obscurity).
+By default, when a user lacks permission, a 404 is returned instead of 403. This prevents information leakage.
 
-You can control this behavior:
+Configure this behavior:
 
 .. code-block:: python
 
-   from flask import Flask
-   
-   app = Flask(__name__)
    app.config["RETURN_404_ON_ACCESS_DENIED"] = True  # Default
-   # Or set to False to return 403
-
-You can also override this per-request:
-
-.. code-block:: python
-
-   from flask import request
-   
-   # In your view or blueprint
-   request.environ["RETURN_404_ON_ACCESS_DENIED"] = False
 
 Permission Mixins
 -----------------
 
-Flask-More-Smorest includes several pre-built mixins for common permission patterns:
-
 HasUserMixin
-^^^^^^^^^^^^
+~~~~~~~~~~~~
 
-Adds a ``user_id`` foreign key and ``user`` relationship:
+Adds ``user_id`` foreign key and ``user`` relationship:
 
 .. code-block:: python
 
    from flask_more_smorest.perms import BasePermsModel, HasUserMixin
 
-   class Critter(HasUserMixin, BasePermsModel):
-       # Table name automatically set to "critter"
-       
-       name: Mapped[str] = mapped_column(db.String(100))
-       species: Mapped[str] = mapped_column(db.String(50))
+   class Comment(HasUserMixin, BasePermsModel):
+       content: Mapped[str] = mapped_column(db.Text)
        # user_id and user relationship automatically added
 
 UserOwnershipMixin
-^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~
 
-Unified mixin for user-owned resources with two configurable modes:
+Unified mixin with two configurable modes:
 
-**Simple Ownership Mode** (default, ``__delegate_to_user__ = False``):
-
-.. code-block:: python
-
-   from flask_more_smorest.perms import BasePermsModel, UserOwnershipMixin
-
-   class Toy(UserOwnershipMixin, BasePermsModel):
-       # Uses default: __delegate_to_user__ = False
-       
-       name: Mapped[str] = mapped_column(db.String(100))
-       color: Mapped[str] = mapped_column(db.String(50))
-       # Users can read/write only their own toys (simple user_id check)
-       # Admins can access all toys (admin bypass in BasePermsModel)
-
-**Implementation**: Checks if ``user_id == current_user_id``
-
-**Use for**: Simple user-owned resources (toys, notes, posts, comments)
-
-**Delegated Permissions Mode** (``__delegate_to_user__ = True``):
+**Simple Ownership** (default, ``__delegate_to_user__ = False``):
 
 .. code-block:: python
 
-   from flask_more_smorest.perms import (
-       BasePermsModel, 
-       HasUserMixin, 
-       UserOwnershipMixin
-   )
+   class Note(UserOwnershipMixin, BasePermsModel):
+       title: Mapped[str] = mapped_column(db.String(100))
+       # Users can read/write only their own notes
+       # Admins can access all notes
 
-   class Token(HasUserMixin, UserOwnershipMixin, BasePermsModel):
+**Implementation**: Checks if ``user_id == current_user.id``
+
+**Delegated Permissions** (``__delegate_to_user__ = True``):
+
+.. code-block:: python
+
+   class Token(UserOwnershipMixin, BasePermsModel):
        __delegate_to_user__ = True
-       
        token: Mapped[str] = mapped_column(db.String(500))
        # Delegates to user's _can_write() and _can_read() methods
-       # If user has custom permission logic, resource inherits it
-       # Admins can access all tokens (admin bypass in BasePermsModel)
 
-**Implementation**: Calls ``self.user._can_write()`` to delegate to user's permissions
-
-**Use for**: Resources that extend the user (tokens, settings, API keys)
+**Implementation**: Calls ``self.user._can_write(current_user)`` to delegate to user's permissions
 
 .. note::
 
-   **Configuration Options**:
-   
-   - ``__delegate_to_user__``: Set to ``True`` for delegated permissions, ``False`` for simple ownership (default: ``False``)
-   - ``__user_id_nullable__``: Set to ``True`` to allow nullable user_id (default: ``False``)
-   
-   Both modes benefit from the **admin bypass** built into ``BasePermsModel``, 
-   so admins can access all resources regardless of ownership.
-
-Combining Mixins
-^^^^^^^^^^^^^^^^
-
-You can combine multiple mixins:
-
-.. code-block:: python
-
-   from flask_more_smorest.perms import (
-       BasePermsModel,
-       HasUserMixin,
-       UserOwnershipMixin,
-       ProfileMixin,
-   )
-
-   class UserProfile(
-       HasUserMixin, 
-       UserOwnershipMixin, 
-       ProfileMixin, 
-       BasePermsModel
-   ):
-       __delegate_to_user__ = True  # Inherit user's permissions
-       
-       bio: Mapped[str] = mapped_column(db.Text, nullable=True)
-       # Has user relationship, delegated permissions, and profile fields
+   Both modes benefit from **admin bypass** in ``BasePermsModel``,
+   so admins can access all resources.
 
 Bypassing Permissions
 ---------------------
 
-Sometimes you need to bypass permissions (e.g., system operations, migrations):
-
 Context Manager
-^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   from flask_more_smorest.perms import bypass_perms
+   with Article.bypass_perms():
+       article.delete()  # No permission check
 
-   with bypass_perms():
-       # All permission checks are disabled in this block
-       user = User.get_by(email="system@example.com")
-       user.update(is_enabled=False)
-
-Decorator
-^^^^^^^^^
+Per-Instance
+~~~~~~~~~~~~
 
 .. code-block:: python
 
-   from flask_more_smorest.perms import bypass_perms
+   article.perms_disabled = True
+   article.delete()  # No permission check
 
-   @bypass_perms()
-   def system_cleanup():
-       # Permissions disabled for this entire function
-       inactive_users = User.query.filter_by(is_enabled=False).all()
-       for user in inactive_users:
-           user.delete()
+Integration with CRUD
+---------------------
 
-Instance Attribute
-^^^^^^^^^^^^^^^^^^
-
-.. code-block:: python
-
-   user = User.get_by(id=some_id)
-   user.perms_disabled = True
-   # Now all operations on this specific instance bypass permissions
-   user.update(some_field="value")
-
-Helper Methods
---------------
-
-Permission Models provide several helper methods:
-
-.. code-block:: python
-
-   from flask_more_smorest.perms.user_models import get_current_user_id
-
-   # Check if current user is admin
-   if critter.is_current_user_admin():
-       # Do admin stuff
-       pass
-
-   # Check if current user is the owner (for HasUserMixin models)
-   if critter.user_id == get_current_user_id():
-       # User owns this resource
-       pass
-
-   # Get current user from JWT (Flask-JWT-Extended proxy)
-   from flask_more_smorest.perms import get_current_user
-   user = get_current_user()  # Safely loads from JWT
-
-Using Your Own User Model
---------------------------
-
-If your application already has its own User model or authentication system, you can configure flask-more-smorest to use it instead of the built-in user models. This avoids SQLAlchemy table name conflicts and integrates seamlessly with your existing auth system.
-
-Quick Example
-^^^^^^^^^^^^^
-
-.. code-block:: python
-
-   from flask_more_smorest.perms import register_get_current_user, register_get_current_user_id
-   from my_app.auth import get_my_current_user, get_my_current_user_id
-   
-   # Register your custom user context functions
-   register_get_current_user(get_my_current_user)
-   register_get_current_user_id(get_my_current_user_id)
-   
-   # Now all permission checks use your User model
-
-.. seealso::
-
-   :doc:`custom-user-context`
-      Complete guide with configuration options, multiple integration examples 
-      (Flask-Login, JWT, OAuth), best practices, and troubleshooting.
-
-Integration with CRUD Blueprints
----------------------------------
-
-CRUD Blueprints automatically enforce permissions:
+CRUDBlueprint automatically enforces permissions:
 
 .. code-block:: python
 
    from flask_more_smorest.perms import CRUDBlueprint
 
-   # All operations will enforce permissions
-   critters = CRUDBlueprint(
-       "critters",
-       __name__,
-       model="Critter",  # Must be a BasePermsModel subclass
-       schema="ArticleSchema",
-   )
-
-   # You can mark specific operations as admin-only
    articles = CRUDBlueprint(
        "articles",
        __name__,
-       model="Article",
-       schema="ArticleSchema",
+       model=Article,
+       schema=Article.Schema,
+   )
+
+   # All operations enforce Article's permission methods
+
+Configure route-level options:
+
+.. code-block:: python
+
+   from flask_more_smorest.perms import CRUDBlueprint, MethodConfig
+
+   articles = CRUDBlueprint(
+       "articles",
+       __name__,
+       model=Article,
+       schema=Article.Schema,
        methods={
-           CRUDMethod.DELETE: {"admin_only": True},
+           CRUDMethod.INDEX: MethodConfig(public=True),  # No auth required
+           CRUDMethod.DELETE: MethodConfig(admin_only=True),  # Admins only
        },
    )
 
 Example: Blog with Permissions
 -------------------------------
 
-Here's a complete example of a blog with permission controls:
-
 .. code-block:: python
 
    from flask_more_smorest.perms import (
@@ -316,59 +174,33 @@ Here's a complete example of a blog with permission controls:
        HasUserMixin,
        UserOwnershipMixin,
    )
-   from flask_more_smorest.sqla import db
-   from sqlalchemy.orm import Mapped, mapped_column
 
-   class Critter(HasUserMixin, BasePermsModel):
-       # Table name automatically set to "critter"
+   class Article(HasUserMixin, BasePermsModel):
+       title: Mapped[str] = mapped_column(db.String(100))
+       content: Mapped[str] = mapped_column(db.Text)
+       is_published: Mapped[bool] = mapped_column(db.Boolean, default=False)
 
-       name: Mapped[str] = mapped_column(db.String(100), nullable=False)
-       species: Mapped[str] = mapped_column(db.String(50), nullable=False)
-       is_adoptable: Mapped[bool] = mapped_column(db.Boolean, default=True)
-
-       def _can_read(self) -> bool:
-           from flask_more_smorest.perms.user_models import get_current_user_id
-           
-           # Anyone can read adoptable critters
-           if self.is_adoptable:
+       def _can_read(self, current_user) -> bool:
+           # Published articles: anyone can read
+           if self.is_published:
                return True
-           # Owners and admins can see non-adoptable ones
-           return self.user_id == get_current_user_id() or self.is_current_user_admin()
+           # Drafts: only owner or admin
+           if not current_user:
+               return False
+           return self.user_id == current_user.id or current_user.is_admin
 
-       def _can_write(self) -> bool:
-           from flask_more_smorest.perms.user_models import get_current_user_id
-           
-           # Only owner or admin can edit
-           return self.user_id == get_current_user_id() or self.is_current_user_admin()
+       def _can_write(self, current_user) -> bool:
+           # Only owner or admin can write
+           if not current_user:
+               return False
+           return self.user_id == current_user.id or current_user.is_admin
 
-       def _can_delete(self) -> bool:
+       def _can_delete(self, current_user) -> bool:
            # Only admin can delete
-           return self.is_current_user_admin()
-
-       @classmethod
-       def _can_create(cls) -> bool:
-           # Any authenticated user can create critters
-           from flask_more_smorest.perms import get_current_user
-           return get_current_user() is not None
+           return current_user is not None and current_user.is_admin
 
 
-   class Toy(HasUserMixin, UserOwnershipMixin, BasePermsModel):
-       # Table name automatically set to "toy"
-       # Uses default: __delegate_to_user__ = False (simple ownership)
-
-       critter_id: Mapped[uuid.UUID] = mapped_column(
-           db.ForeignKey("critter.id"), nullable=False
-       )
-       name: Mapped[str] = mapped_column(db.String(100), nullable=False)
-       color: Mapped[str] = mapped_column(db.String(50))
-
-       # UserOwnershipMixin provides:
-       # - Users can only read/write their own toys
-       # - Admins can access all toys
-
-Next Steps
-----------
-
-- See :doc:`user-models` for authentication and user management
-- Check :doc:`crud` for integrating permissions with CRUD operations
-- Review the :doc:`api` reference for detailed method signatures
+   class Comment(UserOwnershipMixin, BasePermsModel):
+       article_id: Mapped[uuid.UUID] = mapped_column(db.ForeignKey("article.id"))
+       content: Mapped[str] = mapped_column(db.Text)
+       # UserOwnershipMixin provides: users can only read/write their own comments

@@ -4,62 +4,25 @@ This module tests that the User model and related tables (UserRole, Token, Domai
 are created with the correct columns, foreign keys, and relationships.
 """
 
-from collections.abc import Iterator
-
 import pytest
-from flask import Flask
-from sqlalchemy.orm import scoped_session
+from sqlalchemy import inspect
 
 from flask_more_smorest import Api
 from flask_more_smorest.sqla import db
 
 
 @pytest.fixture
-def test_app() -> Flask:
-    """Create a test Flask app with User model."""
-    from flask import Flask
-
-    from flask_more_smorest import init_db, init_jwt
-
-    app = Flask(__name__)
-    app.config.update(
-        TESTING=True,
-        SQLALCHEMY_DATABASE_URI="sqlite:///:memory:",
-        SECRET_KEY="test-secret-key",
-        JWT_SECRET_KEY="test-jwt-secret-key",
-        API_TITLE="Test API",
-        API_VERSION="v1",
-        OPENAPI_VERSION="3.0.2",
-    )
-
-    init_db(app)
-    init_jwt(app)
-
-    return app
+def api(unit_api: Api) -> Api:
+    """Return the API fixture for type compatibility."""
+    return unit_api
 
 
-@pytest.fixture
-def db_session(test_app: Flask) -> Iterator["scoped_session"]:
-    """Create a database session for tests."""
-    with test_app.app_context():
-        db.create_all()
-        yield db.session
-        db.session.remove()
-        db.drop_all()
-
-
-@pytest.fixture
-def api(test_app: Flask, db_session: "scoped_session") -> Api:
-    """Create an Api instance."""
-    return Api(test_app)
-
-
+@pytest.mark.usefixtures("unit_app", "api", "db_session")
 class TestUserModelSchema:
     """Tests for User model database schema."""
 
-    def test_user_related_tables_created(self, test_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_user_related_tables_created(self, unit_app, api, db_session) -> None:
         """Test that all User-related tables are created."""
-        from sqlalchemy import inspect
 
         # Get inspector
         inspector = inspect(db.engine)
@@ -77,9 +40,8 @@ class TestUserModelSchema:
         for table in expected_tables:
             assert table in table_names, f"Table '{table}' should be created"
 
-    def test_user_table_columns(self, test_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_user_table_columns(self, unit_app, api, db_session) -> None:
         """Test that user table has all expected columns."""
-        from sqlalchemy import inspect
 
         inspector = inspect(db.engine)
         columns = {col["name"] for col in inspector.get_columns("user")}
@@ -96,9 +58,8 @@ class TestUserModelSchema:
         for col in expected_columns:
             assert col in columns, f"Column '{col}' should exist in user table"
 
-    def test_user_role_table_columns(self, test_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_user_role_table_columns(self, unit_app, api, db_session) -> None:
         """Test that user_role table has all expected columns."""
-        from sqlalchemy import inspect
 
         inspector = inspect(db.engine)
         columns = {col["name"] for col in inspector.get_columns("user_role")}
@@ -115,9 +76,8 @@ class TestUserModelSchema:
         for col in expected_columns:
             assert col in columns, f"Column '{col}' should exist in user_role table"
 
-    def test_token_table_columns(self, test_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_token_table_columns(self, unit_app, api, db_session) -> None:
         """Test that token table has all expected columns."""
-        from sqlalchemy import inspect
 
         inspector = inspect(db.engine)
         columns = {col["name"] for col in inspector.get_columns("token")}
@@ -137,9 +97,8 @@ class TestUserModelSchema:
         for col in expected_columns:
             assert col in columns, f"Column '{col}' should exist in token table"
 
-    def test_domain_table_columns(self, test_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_domain_table_columns(self, unit_app, api, db_session) -> None:
         """Test that domain table has all expected columns."""
-        from sqlalchemy import inspect
 
         inspector = inspect(db.engine)
         columns = {col["name"] for col in inspector.get_columns("domain")}
@@ -156,9 +115,8 @@ class TestUserModelSchema:
         for col in expected_columns:
             assert col in columns, f"Column '{col}' should exist in domain table"
 
-    def test_user_setting_table_columns(self, test_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_user_setting_table_columns(self, unit_app, api, db_session) -> None:
         """Test that user_setting table has all expected columns."""
-        from sqlalchemy import inspect
 
         inspector = inspect(db.engine)
         columns = {col["name"] for col in inspector.get_columns("user_setting")}
@@ -175,9 +133,8 @@ class TestUserModelSchema:
         for col in expected_columns:
             assert col in columns, f"Column '{col}' should exist in user_setting table"
 
-    def test_all_created_tables_summary(self, test_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_all_created_tables_summary(self, unit_app, api, db_session) -> None:
         """Test that all core User-related tables are created."""
-        from sqlalchemy import inspect
 
         inspector = inspect(db.engine)
         table_names = set(inspector.get_table_names())
@@ -202,9 +159,8 @@ class TestUserModelSchema:
             expected_user_columns <= user_columns
         ), f"User table should have columns: {expected_user_columns}. Found: {user_columns}"
 
-    def test_foreign_key_relationships(self, test_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_foreign_key_relationships(self, unit_app, api, db_session) -> None:
         """Test that foreign key relationships are properly created."""
-        from sqlalchemy import inspect
 
         inspector = inspect(db.engine)
 

@@ -102,6 +102,7 @@ Documentation Contents
    getting-started
    configuration
    permissions
+   user-extension
    custom-user-context
    crud
    user-models
@@ -115,8 +116,6 @@ Documentation Contents
 .. toctree::
    :maxdepth: 1
    :caption: Additional Resources:
-
-   user-extension-guide
 
 Indices and Tables
 ==================

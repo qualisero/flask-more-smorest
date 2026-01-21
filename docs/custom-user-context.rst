@@ -1,28 +1,11 @@
-Custom User Context
-===================
+Custom User Context Integration
+================================
 
-Flask-More-Smorest provides a pluggable user context system that allows you to integrate your own User models and authentication systems while still leveraging the permission system.
+Advanced integration examples for using external authentication systems with flask-more-smorest's permission system.
 
-.. tip:: **Quick Start**
-
-   Already have a User model? Just register your functions:
-   
-   .. code-block:: python
-   
-      from flask_more_smorest.perms import register_get_current_user, register_get_current_user_id
-      
-      register_get_current_user(my_get_current_user)
-      register_get_current_user_id(my_get_current_user_id)
-   
-   See :ref:`quick-start-custom-user` below for a complete example.
-
-.. seealso::
-
-   :doc:`permissions`
-      Learn about the permission system and how it works with user context.
-   
-   :doc:`user-models`
-      Documentation for the built-in User models (if not using custom context).
+.. tip::
+   Looking to extend the User model? See :doc:`user-extension` for extension patterns.
+   This guide covers integrating with external auth providers.
 
 .. contents:: Table of Contents
    :local:
@@ -34,565 +17,404 @@ When to Use Custom User Context
 Use custom user context when you need to:
 
 - **Integrate with existing apps** - Your application already has User/UserRole models
-- **Avoid table conflicts** - Prevent SQLAlchemy "table already defined" errors
 - **Use external auth** - Integrate with OAuth, SAML, LDAP, or other providers
 - **Support multi-tenant** - Different user models per tenant/organization
+- **Custom authentication** - Use any authentication mechanism (session, token, header, etc.)
 
 .. note::
 
-   Without configuration, flask-more-smorest uses its built-in ``User`` and ``UserRole`` 
-   models (see :doc:`user-models`). The custom user context system allows you to replace 
-   these with your own implementation.
-
-Benefits
-^^^^^^^^
-
-Custom user context provides:
-
-- **Automatic debug info** - User context included in error responses (debug mode only)
-- **Permission integration** - Works seamlessly with :doc:`permissions` system
-- **Flexible configuration** - Use Flask config, global registration, or built-in fallback
-- **Type safety** - ``UserProtocol`` ensures your User model is compatible
-
-.. _quick-start-custom-user:
+   Without configuration, flask-more-smorest uses its built-in JWT-based ``User`` model.
+   The custom user context system allows you to replace this with your own implementation.
 
 Quick Start
 -----------
 
-Minimal configuration using registration functions:
+Register your custom user class (and optionally a custom getter):
 
 .. code-block:: python
 
-   from flask_more_smorest.perms import (
-       register_get_current_user,
-       register_get_current_user_id,
-   )
-   
-   def get_my_user():
-       # Your custom logic to get current user
+   from flask_more_smorest.perms import register_user_class
+
+   def my_get_user():
+       from flask import session
        user_id = session.get('user_id')
        return MyUser.query.get(user_id) if user_id else None
-   
-   def get_my_user_id():
-       # Your custom logic to get current user ID
-       return session.get('user_id')
-   
-   # Register your functions
-   register_get_current_user(get_my_user)
-   register_get_current_user_id(get_my_user_id)
 
-Now all permission checks use your custom user context.
+   # Register - everything else derives from this!
+   register_user_class(MyUser, get_current_user=my_get_user)
 
-Configuration Options
----------------------
+That's it! No classes, no base class, no multiple methods to override.
 
-There are three ways to configure user context, listed in order of precedence 
-(highest to lowest):
+The system automatically provides:
 
-1. Flask Config (Highest Priority)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+- ``get_current_user()`` - Calls your registered function or uses JWT
+- ``get_current_user_id()`` - Extracts ``id`` attribute from your user
+- ``is_current_user_admin()`` - Checks admin role via ``has_role()``
+- ``is_current_user_superadmin()`` - Checks superadmin role via ``has_role()``
+- JWT authentication - Loads instances of your user class (when no custom getter provided)
 
-Configure via Flask application config:
-
-.. code-block:: python
-
-   from flask import Flask
-   
-   app = Flask(__name__)
-   app.config['FMS_GET_CURRENT_USER'] = get_my_user
-   app.config['FMS_GET_CURRENT_USER_ID'] = get_my_user_id
-   app.config['FMS_IS_CURRENT_USER_ADMIN'] = lambda: get_my_user().is_admin
-
-**Pros:**
-
-- Per-application configuration
-- Easy to override in different environments
-- Follows Flask conventions
-
-**Cons:**
-
-- Requires app context
-
-2. Global Registration
-^^^^^^^^^^^^^^^^^^^^^^^
-
-Register functions globally using registration API:
-
-.. code-block:: python
-
-   from flask_more_smorest.perms import (
-       register_get_current_user,
-       register_get_current_user_id,
-       register_is_current_user_admin,
-       register_is_current_user_superadmin,
-   )
-   
-   register_get_current_user(get_my_user)
-   register_get_current_user_id(get_my_user_id)
-   register_is_current_user_admin(lambda: get_my_user().is_admin)
-   register_is_current_user_superadmin(lambda: get_my_user().is_superadmin)
-
-**Pros:**
-
-- Works outside app context
-- Simple, straightforward API
-- Good for single-app projects
-
-**Cons:**
-
-- Global state
-- Cannot differ per application
-
-3. Built-in Fallback (Default)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-If neither config nor registration is set, flask-more-smorest uses its built-in user models 
-(see :doc:`user-models` for details).
-
-.. code-block:: python
-
-   # Automatic fallback to built-in
-   from flask_more_smorest.perms.user_models import (
-       get_current_user,
-       get_current_user_id,
-   )
-
-**Pros:** Zero configuration, works out of the box  
-**Cons:** May conflict with existing User models
-
-.. tip::
-
-   For new projects without existing auth, use the built-in models. 
-   For integration with existing apps, use Flask config or global registration.
-
-User Protocol
+How It Works
 -------------
 
-Your custom User model should conform to ``UserProtocol`` for type safety. This ensures 
-your user objects work correctly with permission models (see :doc:`permissions`).
+The user context system is elegantly simple:
+
+1. **Register** your user class with ``register_user_class()``
+2. **Optionally provide** a custom getter (default: JWT-based)
+3. **All other functions** automatically derive from your registration
+4. **Your user object** just needs an ``id`` attribute and optional ``has_role()`` method
 
 .. code-block:: python
 
-   import uuid
-   from flask_more_smorest.perms import UserProtocol
-   
-   class MyUser:
-       """Custom User model implementing UserProtocol."""
-       
-       def __init__(self, id: uuid.UUID, email: str, is_admin: bool):
-           self.id = id
-           self.email = email
-           self._is_admin = is_admin
-       
-       @property
-       def is_admin(self) -> bool:
-           """Required by UserProtocol."""
-           return self._is_admin
-       
-       @property
-       def is_superadmin(self) -> bool:
-           """Required by UserProtocol."""
-           return self._is_superadmin
-
-**Required Attributes:**
-
-``id: uuid.UUID``
-   Unique user identifier used by permission models
-
-``is_admin: bool``
-   Property indicating admin status (used by ``is_current_user_admin()`` and permission checks)
-
-``is_superadmin: bool``
-   Property indicating superadmin status (used by ``is_current_user_superadmin()`` and permission checks)
-
-**Optional Attributes:**
-
-``roles``
-   If present, roles will be included in error debug context (debug mode only). 
-   Each role should have a ``role`` attribute containing the role name.
-
-.. note::
-
-   ``UserProtocol`` is a :py:class:`typing.Protocol`, so you don't need to explicitly 
-   inherit from it. Any class with matching attributes will be considered conforming.
-
-.. tip::
-
-   In debug mode, user context (including roles if available) is automatically included 
-   in API error responses for easier debugging. This works with both built-in and custom 
-   User models via the configurable user context system.
-
-Integration Examples
---------------------
-
-The following examples show how to integrate custom user context with popular 
-authentication libraries. After configuration, all permission checks in 
-:doc:`permissions` will use your custom user context.
-
-Example 1: Flask-Login Integration
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. code-block:: python
-
-   from flask import Flask
-   from flask_login import LoginManager, current_user
-   from flask_sqlalchemy import SQLAlchemy
    from flask_more_smorest.perms import (
-       register_get_current_user,
-       register_get_current_user_id,
+       register_user_class,
+       get_current_user,
+       get_current_user_id,
+       is_current_user_admin,
+       is_current_user_superadmin,
    )
-   
-   app = Flask(__name__)
-   db = SQLAlchemy(app)
-   login_manager = LoginManager(app)
-   
-   # Your existing User model
-   class User(db.Model):
-       id = db.Column(db.String(36), primary_key=True)
-       email = db.Column(db.String(255), unique=True)
-       is_admin = db.Column(db.Boolean, default=False)
-   
-   @login_manager.user_loader
-   def load_user(user_id):
-       return User.query.get(user_id)
-   
-   # Configure flask-more-smorest to use Flask-Login
-   register_get_current_user(lambda: current_user if current_user.is_authenticated else None)
-   register_get_current_user_id(lambda: current_user.id if current_user.is_authenticated else None)
 
-Example 2: JWT with Custom Claims
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   def my_get_user():
+       # Your custom logic to retrieve user
+       user_id = request.headers.get('X-User-ID')
+       return MyUser.query.get(user_id) if user_id else None
 
-Use custom JWT claims for user context:
+   register_user_class(MyUser, get_current_user=my_get_user)
+
+   # Now you can use:
+   user = get_current_user()          # Calls my_get_user()
+   user_id = get_current_user_id()    # Extracts user.id
+   admin = is_current_user_admin()    # Checks user.has_role('admin')
+   superadmin = is_current_user_superadmin()  # Checks user.has_role('superadmin')
+
+Flask-Login Integration
+-------------------------
+
+Integrate with Flask-Login's session-based authentication:
 
 .. code-block:: python
 
-   from flask import Flask
-   from flask_jwt_extended import JWTManager, get_jwt_identity, get_jwt
-   from flask_more_smorest.perms import (
-       register_get_current_user,
-       register_get_current_user_id,
-       register_is_current_user_admin,
-   )
-   
-   app = Flask(__name__)
-   jwt = JWTManager(app)
-   
-   # Custom User model (simplified example - replace with your actual User model/ORM)
-   class User:
-       def __init__(self, id, email, is_admin):
-           self.id = id
-           self.email = email
-           self.is_admin = is_admin
-   
-       @staticmethod
-       def get(user_id):
-           # Replace with your actual user lookup logic
-           # e.g., db.session.query(User).get(user_id) or User.query.get(user_id)
-           return User.query.get(user_id)
-   
-   # Add custom claims to JWT
-   @jwt.additional_claims_loader
-   def add_claims_to_jwt(identity):
-       user = User.get(identity)
-       return {
-           'is_admin': user.is_admin,
-           'email': user.email,
-       }
-   
-   # Configure user context
-   def get_current_user():
-       user_id = get_jwt_identity()
-       return User.get(user_id) if user_id else None
-   
-   def get_current_user_id():
-       return get_jwt_identity()
-   
-   def is_current_user_admin():
-       claims = get_jwt()
-       return claims.get('is_admin', False)
-   
-   register_get_current_user(get_current_user)
-   register_get_current_user_id(get_current_user_id)
-   register_is_current_user_admin(is_current_user_admin)
+   from flask_login import current_user
+   from flask_more_smorest.perms import register_user_class
 
-Example 3: OAuth / Third-Party Auth
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   def get_flask_login_user():
+       return current_user if not current_user.is_anonymous else None
 
-Integrate with external authentication providers:
+   register_user_class(MyUser, get_current_user=get_flask_login_user)
+
+   # Now all permission checks use Flask-Login's current_user
+   from flask_more_smorest.perms import is_current_user_admin
+
+   @app.route('/api/admin/dashboard')
+   def admin_dashboard():
+       if is_current_user_admin():
+           return "Admin dashboard"
+       return "Access denied", 403
+
+Benefits:
+
+- Seamless Flask-Login integration
+- Anonymous user handling via ``current_user.is_anonymous``
+- Session-based authentication with all Flask-Login features
+
+Custom JWT Implementation
+-------------------------
+
+If you have a custom JWT implementation:
 
 .. code-block:: python
 
-   from flask import Flask, session
-   from flask_more_smorest.perms import register_get_current_user, register_get_current_user_id
-   
-   app = Flask(__name__)
-   
-   # User data comes from OAuth provider
-   class OAuthUser:
-       def __init__(self, oauth_data):
-           self.id = oauth_data['sub']  # OAuth subject claim
-           self.email = oauth_data['email']
-           self.is_admin = 'admin' in oauth_data.get('roles', [])
-   
-   def get_current_user():
-       oauth_data = session.get('oauth_user')
-       return OAuthUser(oauth_data) if oauth_data else None
-   
-   def get_current_user_id():
-       oauth_data = session.get('oauth_user')
-       return oauth_data.get('sub') if oauth_data else None
-   
-   register_get_current_user(get_current_user)
-   register_get_current_user_id(get_current_user_id)
+   import jwt
+   from flask import request
+   from flask_more_smorest.perms import register_user_class
 
-Example 4: Multi-Tenant with Different User Models
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   def decode_token():
+       token = request.headers.get('Authorization', '').replace('Bearer ', '')
+       try:
+           return jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+       except jwt.InvalidTokenError:
+           return None
+
+   def get_jwt_user():
+       payload = decode_token()
+       if payload:
+           return MyUser.query.get(payload.get('user_id'))
+       return None
+
+   register_user_class(MyUser, get_current_user=get_jwt_user)
+
+OAuth Integration (Google, GitHub, etc.)
+-----------------------------------------
+
+.. code-block:: python
+
+   from authlib.integrations.flask_client import OAuth
+   from flask import session
+   from flask_more_smorest.perms import register_user_class
+
+   oauth = OAuth()
+
+   google = oauth.register(
+       'google',
+       client_id='your-client-id',
+       client_secret='your-client-secret',
+       server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+       client_kwargs={'scope': 'openid email profile'}
+   )
+
+   def get_oauth_user():
+       user_id = session.get('user_id')
+       return MyUser.query.get(user_id) if user_id else None
+
+   register_user_class(MyUser, get_current_user=get_oauth_user)
+
+   # OAuth callback handler
+   @app.route('/auth/google/callback')
+   def google_callback():
+       token = google.authorize_access_token()
+       user_info = google.parse_id_token(token)
+       # Link/create user in your DB
+       user = MyUser.get_or_create_from_oauth(user_info)
+       session['user_id'] = user.id
+       return redirect('/dashboard')
+
+SAML Integration
+----------------
+
+.. code-block:: python
+
+   from flask_saml2 import SP as SAMLSP
+   from flask import session
+   from flask_more_smorest.perms import register_user_class
+
+   saml = SAMLSP(...)
+
+   def get_saml_user():
+       user_id = session.get('user_id')
+       return MyUser.query.get(user_id) if user_id else None
+
+   register_user_class(MyUser, get_current_user=get_saml_user)
+
+   # SAML assertion consumer service
+   @app.route('/saml/acs')
+   def saml_acs():
+       authn_response = saml.parse_authn_request_response(request.form)
+       user = MyUser.get_or_create_from_saml(authn_response)
+       session['user_id'] = user.id
+       return redirect('/dashboard')
+
+LDAP Integration
+----------------
+
+.. code-block:: python
+
+   from flask import session
+   from flask_more_smorest.perms import register_user_class
+   import ldap3
+
+   def get_ldap_user():
+       username = session.get('username')
+       if not username:
+           return None
+
+       # Look up user in LDAP
+       server = ldap3.Server(app.config['LDAP_SERVER'])
+       conn = ldap3.Connection(server, 'uid=' + username + ',ou=users,dc=example,dc=com', password=...)
+
+       if not conn.bind():
+           return None
+
+       # Sync to local DB if needed
+       user = MyUser.get_or_create_from_ldap(username)
+       return user
+
+   register_user_class(MyUser, get_current_user=get_ldap_user)
+
+Multi-Tenant Applications
+-------------------------
 
 Different user models per tenant:
 
 .. code-block:: python
 
-   import uuid
-   
-   from flask import Flask, g
-   from flask_more_smorest.perms import UserProtocol
-   
-   app = Flask(__name__)
-   
-   # Different user models per tenant
-   class TenantAUser:
-       id: uuid.UUID
-       @property
-       def is_admin(self) -> bool:
-           return self.role == 'admin'
-   
-   class TenantBUser:
-       id: uuid.UUID
-       @property
-       def is_admin(self) -> bool:
-           return 'admin' in self.permissions
-   
-   # Use Flask config for per-request resolution
-   def get_current_user():
-       tenant = g.get('tenant')
-       if tenant == 'tenant_a':
-           return TenantAUser.get_current()
-       elif tenant == 'tenant_b':
-           return TenantBUser.get_current()
-       return None
-   
-   app.config['FMS_GET_CURRENT_USER'] = get_current_user
+   from flask import g
+   from flask_more_smorest.perms import register_user_class
 
-.. _testing-custom-user-context:
+   def get_tenant_user_model(tenant_id: str):
+       """Get the User model class for a specific tenant."""
+       module = import_module(f'tenants.{tenant_id}.models')
+       return module.User
 
-Testing Custom User Context
-----------------------------
+   def get_tenant_user():
+       if not hasattr(g, 'tenant_id'):
+           return None
 
-When testing permission models (see :doc:`permissions`), provide mock user context:
+       UserClass = get_tenant_user_model(g.tenant_id)
+       user_id = session.get('user_id')
+       return UserClass.query.get(user_id) if user_id else None
+
+   register_user_class(get_tenant_user_model(g.tenant_id), get_current_user=get_tenant_user)
+
+   # Tenant middleware
+   @app.before_request
+   def set_tenant():
+       g.tenant_id = request.headers.get('X-Tenant-ID', 'default')
+
+Type Safety with UserProtocol
+------------------------------
+
+Use ``UserProtocol`` for runtime type checking:
 
 .. code-block:: python
 
-   import pytest
-   import uuid
-   from flask_more_smorest.perms import register_get_current_user, clear_registrations
-   
-   class MockUser:
-       def __init__(self, id: uuid.UUID, is_admin: bool = False):
-           self.id = id
-           self.is_admin = is_admin
-   
-   @pytest.fixture
-   def mock_admin_user():
-       """Provide a mock admin user for testing."""
-       user = MockUser(id=uuid.uuid4(), is_admin=True)
-       register_get_current_user(lambda: user)
-       yield user
-       clear_registrations()  # Important: clean up after test
-   
-   def test_admin_access(mock_admin_user):
-       # Test uses mock admin user
-       result = some_protected_function()
-       assert result.success
+   from flask_more_smorest.perms import UserProtocol, get_current_user, ROLE_ADMIN, ROLE_SUPERADMIN
+   from typing import runtime_checkable
 
-.. seealso::
+   @runtime_checkable
+   class MyUser(UserProtocol):
+       id: uuid.UUID
+       email: str
 
-   See the **Troubleshooting** section below for common testing issues.
+       def has_role(self, role: str) -> bool:
+           return self.role == role
 
-Best Practices
---------------
+       def list_roles(self) -> list[str]:
+           return [self.role] if self.role else []
 
-1. **Type Safety**
-   
-   Ensure your User model conforms to ``UserProtocol``:
+   # Now runtime checking works
+   user = get_current_user()
+   if isinstance(user, UserProtocol):
+       print(f"User {user.email} is compliant with UserProtocol")
+   else:
+       print("Warning: User model doesn't implement UserProtocol")
 
-   .. code-block:: python
 
-      from flask_more_smorest.perms import UserProtocol
-      
-      # Type checker will verify conformance
-      def get_my_user() -> UserProtocol | None:
-          return MyUser.get_current()
+Custom Role Checking
+--------------------
 
-2. **Error Handling**
-   
-   Handle missing or invalid user gracefully:
+If your custom User model has a different role system:
 
-   .. code-block:: python
+.. code-block:: python
 
-      def get_current_user():
-          try:
-              user_id = get_jwt_identity()
-              return User.query.get(user_id)
-          except Exception as e:
-              logger.error(f"Error getting current user: {e}")
-              return None
+   def get_custom_role_user():
+       # Your custom user retrieval
+       user_id = session.get('user_id')
+       return MyUser.query.get(user_id) if user_id else None
 
-3. **Performance**
-   
-   Cache user lookups to avoid repeated database queries:
+   register_user_class(MyUser, get_current_user=get_custom_role_user)
 
-   .. code-block:: python
+   # Your User model just needs role properties:
+   class MyUser:
+       id: uuid.UUID
+       roles: list[Role]
 
-      from flask import g
-      
-      def get_current_user():
-          if not hasattr(g, 'current_user'):
-              user_id = get_jwt_identity()
-              g.current_user = User.query.get(user_id) if user_id else None
-          return g.current_user
+       @property
+       def is_admin(self) -> bool:
+           # Custom role checking - e.g., multiple admin levels
+           return any(role.level >= 2 for role in self.roles)
 
-4. **Security**
-   
-   Validate user state before returning:
+       @property
+       def is_superadmin(self) -> bool:
+           # Custom superadmin check
+           return any(role.level >= 3 for role in self.roles)
 
-   .. code-block:: python
+User Object Requirements
+------------------------
 
-      def get_current_user():
-          user = _load_user_from_session()
-          if user and not user.is_active:
-              # Don't return disabled users
-              return None
-          return user
+Your user object must have:
+
+**Required:**
+
+- ``id``: Any type (UUID, int, string are all supported)
+
+**Optional (for admin checks):**
+
+- ``is_admin`` property/method: Returns ``True`` if user has admin privileges
+- ``is_superadmin`` property/method: Returns ``True`` if user has superadmin privileges
+
+The system handles:
+
+- **Dict-style access**: ``{'id': uuid.uuid4(), 'is_admin': True}``
+- **Object attribute access**: ``user.id``, ``user.is_admin``
+- **Property access**: ``user.is_admin`` (calls ``@property`` decorated method)
+- **Method access**: ``user.is_admin()`` (calls callable)
+
+Testing with Custom Context
+----------------------------
+
+Clear registration in tests:
+
+.. code-block:: python
+
+   from flask_more_smorest.perms import register_user_class, clear_registration
+
+   def test_with_custom_user():
+       # Register mock user
+       class MockUser:
+           id = 'test-id'
+
+           def has_role(self, role: str) -> bool:
+               return role == 'admin'
+
+           def list_roles(self) -> list[str]:
+               return ['admin']
+
+       register_user_class(MockUser)
+
+       # Test your code
+       user = get_current_user()
+       assert user.id == 'test-id'
+
+       # Clear for next test
+       clear_registration()
+
 
 Troubleshooting
 ---------------
 
-Issue: Permission checks not using custom user
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**User not showing up in error debug context:**
 
-**Problem:** Permissions still use built-in User model.
+- Ensure your registered function returns a user with an ``id`` attribute
+- Verify debug mode is enabled (``app.config['DEBUG'] = True``)
 
-**Solution:** Ensure registration happens before importing permission models:
+**Permission checks failing unexpectedly:**
 
-.. code-block:: python
+- Verify ``is_admin`` and ``is_superadmin`` are accessible as properties on your user object
+- Check that user ID is being returned correctly
+- Ensure request context exists when calling permission methods
 
-   # Do this FIRST
-   from flask_more_smorest.perms import register_get_current_user
-   register_get_current_user(my_func)
-   
-   # Then import models that use permissions
-   from my_app.models import Article
+**"User has no attribute 'is_admin'" error:**
 
-Issue: Table name conflicts
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+- Add ``@property`` decorator to your role-checking methods
+- Ensure default ``False`` return when role not found:
 
-**Problem:** SQLAlchemy raises "Table 'users' is already defined" error.
+  .. code-block:: python
 
-**Solution:** Configure custom user context to avoid flask-more-smorest's built-in User model:
+     @property
+     def is_admin(self) -> bool:
+         return getattr(self, '_is_admin', False)
 
-.. code-block:: python
-
-   register_get_current_user(my_get_user)
-   register_get_current_user_id(my_get_user_id)
-   # Don't import or use flask_more_smorest.perms.user_models.User
-
-Issue: Tests fail with "Working outside request context"
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-**Problem:** Tests fail because user context requires request/app context.
-
-**Solution:** Use test fixtures with proper context or mock user functions 
-(see :ref:`Testing Custom User Context <testing-custom-user-context>` above for examples):
+**Clearing registration for tests:**
 
 .. code-block:: python
 
-   @pytest.fixture
-   def app_context(app):
-       with app.app_context():
-           yield
+   from flask_more_smorest.perms import clear_registration
 
-API Reference
--------------
+   def setup():
+       clear_registration()
 
-.. py:function:: register_get_current_user(func: Callable[[], Any]) -> None
+**Getting the default JWT behavior back:**
 
-   Register a function to get the current user.
-   
-   :param func: Function that returns current user or None
-   :type func: Callable[[], Any]
+.. code-block:: python
 
-.. py:function:: register_get_current_user_id(func: Callable[[], uuid.UUID | None]) -> None
+   from flask_more_smorest.perms import clear_registration
 
-   Register a function to get the current user's ID.
-   
-   :param func: Function that returns current user's UUID or None
-   :type func: Callable[[], uuid.UUID | None]
+   # Revert to built-in JWT authentication
+   clear_registration()
 
-.. py:function:: register_is_current_user_admin(func: Callable[[], bool]) -> None
+.. seealso::
 
-   Register a function to check if current user is admin.
-   
-   :param func: Function that returns True if current user is admin
-   :type func: Callable[[], bool]
+   :doc:`user-extension`
+      Comprehensive guide for extending User models.
 
-.. py:function:: register_is_current_user_superadmin(func: Callable[[], bool]) -> None
-
-   Register a function to check if current user is superadmin.
-   
-   :param func: Function that returns True if current user is superadmin
-   :type func: Callable[[], bool]
-
-.. py:function:: clear_registrations() -> None
-
-   Clear all registered user context functions. Useful for testing.
-
-.. py:class:: UserProtocol
-
-   Protocol defining minimum interface for User objects.
-   
-   .. py:attribute:: id
-      :type: uuid.UUID
-      
-      Unique user identifier.
-   
-   .. py:attribute:: is_admin
-      :type: bool
-      
-      Whether user has admin privileges (must be a property).
-   
-   .. py:attribute:: is_superadmin
-      :type: bool
-      
-      Whether user has superadmin privileges (must be a property).
-
-See Also
---------
-
-Related Documentation
-^^^^^^^^^^^^^^^^^^^^^
-
-:doc:`permissions`
-   Learn how permission models work with custom user context, including 
-   ``BasePermsModel``, permission hooks, and mixins.
-
-:doc:`user-models`
-   Documentation for the built-in User, UserRole, and related models 
-   (used when custom context is not configured).
-
-:doc:`crud`
-   CRUD blueprints automatically enforce permissions using the configured 
-   user context.
-
-:doc:`configuration`
-   Complete Flask configuration reference, including user context config keys.
+   :doc:`permissions`
+      Learn about the permission system and how it works with user context.

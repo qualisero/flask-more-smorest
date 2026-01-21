@@ -1,4 +1,4 @@
-﻿flask\_more\_smorest
+flask\_more\_smorest
 ====================
 
 .. automodule:: flask_more_smorest
@@ -13,5 +13,6 @@
    crud
    error
    perms
+   protocols
    sqla
    utils
