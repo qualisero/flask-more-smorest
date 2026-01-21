@@ -31,6 +31,7 @@ from flask_more_smorest import (
     init_jwt,
 )
 from flask_more_smorest.error import ForbiddenError, UnauthorizedError
+from flask_more_smorest.perms import is_current_user_admin
 
 if TYPE_CHECKING:
     from flask.testing import FlaskClient
@@ -94,7 +95,7 @@ class Article(UserOwnershipMixin, TimestampMixin, BasePermsModel):
     published = db.Column(db.Boolean, default=False)
     view_count = db.Column(db.Integer, default=0)
 
-    def _can_read(self) -> bool:
+    def _can_read(self, current_user) -> bool:
         """Published articles can be read by anyone."""
         return self.published or self.can_write()
 
@@ -111,9 +112,9 @@ class Comment(UserOwnershipMixin, TimestampMixin, BasePermsModel):
     # Relationships - no backref needed for testing
     article = db.relationship(Article, foreign_keys=[article_id])
 
-    def _can_read(self) -> bool:
+    def _can_read(self, current_user) -> bool:
         """Comments are readable if article is readable."""
-        return self.article._can_read() if self.article else True
+        return self.article._can_read(current_user) if self.article else True
 
 
 class Topic(TimestampMixin, BasePermsModel):
@@ -128,9 +129,9 @@ class Topic(TimestampMixin, BasePermsModel):
     # Relationship to articles
     articles = db.relationship("Article", secondary="article_topics", backref="topics")
 
-    def _can_create(self) -> bool:
+    def _can_create(self, current_user) -> bool:
         """Only admins can create topics."""
-        return self.is_current_user_admin()
+        return is_current_user_admin()
 
 
 # Association table for Article-Topic many-to-many relationship
@@ -825,7 +826,7 @@ class TestMaximalFeatureIntegration:
 
         with auth_client.application.test_request_context("/", headers={"Authorization": token}):
             # Now we are "logged in" as test_user
-            assert topic.is_current_user_admin() is False
+            assert is_current_user_admin() is False
 
             with pytest.raises(ForbiddenError):
                 topic.save()

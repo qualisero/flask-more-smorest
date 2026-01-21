@@ -9,22 +9,34 @@ from flask_jwt_extended import create_access_token
 
 from ..crud.crud_blueprint import CRUDMethod, MethodConfig, MethodConfigMapping
 from ..error import UnauthorizedError
+from .perms_blueprint import PermsBlueprint
 
 if TYPE_CHECKING:
     from marshmallow import Schema
 
     from ..sqla.base_model import BaseModel
-    from .user_models import User
+
+from .user_context import UserProtocol
+
+_user_bp: UserBlueprint | None = None
 
 
-def _get_perms_crud_blueprint() -> type:
-    """Get the CRUDBlueprint class from perms module (includes mixins)."""
-    from . import PermsBlueprint
+def _get_default_user_bp() -> UserBlueprint:
+    """Get or create the default user_bp instance."""
+    global _user_bp
+    if _user_bp is None:
+        _user_bp = UserBlueprint()
+    return _user_bp
 
-    return PermsBlueprint
+
+def __getattr__(name: str) -> UserBlueprint:
+    """Lazy attribute access for default user_bp instance."""
+    if name == "user_bp":
+        return _get_default_user_bp()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-class UserBlueprint(_get_perms_crud_blueprint()):  # type: ignore[misc]
+class UserBlueprint(PermsBlueprint):
     """Blueprint for User CRUD operations with authentication endpoints.
 
     This blueprint extends CRUDBlueprint to provide:
@@ -75,7 +87,7 @@ class UserBlueprint(_get_perms_crud_blueprint()):  # type: ignore[misc]
         """Initialize UserBlueprint with default User model and schema."""
         # Set defaults for model and schema
         if model is None:
-            from .user_models import User
+            from .models import User
 
             model = User
 
@@ -125,7 +137,7 @@ class UserBlueprint(_get_perms_crud_blueprint()):  # type: ignore[misc]
 
     def _register_login_endpoint(self) -> None:
         """Register the login endpoint."""
-        from .user_models import User as UserModel
+        from .models import User as UserModel
         from .user_schemas import TokenSchema, UserLoginSchema
 
         @self.public_endpoint
@@ -157,39 +169,16 @@ class UserBlueprint(_get_perms_crud_blueprint()):  # type: ignore[misc]
 
     def _register_current_user_endpoint(self) -> None:
         """Register the current user profile endpoint."""
-
         user_schema_cls: type[Schema] = self._config.schema_cls
 
         @self.route("/me/", methods=["GET"])
         @self.response(HTTPStatus.OK, user_schema_cls)
-        def get_current_user_profile() -> User:
+        def get_current_user_profile() -> UserProtocol:
             """Get current authenticated user's profile."""
-            from .user_models import get_current_user
+            from .user_context import get_current_user
 
             user = get_current_user()
             if not user or not user.id:
                 raise UnauthorizedError("Not authenticated")
 
             return user
-
-
-# Lazy creation of default instance for backward compatibility
-# This avoids importing User model at module level
-_user_bp: UserBlueprint | None = None
-
-
-def _get_default_user_bp() -> UserBlueprint:
-    """Get or create the default user_bp instance."""
-    global _user_bp
-    if _user_bp is None:
-        _user_bp = UserBlueprint()
-    return _user_bp
-
-
-# Make user_bp available as a module attribute via __getattr__ in perms/__init__.py
-# or by accessing this module's __getattr__
-def __getattr__(name: str) -> UserBlueprint:
-    """Lazy attribute access for default user_bp instance."""
-    if name == "user_bp":
-        return _get_default_user_bp()
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

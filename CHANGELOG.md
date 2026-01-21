@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-01-21
+
+### Added
+- **Testing Utilities Module**: Context managers for authenticating as different user types in tests
+  - `as_user()` - run code as a specific user
+  - `as_admin()` - run code as an admin user
+  - `as_superadmin()` - run code as a superadmin user
+  - `as_anonymous()` - run code without authentication
+  - Properly uses bypass_perms() to simulate authenticated state
+- **Protocol Definitions Module**: Centralized protocol definitions for better type safety
+  - `ProtocolResolver` - protocol for resolving registered classes
+  - `UserProtocol` - interface for User-like objects (moved from user_context)
+  - Improves code organization and discoverability
+
+### Changed
+- **BREAKING**: User models module reorganized from flat file to package structure
+  - `flask_more_smorest.perms.user_models` → `flask_more_smorest.perms.models`
+  - New submodules: `role.py`, `setting.py`, `token.py`, `user.py`
+  - All imports remain compatible via package-level __init__.py
+- **BREAKING**: `user_blueprints.py` renamed to `user_blueprint.py` for consistency
+  - Follows singular naming pattern (like `crud_blueprint.py`, `perms_blueprint.py`)
+- **UserBlueprint**: Lazy-loaded `user_bp` singleton moved to `flask_more_smorest.perms` module
+  - Access via `from flask_more_smorest.perms import user_bp`
+  - Provides default pre-configured UserBlueprint instance
+- **Documentation cleanup**: Consolidated and reorganized documentation structure
+  - Migrated docs from Markdown to ReStructuredText for Sphinx consistency
+  - Fixed incorrect API references (e.g., `register_get_current_user` → `register_user_class`)
+  - Removed references to non-existent `HasDomainMixin`
+  - Fixed cross-references and broken links
+  - Updated generated documentation in `docs/_build/`
+- **Code quality**: Added type hints to model imports (e.g., `AdminRole` in models/user.py)
+
+### Fixed
+- File naming inconsistency: `user_blueprints.py` → `user_blueprint.py` for consistency
+- Documentation references to deprecated function names
+- Broken imports and cross-references in documentation
+- Empty `.ralph/` directory and stale `AGENT_DOCS/` references
+- Test naming: `test_multiple_user_blueprints` → `test_multiple_user_blueprint_instances`
+
+### Tests
+- Added 18 unit tests for testing utilities (context managers)
+- All 270 tests pass with new module structure
+
+### Internal
+- Added `.ralph/` to `.gitignore` to exclude Ralph loop state files
+- Cleaned up `AGENT_DOCS/` directory for release
+- Updated git ignore patterns for development artifacts
+
 ## [0.7.1] - 2026-01-13
 
 ### Added
@@ -28,7 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Configurable User Context System**: Pluggable authentication system allowing applications to use custom User models
   - Three-tier resolution: Flask config > global registration > built-in fallback
-  - `register_get_current_user()`, `register_get_current_user_id()`, `register_is_current_user_admin()` functions
+  - `register_user_class()`, `get_current_user()`, `get_current_user_id()`, `is_current_user_admin()` functions
   - `UserProtocol` for type-safe custom User models
   - Flask config options: `FMS_GET_CURRENT_USER`, `FMS_GET_CURRENT_USER_ID`, `FMS_IS_CURRENT_USER_ADMIN`
   - Comprehensive documentation with integration examples (Flask-Login, JWT, OAuth, multi-tenant)

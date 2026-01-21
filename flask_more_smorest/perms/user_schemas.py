@@ -3,7 +3,7 @@
 from marshmallow import fields, pre_load
 
 from ..sqla.base_model import BaseSchema
-from .user_models import User
+from .models import User
 
 
 class UserSchema(User.Schema):

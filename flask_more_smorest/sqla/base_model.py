@@ -11,9 +11,6 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Self, TypeAlias, cast
 
 import sqlalchemy as sa
-from flask import request
-from marshmallow import fields, pre_load
-from marshmallow_sqlalchemy import ModelConverter, SQLAlchemyAutoSchema
 from sqlalchemy.orm import (
     DeclarativeMeta,
     Mapped,
@@ -27,73 +24,9 @@ from sqlalchemy.orm.state import InstanceState
 
 from ..error.exceptions import NotFoundError
 from .database import db
+from .schema import BaseSchema, create_model_schema
 
 PropertyOrColumn: TypeAlias = MapperProperty | sa.Column
-
-
-class BaseSchema(SQLAlchemyAutoSchema):
-    """Base schema for all Marshmallow schemas.
-
-    This schema extends SQLAlchemyAutoSchema with automatic view_args
-    injection for URL parameters and adds an is_writable field for
-    permission checking.
-
-    Attributes:
-        is_writable: Read-only boolean field indicating if current user
-                     can write to the resource
-    """
-
-    is_writable = fields.Boolean(dump_only=True)
-
-    @pre_load
-    def pre_load(self, data: dict[str, str | int | float | bool], **kwargs: Any) -> dict[str, str | int | float | bool]:
-        """Pre-load hook to handle UUID conversion and view_args injection.
-
-        Automatically injects URL parameters from Flask's request.view_args
-        into the data being loaded, allowing schemas to access route parameters.
-
-        Args:
-            data: The input data dictionary
-            **kwargs: Additional keyword arguments from Marshmallow
-
-        Returns:
-            The modified data dictionary with view_args injected
-        """
-
-        if request and (args := request.view_args):
-            for view_arg, val in args.items():
-                if view_arg not in self.fields or self.fields[view_arg].dump_only or data.get(view_arg) is not None:
-                    continue
-                # TODO: Consider restricting automatic injection to fields marked as required.
-                #       This would ensure that only mandatory identifiers (for example, IDs coming
-                #       from the URL path) are populated from view_args, while optional fields
-                #       remain controlled by the client payload. Changing this behavior could
-                #       affect how partial updates are interpreted and may reduce surprising
-                #       cases where non-required fields are implicitly filled from the route.
-                data[view_arg] = val
-
-        return data
-
-
-class BaseModelConverter(ModelConverter):
-    """Model converter for BaseModel-based SQLAlchemy models."""
-
-    def _add_relationship_kwargs(self, kwargs: dict[str, Any], prop: PropertyOrColumn) -> None:
-        """Add keyword arguments to kwargs (in-place) based on the passed in
-        relationship `Property`.
-        Copied and adapted from marshmallow_sqlalchemy.convert.ModelConverter.
-        """
-        required = False
-        allow_none = True
-        for pair in prop.local_remote_pairs:
-            if not pair[0].nullable:
-                if prop.uselist is True or self.DIRECTION_MAPPING[prop.direction.name] is False:
-                    allow_none = False
-                    # Do not make required if a default is provided:
-                    if not pair[0].default and not pair[0].server_default:
-                        required = True
-        # NOTE: always set dump_only to True for relationships (can be overriden in schema)
-        kwargs.update({"allow_none": allow_none, "required": required, "dump_only": True})
 
 
 class BaseModelMeta(DeclarativeMeta):
@@ -107,29 +40,12 @@ class BaseModelMeta(DeclarativeMeta):
     def _set_schema_cls(cls) -> type[BaseSchema]:
         """Dynamically generate the Schema class for the model.
 
+        Uses the create_model_schema utility from the schema module.
+
         Returns:
             The generated schema class for this model
         """
-
-        schema_cls = type(
-            f"{cls.__name__}AutoSchema",
-            (BaseSchema,),
-            {
-                "Meta": type(
-                    "Meta",
-                    (object,),
-                    {
-                        "model": cls,
-                        "include_relationships": True,
-                        "include_fk": True,
-                        "load_instance": True,
-                        "sqla_session": db.session,
-                        "model_converter": BaseModelConverter,
-                        "dump_only": ("id", "created_at", "updated_at"),
-                    },
-                )
-            },
-        )
+        schema_cls = create_model_schema(cls)
         # Cache it so it doesn't regenerate
         cls.Schema = schema_cls
 

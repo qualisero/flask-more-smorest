@@ -14,7 +14,8 @@ flask\_more\_smorest.perms
    base_perms_model
    jwt
    model_mixins
+   models
    perms_blueprint
-   user_blueprints
-   user_models
+   user_blueprint
+   user_context
    user_schemas

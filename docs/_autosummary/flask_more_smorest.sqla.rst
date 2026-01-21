@@ -13,3 +13,4 @@ flask\_more\_smorest.sqla
    base_model
    database
    migrations
+   schema

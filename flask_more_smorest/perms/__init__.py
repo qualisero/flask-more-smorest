@@ -4,7 +4,12 @@ This module provides the permissions system including the Api with auth,
 BasePermsModel with permission checks, user models, and PermsBlueprintMixin.
 """
 
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .user_blueprint import UserBlueprint
 
 from .api import Api
 from .base_perms_model import BasePermsModel
@@ -17,73 +22,49 @@ from .model_mixins import (
     UserOwnershipMixin,
 )
 from .perms_blueprint import PermsBlueprint, PermsBlueprintMixin
-from .user_blueprints import UserBlueprint
+from .user_blueprint import UserBlueprint
 from .user_context import (
+    ROLE_ADMIN,
+    ROLE_SUPERADMIN,
+    AdminRole,
     UserProtocol,
-    register_get_current_user,
-    register_get_current_user_id,
-    register_is_current_user_admin,
-    register_is_current_user_superadmin,
+    clear_registration,
+    get_current_user,
+    get_current_user_id,
+    is_current_user_admin,
+    is_current_user_superadmin,
+    register_user_class,
 )
 
-# Type stubs for lazy-loaded objects
-if TYPE_CHECKING:
-    from flask_smorest import Blueprint as _Blueprint
+_user_bp: UserBlueprint | None = None
 
-    from .user_models import (
-        DefaultUserRole,
-        Domain,
-        Token,
-        User,
-        UserRole,
-        UserSetting,
-        get_current_user,
-        get_current_user_id,
-    )
-    from .user_schemas import UserSchema
 
-    user_bp: _Blueprint
-
-# Lazy imports for models and schemas to avoid premature table creation
-# These are imported on first access via __getattr__
-__all__ = [
-    "Api",
-    "BasePermsModel",
-    "user_bp",
-    "User",
-    "UserRole",
-    "Domain",
-    "Token",
-    "UserSetting",
-    "DefaultUserRole",
-    "UserSchema",
-    "get_current_user",
-    "get_current_user_id",
-    "HasUserMixin",
-    "UserOwnershipMixin",
-    "ProfileMixin",
-    "TimestampMixin",
-    "SoftDeleteMixin",
-    "PermsBlueprintMixin",
-    "PermsBlueprint",
-    "UserBlueprint",
-    "init_jwt",
-    # User context configuration
-    "register_get_current_user",
-    "register_get_current_user_id",
-    "register_is_current_user_admin",
-    "register_is_current_user_superadmin",
-    "UserProtocol",
-]
+def _get_default_user_bp() -> UserBlueprint:
+    """Get or create the default user_bp instance."""
+    global _user_bp
+    if _user_bp is None:
+        _user_bp = UserBlueprint()
+    return _user_bp
 
 
 def __getattr__(name: str) -> object:
-    """Lazy import user models and schemas to avoid premature table creation."""
+    """Lazy attribute access for default user_bp instance and models/schemas."""
     if name == "user_bp":
-        from . import user_blueprints
+        return _get_default_user_bp()
 
-        return user_blueprints.user_bp
+    # Type stubs for lazy-loaded objects
+    if TYPE_CHECKING:
+        from .models import (
+            DefaultUserRole,
+            Domain,
+            Token,
+            User,
+            UserRole,
+            UserSetting,
+        )
+        from .user_schemas import UserSchema
 
+    # Lazy imports for models and schemas to avoid premature table creation
     if name == "UserSchema":
         from .user_schemas import UserSchema
 
@@ -97,18 +78,14 @@ def __getattr__(name: str) -> object:
         "Token",
         "UserSetting",
         "DefaultUserRole",
-        "get_current_user",
-        "get_current_user_id",
     ):
-        from .user_models import (
+        from .models import (
             DefaultUserRole,
             Domain,
             Token,
             User,
             UserRole,
             UserSetting,
-            get_current_user,
-            get_current_user_id,
         )
 
         # Cache the imports
@@ -116,3 +93,37 @@ def __getattr__(name: str) -> object:
         return locals()[name]
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+__all__ = [
+    "Api",
+    "BasePermsModel",
+    "User",
+    "UserRole",
+    "Domain",
+    "Token",
+    "UserSetting",
+    "DefaultUserRole",
+    "UserSchema",
+    "get_current_user",
+    "get_current_user_id",
+    "is_current_user_admin",
+    "is_current_user_superadmin",
+    "HasUserMixin",
+    "UserOwnershipMixin",
+    "ProfileMixin",
+    "TimestampMixin",
+    "SoftDeleteMixin",
+    "PermsBlueprintMixin",
+    "PermsBlueprint",
+    "UserBlueprint",
+    "init_jwt",
+    # User context
+    "UserProtocol",
+    "AdminRole",
+    "ROLE_ADMIN",
+    "ROLE_SUPERADMIN",
+    "register_user_class",
+    "clear_registration",
+    "user_bp",
+]

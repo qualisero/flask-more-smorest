@@ -1,8 +1,4 @@
-"""Base permission-aware model for Flask-More-Smorest.
-
-This module provides BasePermsModel which extends BaseModel with
-permission checking functionality based on the current user context.
-"""
+"""Base permission-aware model for Flask-More-Smorest."""
 
 import logging
 from collections.abc import Callable, Iterator
@@ -22,49 +18,34 @@ logger = logging.getLogger(__name__)
 
 
 class BasePermsModel(SQLABaseModel):
-    """Permission-aware Base model for all models.
-
-    This model extends BaseModel with permission checking based on the
-    current authenticated user. It provides hooks for read, write, and
-    create permission checks that subclasses can override.
+    """Base model with permission checking.
 
     Attributes:
-        perms_disabled: Whether permission checking is disabled (default: False)
+        perms_disabled: Disable permission checks (default: False)
 
     Example:
         >>> class Article(BasePermsModel):
         ...     title: Mapped[str] = mapped_column(sa.String(200))
-        ...
-        ...     def _can_write(self) -> bool:
-        ...         return self.user_id == get_current_user_id()
+        ...     def _can_write(self, current_user) -> bool:
+        ...         return current_user is not None and self.user_id == current_user.id
     """
 
     __abstract__ = True
     perms_disabled = False
 
     def __init__(self, **kwargs: object) -> None:
-        """Initialize the model after checking that all sub fields can be created.
-
-        Args:
-            **kwargs: Field values to initialize the model with
-        """
-
+        """Initialize model after checking sub-fields can be created."""
         self.check_create(kwargs.values())
         super().__init__(**kwargs)
 
     @classmethod
     @contextmanager
     def bypass_perms(cls) -> Iterator[None]:
-        """Context manager to bypass permissions for the class.
-
-        Temporarily disables permission checking for this model class.
-
-        Yields:
-            None
+        """Temporarily disable permission checking for this model class.
 
         Example:
             >>> with Article.bypass_perms():
-            ...     article.delete()  # Deletes without permission check
+            ...     article.delete()  # No permission check
         """
         original = cls.perms_disabled
         cls.perms_disabled = True
@@ -74,22 +55,43 @@ class BasePermsModel(SQLABaseModel):
             cls.perms_disabled = original
 
     def _should_bypass_perms(self) -> bool:
-        """Check if permissions should be bypassed.
+        return self.perms_disabled or not has_request_context()
+
+    def _check_admin_bypass(self) -> bool:
+        """Check if current operation should bypass due to admin privileges.
+
+        Returns True if:
+        - Permissions are disabled (bypass_perms context)
+        - Not in request context
+        - Current user is admin AND target is not admin-protected
 
         Returns:
-            True if permissions are disabled or not in request context
+            True if permission check should be skipped
         """
-        return self.perms_disabled or not has_request_context()
+        if self._should_bypass_perms():
+            return True
+
+        # UserRole has special admin rules
+        if type(self).__name__ == "UserRole":
+            return False
+
+        # Don't auto-allow if target has is_admin=True
+        if getattr(self, "is_admin", False):
+            return False
+
+        from .user_context import is_current_user_admin
+
+        return is_current_user_admin()
 
     def _execute_permission_check(self, check_func: Callable[[], bool], operation: str) -> bool:
         """Execute permission check with consistent error handling.
 
         Args:
-            check_func: Permission check function to execute
-            operation: Name of operation for logging (e.g., 'write', 'read')
+            check_func: Permission check function
+            operation: Operation name for logging
 
         Returns:
-            True if permission check passes, False otherwise
+            True if permission check passes
 
         Raises:
             UnauthorizedError: If user authentication is required
@@ -99,89 +101,88 @@ class BasePermsModel(SQLABaseModel):
         except (exceptions.JWTExtendedException, Unauthorized):
             raise UnauthorizedError("User must be authenticated")
         except RuntimeError as e:
-            # Handle "Working outside of request context" errors
             if not has_request_context():
                 raise UnauthorizedError("User must be authenticated")
             raise e
 
     def can_write(self) -> bool:
-        """Does current user have write permission on object.
-
-        Returns:
-            True if user can write, False otherwise
-        """
-        if self._should_bypass_perms():
+        """Check if current user has write permission."""
+        if self._check_admin_bypass():
             return True
 
-        is_admin = getattr(self, "is_admin", False)
-        is_role_instance = type(self).__name__ == "UserRole"
-        if not is_role_instance and not is_admin and self.is_current_user_admin():
-            return True
+        from .user_context import get_current_user
 
+        current_user = get_current_user()
         if getattr(sa.inspect(self), "transient", False):
-            return self._execute_permission_check(self._can_create, "create")
-        return self._execute_permission_check(self._can_write, "write")
+            return self._execute_permission_check(lambda: self._can_create(current_user), "create")
+        return self._execute_permission_check(lambda: self._can_write(current_user), "write")
 
     def can_read(self) -> bool:
-        """Does current user have read permissions on object.
-
-        Returns:
-            True if user can read, False otherwise
-        """
-        if self._should_bypass_perms():
+        """Check if current user has read permission."""
+        if self._check_admin_bypass():
             return True
 
-        if self.id is None or self.is_current_user_admin():
-            return True
+        if self.id is None:
+            return True  # type: ignore[unreachable]  # mypy false positive
 
-        return self._execute_permission_check(self._can_read, "read")
+        from .user_context import get_current_user
+
+        current_user = get_current_user()
+        return self._execute_permission_check(lambda: self._can_read(current_user), "read")
 
     def can_create(self) -> bool:
-        """Can current user create object.
+        """Check if current user can create objects."""
+        if self._check_admin_bypass():
+            return True
+
+        from .user_context import get_current_user
+
+        current_user = get_current_user()
+        return self._can_create(current_user)
+
+    def _can_write(self, current_user: Any) -> bool:
+        """Override in subclasses to implement custom write permission.
+
+        Args:
+            current_user: Current authenticated user, or None
 
         Returns:
-            True if user can create, False otherwise
-        """
-
-        if self.perms_disabled:
-            return True
-        if not has_request_context():
-            return True
-        is_admin = getattr(self, "is_admin", False)
-        is_role_instance = type(self).__name__ == "UserRole"
-        if not is_role_instance and not is_admin and self.is_current_user_admin():
-            return True
-
-        return self._can_create()
-
-    def _can_write(self) -> bool:
-        """Permission helper: override in subclasses.
-
-        Returns:
-            False (deny by default, must be explicitly allowed in subclasses)
+            False (deny by default)
         """
         return False
 
-    def _can_create(self) -> bool:
-        """Permission helper: override in subclasses.
+    def _can_create(self, current_user: Any) -> bool:
+        """Override in subclasses to implement custom create permission.
+
+        Args:
+            current_user: Current authenticated user, or None
 
         Returns:
-            True (allow creation by default)
+            True (allow by default)
         """
-        return True  # adding new records is allowed by default
+        return True
 
-    def _can_read(self) -> bool:
-        """Permission helper: override in subclasses.
+    def _can_read(self, current_user: Any) -> bool:
+        """Override in subclasses to implement custom read permission.
+
+        Args:
+            current_user: Current authenticated user, or None
 
         Returns:
             Same as _can_write() by default
         """
-        return self._can_write()
+        return self._can_write(current_user)
 
     def _check_permission(self, operation: str) -> None:
-        """Ensure permissions exist before mutating the resource.
+        """Ensure permissions exist before mutating resource.
 
-        Logs permission denials at WARNING level for debugging access issues.
+        Logs permission denials at WARNING level for debugging.
+
+        Args:
+            operation: Operation type ('write', 'create', 'delete')
+
+        Raises:
+            ForbiddenError: If user doesn't have permission
         """
         from .user_context import get_current_user_id
 
@@ -192,16 +193,55 @@ class BasePermsModel(SQLABaseModel):
         }
         check_method, action = permission_methods[operation]
         if not check_method():
-            # Log permission denial for debugging
             user_id = get_current_user_id()
+
+            # Determine the reason for permission failure
+            reason = self._get_permission_failure_reason(operation)
+
             logger.warning(
-                "Permission denied: user %s cannot %s %s (id=%s)",
+                "Permission denied: user %s cannot %s %s (id=%s): %s",
                 user_id,
                 action,
                 self.__class__.__name__,
                 self.id,
+                reason or "permission denied",
             )
-            raise ForbiddenError(f"User not allowed to {action} this resource: {self}")
+
+            raise ForbiddenError(
+                operation=action,
+                resource_type=self.__class__.__name__,
+                resource_id=self.id,
+                reason=reason,
+                user_id=str(user_id) if user_id else None,
+            )
+
+    def _get_permission_failure_reason(self, operation: str) -> str | None:
+        """Determine the reason for permission failure.
+
+        Override in subclasses to provide specific failure reasons.
+
+        Args:
+            operation: Operation type ('write', 'create', 'delete')
+
+        Returns:
+            Human-readable reason string, or None for generic denial
+
+        Example:
+            >>> def _get_permission_failure_reason(self, operation: str) -> str | None:
+            ...     from .user_context import get_current_user
+            ...     current_user = get_current_user()
+            ...     if current_user is None:
+            ...         return "not authenticated"
+            ...     if operation == "write" and self.published:
+            ...         return "cannot modify published articles"
+            ...     return None
+        """
+        from .user_context import get_current_user
+
+        current_user = get_current_user()
+        if current_user is None:
+            return "not authenticated"
+        return None  # Generic "permission denied"
 
     def save(self, commit: bool = True) -> Self:
         """Extend BaseModel save with permission checks."""
@@ -221,16 +261,12 @@ class BasePermsModel(SQLABaseModel):
     def get_by(cls, **kwargs: Any) -> Self | None:
         """Get resource by field values with permission check.
 
-        Behavior:
-            * If no resource is found, returns ``None``.
-            * If a resource is found and ``can_read()`` returns ``True``, the
-              instance is returned.
-            * If a resource is found but ``can_read()`` returns ``False``:
-
-              - If ``current_app.config['RETURN_404_ON_ACCESS_DENIED']`` is
-                truthy, this behaves as if the resource does not exist and
-                returns ``None``.
-              - Otherwise, a :class:`ForbiddenError` is raised.
+        Returns:
+            Instance if found and can_read() is True
+            None if not found
+            None if found but can_read() is False and RETURN_404_ON_ACCESS_DENIED is True
+        Raises:
+            ForbiddenError: If found but can_read() is False
         """
         from flask import current_app
 
@@ -242,69 +278,16 @@ class BasePermsModel(SQLABaseModel):
             return res
 
         if current_app and current_app.config.get("RETURN_404_ON_ACCESS_DENIED"):
-            # Pretend the resource does not exist
             return None
 
         raise ForbiddenError(f"User not allowed to read resource: {res}")
-
-    @classmethod
-    def is_current_user_admin(cls) -> bool:
-        """Check if current user is an admin.
-
-        Uses the configurable user context system, allowing applications
-        to provide their own admin check logic via:
-        - app.config['FMS_IS_CURRENT_USER_ADMIN']
-        - register_is_current_user_admin()
-
-        Returns:
-            True if current user is admin, False otherwise
-        """
-        from .user_context import is_current_user_admin
-
-        try:
-            return is_current_user_admin()
-        except RuntimeError as exc:
-            logger.debug(
-                "Runtime error during admin check (likely outside request context): %s",
-                exc,
-            )
-            return False
-        except Exception as exc:  # pragma: no cover - defensive guard
-            logger.warning("Unexpected error during admin check: %s", exc, exc_info=True)
-            return False
-
-    @classmethod
-    def is_current_user_superadmin(cls) -> bool:
-        """Check if current user is a superadmin.
-
-        Uses the configurable user context system, allowing applications
-        to provide their own superadmin check logic via:
-        - app.config['FMS_IS_CURRENT_USER_SUPERADMIN']
-        - register_is_current_user_superadmin()
-
-        Returns:
-            True if current user is superadmin, False otherwise
-        """
-        from .user_context import is_current_user_superadmin
-
-        try:
-            return is_current_user_superadmin()
-        except RuntimeError as exc:
-            logger.debug(
-                "Runtime error during superadmin check (likely outside request context): %s",
-                exc,
-            )
-            return False
-        except Exception as exc:  # pragma: no cover - defensive guard
-            logger.warning("Unexpected error during superadmin check: %s", exc, exc_info=True)
-            return False
 
     def check_create(self, val: list | set | tuple | object, _visited: set[int] | None = None) -> None:
         """Recursively check that all BaseModel instances can be created.
 
         Args:
             val: Value or collection of values to check
-            _visited: Internal set of visited object ids to prevent infinite recursion
+            _visited: Internal set of visited object IDs to prevent infinite recursion
 
         Raises:
             ForbiddenError: If any nested object cannot be created
@@ -314,13 +297,12 @@ class BasePermsModel(SQLABaseModel):
 
         obj_id = id(val)
         if obj_id in _visited:
-            # Cycle detected; stop descending further to avoid infinite recursion
             return
         _visited.add(obj_id)
 
         if isinstance(val, BasePermsModel):
             if getattr(sa.inspect(val), "transient", False) and not val.can_create():
                 raise ForbiddenError(f"User not allowed to create resource: {val}")
-        elif isinstance(val, list) or isinstance(val, set) or isinstance(val, tuple):
+        elif isinstance(val, list | set | tuple):
             for x in val:
                 self.check_create(x, _visited=_visited)

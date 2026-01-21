@@ -359,14 +359,14 @@ Multi-Tenant Users:
 
 .. code-block:: python
 
-   from flask_more_smorest.perms import User, HasDomainMixin
+   from flask_more_smorest.perms import User, HasUserMixin
    import uuid
 
-   class TenantUser(HasDomainMixin, User):
+   class TenantUser(HasUserMixin, User):
        # Table name automatically set to "tenant_user"
        
-       # HasDomainMixin adds domain_id and domain relationship
-       # for multi-tenant applications
+       # HasUserMixin adds user_id and user relationship
+       # Customize to support multi-tenant patterns as needed
 
 Profile Mixin
 -------------
@@ -395,48 +395,8 @@ Fields added by ProfileMixin:
 Domain/Multi-Tenancy
 --------------------
 
-Use ``HasDomainMixin`` for multi-tenant applications:
-
-.. code-block:: python
-
-   from flask_more_smorest.perms import (
-       BasePermsModel,
-       HasDomainMixin,
-       User,
-   )
-
-   # Domain model (tenant)
-   class Organization(BasePermsModel):
-       # Table name automatically set to "organization"
-       
-       name: Mapped[str] = mapped_column(db.String(200))
-       slug: Mapped[str] = mapped_column(db.String(100), unique=True)
-
-   # User with domain
-   class OrgUser(HasDomainMixin, User):
-       # Table name automatically set to "org_user"
-       
-       # Automatically adds:
-       # - domain_id: UUID foreign key
-       # - domain: relationship to Organization
-
-   # Resource scoped to domain
-   class OrgDocument(HasDomainMixin, BasePermsModel):
-       # Table name automatically set to "org_document"
-       
-       title: Mapped[str] = mapped_column(db.String(200))
-       # domain_id automatically added
-
-Query by domain:
-
-.. code-block:: python
-
-   # Get users in specific organization
-   org = Organization.get_by(slug="acme-corp")
-   users = OrgUser.query.filter_by(domain_id=org.id).all()
-   
-   # Get documents for organization
-   docs = OrgDocument.query.filter_by(domain_id=org.id).all()
+Multi-tenant patterns are typically implemented using ``Domain`` and ``UserRole`` (roles scoped to domains) or your own mixins.
+See :doc:`custom-user-context` for integrating existing multi-tenant models.
 
 Custom Roles
 ------------

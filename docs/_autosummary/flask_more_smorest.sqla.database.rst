@@ -1,4 +1,4 @@
-﻿flask\_more\_smorest.sqla.database
+flask\_more\_smorest.sqla.database
 ==================================
 
 .. automodule:: flask_more_smorest.sqla.database

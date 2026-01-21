@@ -1,8 +1,4 @@
-"""Model mixins for extending User models with common functionality.
-
-This module provides reusable mixins for adding common fields and
-functionality to User models and other models in Flask-More-Smorest.
-"""
+"""Reusable mixins for User models and other models in Flask-More-Smorest."""
 
 import datetime as dt
 import uuid
@@ -15,46 +11,26 @@ from sqlalchemy.orm import Mapped, backref, mapped_column, relationship, synonym
 from flask_more_smorest.error.exceptions import ForbiddenError
 
 if TYPE_CHECKING:
-    from .user_models import User
+    from .models.user import User
 
 
 class HasUserMixin:
-    """Mixin to add user ID foreign key to a model.
+    """Adds user_id foreign key and user relationship to a model.
 
-    Adds a user_id field and user relationship to track which user
-    owns or created the model instance.
+    Configuration:
+        - ``__user_field_name__``: Custom alias for user_id (default: "user_id")
+        - ``__user_relationship_name__``: Custom alias for user (default: "user")
+        - ``__user_id_nullable__``: Allow NULL owner IDs (default: False)
+        - ``__user_backref_name__``: Custom backref on User model
+            - ``None`` (default): Auto-generate as ``{tablename}s`` (e.g., "articles")
+            - Custom string: Use specified name
+            - ``""``: Skip backref creation
 
-    The mixin supports optional aliasing/nullable configuration via:
-        - ``__user_field_name__``: custom attribute alias for ``user_id``
-        - ``__user_relationship_name__``: custom alias for ``user``
-        - ``__user_id_nullable__``: allow NULL owner IDs
-        - ``__user_backref_name__``: custom backref name on User model
-
-    Backref Configuration:
-        - ``None`` (default): Auto-generate as ``{tablename}s`` (e.g., "articles")
-        - Custom string: Use specified name (e.g., "my_posts")
-        - Empty string (``""``): Skip backref creation
-
-    Example (Basic):
+    Example:
         >>> class Article(BasePermsModel, HasUserMixin):
-        ...     title: Mapped[str] = mapped_column(sa.String(200))
-        ...
-        >>> # Auto-generated backref: user.articles
-
-    Example (Custom names):
-        >>> class Article(BasePermsModel, HasUserMixin):
-        ...     __user_field_name__ = "author_id"
-        ...     __user_relationship_name__ = "author"
         ...     __user_backref_name__ = "written_articles"
         ...     title: Mapped[str] = mapped_column(sa.String(200))
-        ...
-        >>> article = Article(title="Test", author_id=get_current_user_id())
-        >>> user.written_articles  # Custom backref name
-
-    Example (No backref):
-        >>> class Note(BasePermsModel, HasUserMixin):
-        ...     __user_backref_name__ = ""  # No backref
-        ...     content: Mapped[str] = mapped_column(sa.Text)
+        >>> user.written_articles  # Custom backref
     """
 
     __user_field_name__ = "user_id"
@@ -81,17 +57,10 @@ class HasUserMixin:
 
     @classmethod
     def _user_backref_name(cls) -> str | None:
-        """Get the backref name for the User relationship.
-
-        Returns:
-            Custom backref name if set, or auto-generated from tablename.
-            Returns None if backref should be skipped.
-        """
+        """Get backref name: custom if set, or auto-generated from tablename, or None to skip."""
         custom_name: str | None = getattr(cls, "__user_backref_name__", None)
         if custom_name is not None:
             return custom_name
-
-        # Auto-generate from tablename
         return f"{cls.__tablename__}s"  # type: ignore
 
     @classmethod
@@ -122,7 +91,7 @@ class HasUserMixin:
     @declared_attr
     def user_id(cls) -> Mapped[uuid.UUID | None]:
         """User ID foreign key with optional nullability."""
-        from .user_models import get_current_user_id
+        from .user_context import get_current_user_id
 
         nullable = cls._user_column_nullable()
         default_callable = None if nullable else get_current_user_id
@@ -137,7 +106,7 @@ class HasUserMixin:
     @declared_attr
     def user(cls) -> Mapped["User"]:
         """Relationship to User model."""
-        from .user_models import User
+        from .models.user import User
 
         backref_name = cls._user_backref_name()
 
@@ -160,123 +129,71 @@ class HasUserMixin:
 
 
 class UserOwnershipMixin(HasUserMixin):
-    """Unified mixin for user-owned resources with configurable permission delegation.
+    """User-owned resources with configurable permission delegation.
 
-    This mixin provides user ownership with two modes:
+    Two modes:
 
     1. **Simple Ownership** (default, ``__delegate_to_user__ = False``):
-       - Direct user_id comparison: ``user_id == current_user_id``
-       - Best for: Notes, posts, comments, documents
+       - Compares ``user_id == current_user.id``
+       - Use for: Notes, posts, comments
 
     2. **Delegated Permissions** (``__delegate_to_user__ = True``):
-       - Calls user's permission methods: ``self.user._can_write()``
-       - Best for: Tokens, settings, API keys (resources that extend the user)
-
-    Both modes benefit from the admin bypass built into BasePermsModel.
+       - Calls ``self.user._can_write(current_user)``
+       - Use for: Tokens, settings, API keys
 
     Attributes:
-        __delegate_to_user__: If True, delegate to user's permission methods.
-                             If False (default), use simple user_id comparison.
-        __user_id_nullable__: If False (default), requires owner on creation.
+        __delegate_to_user__: Delegate to user's permission methods (default: False)
+        __user_id_nullable__: Allow NULL owner IDs (default: False)
 
-    Example (Simple Ownership):
-        >>> class Note(UserOwnershipMixin, BasePermsModel):
-        ...     # Uses default: __delegate_to_user__ = False
-        ...     content: Mapped[str] = mapped_column(sa.Text)
-        ...     # Permission: user_id == current_user_id
-
-    Example (Delegated Permissions):
+    Example:
         >>> class Token(UserOwnershipMixin, BasePermsModel):
         ...     __delegate_to_user__ = True
         ...     token: Mapped[str] = mapped_column(sa.String(500))
-        ...     # Permission: delegates to self.user._can_write()
+        >>> # Delegates to user's permission methods
     """
 
     __user_id_nullable__ = False
     __delegate_to_user__ = False
 
-    def _can_write(self) -> bool:
-        """Check if current user can write this resource.
-
-        Returns:
-            True if user can write (based on delegation mode)
-        """
+    def _can_write(self, current_user: Any) -> bool:
         if self.__delegate_to_user__:
-            # Delegate to user's permission method
-            return self.user._can_write()
-        else:
-            # Simple ownership check
-            from .user_models import get_current_user_id
+            return self.user._can_write(current_user)
+        return bool(current_user) and self.user_id == current_user.id
 
-            return self.user_id == get_current_user_id()
-
-    def _can_read(self) -> bool:
-        """Check if current user can read this resource.
-
-        Returns:
-            True if user can read (based on delegation mode)
-        """
+    def _can_read(self, current_user: Any) -> bool:
         if self.__delegate_to_user__:
-            # Delegate to user's permission method (via _can_write)
-            return self._can_write()
-        else:
-            # Simple ownership check
-            from .user_models import get_current_user_id
+            return self._can_write(current_user)
+        return bool(current_user) and self.user_id == current_user.id
 
-            return self.user_id == get_current_user_id()
-
-    def _can_create(self) -> bool:
-        """Check if current user can create this resource.
-
-        Returns:
-            True if user can create (only used in delegation mode)
-        """
+    def _can_create(self, current_user: Any) -> bool:
         if not self.__delegate_to_user__:
-            # Simple mode: use default behavior
             return True
 
-        # Delegation mode: check user's permission
         if self.user_id:
-            from .user_models import User
+            from .models.user import User
 
             try:
                 user = User.get_or_404(self.user_id)
             except ForbiddenError:
                 return False
 
-            return user._can_write()
+            return user._can_write(current_user)
 
-        return self._can_write()
+        return self._can_write(current_user)
 
 
 # Commonly used mixins for extending User models
 class TimestampMixin:
-    """Mixin adding additional timestamp fields.
-
-    Adds last_login_at and email_verified_at fields for tracking
-    user authentication and verification events.
-
-    Example:
-        >>> class CustomUser(User, TimestampMixin):
-        ...     pass
-        >>> user.email_verified_at = dt.datetime.now()
-    """
+    """Adds authentication-related timestamps: last_login_at, email_verified_at."""
 
     last_login_at: Mapped[dt.datetime | None] = mapped_column(sa.DateTime(), nullable=True)
     email_verified_at: Mapped[dt.datetime | None] = mapped_column(sa.DateTime(), nullable=True)
 
 
 class ProfileMixin:
-    """Mixin adding basic profile fields.
+    """Adds profile fields: first_name, last_name, display_name, avatar_url.
 
-    Adds first_name, last_name, display_name, and avatar_url fields
-    for user profile information.
-
-    Example:
-        >>> class CustomUser(User, ProfileMixin):
-        ...     pass
-        >>> print(user.full_name)
-        'John Doe'
+    Property: ``full_name`` returns combined first/last name.
     """
 
     first_name: Mapped[str | None] = mapped_column(sa.String(50), nullable=True)
@@ -297,17 +214,10 @@ class ProfileMixin:
 
 
 class SoftDeleteMixin:
-    """Mixin adding soft delete functionality.
+    """Soft delete with deleted_at timestamp and helper methods.
 
-    Adds deleted_at timestamp and helper methods for soft deleting
-    records (marking as deleted without removing from database).
-
-    Example:
-        >>> class CustomUser(User, SoftDeleteMixin):
-        ...     pass
-        >>> user.soft_delete()
-        >>> print(user.is_deleted)
-        True
+    Methods: ``soft_delete()`` marks as deleted, ``restore()`` clears.
+    Property: ``is_deleted`` returns True if deleted_at is not None.
     """
 
     deleted_at: Mapped[dt.datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)

@@ -88,7 +88,8 @@ class ApiException(Exception):
     # None means use environment detection (debug/testing mode)
     # True/False explicitly enables/disables traceback
     INCLUDE_TRACEBACK: bool | None = None
-    debug_context: dict[str, str | int | bool | dict | None] = {}
+    _debug_context: dict[str, str | int | bool | dict | None] | None = None
+    _debug_context_kwargs: dict[str, str | int | bool | None]
 
     def __init__(
         self,
@@ -102,7 +103,9 @@ class ApiException(Exception):
             **kwargs: Additional context information
         """
         self.custom_args: dict[str, str | int | bool | None] = dict(kwargs)
-        self.debug_context = self.get_debug_context(**kwargs)
+        # Store kwargs for lazy evaluation
+        self._debug_context_kwargs = dict(kwargs)
+        self._debug_context = None  # Will be computed on first access
 
         if message is None:
             if self.MESSAGE_PREFIX:
@@ -118,6 +121,35 @@ class ApiException(Exception):
         super().__init__(self.message)
 
         self.log_exception()
+
+    @property
+    def debug_context(self) -> dict[str, str | int | bool | dict | None]:
+        """Lazily compute debug context on first access.
+
+        This property defers the expensive operation of collecting user context
+        until the debug context is actually needed (typically only in debug mode
+        when generating error responses).
+
+        Returns:
+            Dictionary containing debug context including user information
+        """
+        if self._debug_context is None:
+            self._debug_context = self._compute_debug_context(**self._debug_context_kwargs)
+        return self._debug_context
+
+    def _compute_debug_context(self, **kwargs: str | int | bool | None) -> dict[str, str | int | bool | dict | None]:
+        """Compute debug context (expensive operation).
+
+        This method is only called when debug_context is actually accessed,
+        avoiding unnecessary work in production.
+
+        Args:
+            **kwargs: Additional context information to include
+
+        Returns:
+            Dictionary containing debug context
+        """
+        return self.get_debug_context(**kwargs)
 
     @classmethod
     def error_code(cls) -> str:
@@ -152,10 +184,16 @@ class ApiException(Exception):
                 user = get_current_user()
                 if user_id and user:
                     # Try to get roles if available (works with built-in User model)
-                    roles = getattr(user, "roles", None)
+                    roles: list[str] | None
+                    if hasattr(user, "list_roles"):
+                        roles = list(user.list_roles())
+                    else:
+                        raw_roles = getattr(user, "roles", None)
+                        roles = [getattr(role, "role", role) for role in raw_roles] if raw_roles else None
+
                     debug_context["user"] = {
                         "id": str(user_id),
-                        "roles": [r.role for r in roles] if roles else None,
+                        "roles": roles,
                     }
                 else:
                     debug_context["user"] = {
@@ -262,22 +300,70 @@ class NotFoundError(ApiException):
 
 
 class ForbiddenError(ApiException):
-    """403 Forbidden error with automatic session rollback."""
+    """403 Forbidden error with permission context.
+
+    Provides detailed information about permission failures including
+    the operation attempted, resource type, resource ID, and failure reason.
+
+    Attributes:
+        operation: Operation attempted (e.g., 'modify', 'create', 'delete')
+        resource_type: Type of resource (e.g., 'Article', 'User')
+        resource_id: ID of the specific resource
+        reason: Human-readable reason for denial
+    """
 
     TITLE = "Forbidden"
     HTTP_STATUS_CODE = HTTPStatus.FORBIDDEN
 
-    def __init__(self, message: str | None = None, **kwargs: str | int | bool | None) -> None:
-        """Initialize ForbiddenError and rollback database session.
+    def __init__(
+        self,
+        message: str | None = None,
+        *,
+        operation: str | None = None,
+        resource_type: str | None = None,
+        resource_id: Any = None,
+        reason: str | None = None,
+        **kwargs: str | int | bool | None,
+    ) -> None:
+        """Initialize ForbiddenError with permission context.
 
         Args:
-            message: Error message
+            message: Error message (auto-generated if not provided)
+            operation: Operation attempted (e.g., 'modify', 'create', 'delete')
+            resource_type: Type of resource (e.g., 'Article', 'User')
+            resource_id: ID of the specific resource
+            reason: Human-readable reason for denial
             **kwargs: Additional debug_context information
         """
+        self.operation = operation
+        self.resource_type = resource_type
+        self.resource_id = resource_id
+        self.reason = reason
+
+        # Build detailed message if not provided
+        if message is None and operation and resource_type:
+            message = f"Cannot {operation} {resource_type}"
+            if resource_id is not None:
+                message += f" (id={resource_id})"
+            if reason:
+                message += f": {reason}"
+
+        # Rollback database session
         from ..sqla import db
 
         if db.session:
             db.session.rollback()
+
+        # Include permission context in debug_context
+        if operation:
+            kwargs["operation"] = operation
+        if resource_type:
+            kwargs["resource_type"] = resource_type
+        if resource_id is not None:
+            kwargs["resource_id"] = str(resource_id)
+        if reason:
+            kwargs["reason"] = reason
+
         super().__init__(message, **kwargs)
 
 

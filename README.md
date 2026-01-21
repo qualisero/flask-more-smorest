@@ -125,14 +125,14 @@ class Critter(BasePermsModel):
     name: Mapped[str] = mapped_column(db.String(100), nullable=False)
     species: Mapped[str] = mapped_column(db.String(50), nullable=False)
 
-    def _can_write(self) -> bool:
-        return self.is_current_user_admin()
+    def _can_write(self, current_user) -> bool:
+        return current_user is not None and current_user.has_role("admin")
 
-    def _can_read(self) -> bool:
+    def _can_read(self, current_user) -> bool:
         return True  # Anyone can read
 ```
 
-`BasePermsModel` adds `_can_read()`, `_can_write()`, and `_can_create()` hooks that are checked automatically on CRUD operations.
+`BasePermsModel` adds `_can_read()`, `_can_write()`, and `_can_create()` hooks that are checked automatically on CRUD operations. The `current_user` argument contains the authenticated user (or `None`).
 
 ## Built-in user authentication
 
@@ -178,16 +178,38 @@ class PublicUser(User):
 public_bp = UserBlueprint(model=PublicUser, schema=PublicUser.Schema)
 ```
 
+### Getting the current user
+
+Access the authenticated user using the class method for type-safe results:
+
+```python
+from flask_more_smorest import User
+
+# In your route or permission check
+user = User.get_current_user()  # Returns User | None
+
+# With a custom user class
+class MyUser(User):
+    employee_id = mapped_column(db.String(32))
+
+user = MyUser.get_current_user()  # Returns MyUser | None (properly typed)
+
+# Check if user is authenticated
+if user:
+    print(f"User {user.email} is logged in")
+```
+
+The class method provides typed access and is the preferred way to get the current user in application code.
+
 ### Using your own User model
 
 If you already have a User model, configure flask-more-smorest to use it:
 
 ```python
-from flask_more_smorest.perms import register_get_current_user, register_get_current_user_id
-from my_app.auth import get_current_user, get_current_user_id
+from flask_more_smorest.perms import register_user_class
+from my_app.auth import get_current_user
 
-register_get_current_user(get_current_user)
-register_get_current_user_id(get_current_user_id)
+register_user_class(MyUser, get_current_user=get_current_user)
 # Permission system now uses your User model
 ```
 

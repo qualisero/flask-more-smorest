@@ -199,14 +199,19 @@ def test_user_context_included_in_debug_mode() -> None:
     """Test that user context is included in debug mode using configurable user context."""
     import uuid
 
+    from flask_more_smorest import init_jwt
     from flask_more_smorest.perms.user_context import (
-        clear_registrations,
-        register_get_current_user,
-        register_get_current_user_id,
+        clear_registration,
+        register_user_class,
     )
 
     app = Flask(__name__)
     app.config["DEBUG"] = True
+    app.config["JWT_SECRET_KEY"] = "test-secret-key"
+    app.config["JWT_TOKEN_LOCATION"] = ["headers"]
+    app.config["JWT_HEADER_NAME"] = "Authorization"
+    app.config["JWT_HEADER_TYPE"] = "Bearer"
+    init_jwt(app)
 
     # Set up mock user context
     test_user_id = uuid.uuid4()
@@ -214,24 +219,25 @@ def test_user_context_included_in_debug_mode() -> None:
     class MockUser:
         def __init__(self):
             self.id = test_user_id
-            self.is_admin = True
             self.roles = [type("Role", (), {"role": "admin"})]
+
+        def has_role(self, role: str) -> bool:
+            return role == "admin"
+
+        def list_roles(self) -> list[str]:
+            return ["admin"]
 
     def get_mock_user():
         return MockUser()
 
-    def get_mock_user_id():
-        return test_user_id
-
-    register_get_current_user(get_mock_user)
-    register_get_current_user_id(get_mock_user_id)
-
     try:
         with app.app_context():
-            try:
-                raise DummyException("test error")
-            except DummyException as exc:
-                response = exc.make_error_response()
+            register_user_class(MockUser, get_current_user=get_mock_user)
+            with app.test_request_context():
+                try:
+                    raise DummyException("test error")
+                except DummyException as exc:
+                    response = exc.make_error_response()
 
         payload = response.get_json()
 
@@ -246,7 +252,7 @@ def test_user_context_included_in_debug_mode() -> None:
         assert user_context["roles"] == ["admin"]
 
     finally:
-        clear_registrations()
+        clear_registration()
 
 
 def test_user_context_not_included_in_production() -> None:
@@ -254,9 +260,8 @@ def test_user_context_not_included_in_production() -> None:
     import uuid
 
     from flask_more_smorest.perms.user_context import (
-        clear_registrations,
-        register_get_current_user,
-        register_get_current_user_id,
+        clear_registration,
+        register_user_class,
     )
 
     app = Flask(__name__)
@@ -266,21 +271,26 @@ def test_user_context_not_included_in_production() -> None:
     # Set up mock user context
     test_user_id = uuid.uuid4()
 
+    class MockUser:
+        id = test_user_id
+
+        def has_role(self, role: str) -> bool:
+            return role == "admin"
+
+        def list_roles(self) -> list[str]:
+            return ["admin"]
+
     def get_mock_user():
-        return type("User", (), {"id": test_user_id, "is_admin": True})()
-
-    def get_mock_user_id():
-        return test_user_id
-
-    register_get_current_user(get_mock_user)
-    register_get_current_user_id(get_mock_user_id)
+        return MockUser()
 
     try:
         with app.app_context():
-            try:
-                raise DummyException("test error")
-            except DummyException as exc:
-                response = exc.make_error_response()
+            register_user_class(MockUser, get_current_user=get_mock_user)
+            with app.test_request_context():
+                try:
+                    raise DummyException("test error")
+                except DummyException as exc:
+                    response = exc.make_error_response()
 
         payload = response.get_json()
 
@@ -288,4 +298,4 @@ def test_user_context_not_included_in_production() -> None:
         assert "debug" not in payload
 
     finally:
-        clear_registrations()
+        clear_registration()

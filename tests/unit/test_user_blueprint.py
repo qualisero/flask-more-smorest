@@ -8,55 +8,34 @@ from typing import TYPE_CHECKING
 import pytest
 from flask import Flask
 
-from flask_more_smorest import Api, User, UserBlueprint, db, init_db, init_jwt
+from flask_more_smorest import Api, User, UserBlueprint, db
 from flask_more_smorest.crud.crud_blueprint import CRUDMethod
-from flask_more_smorest.error.error_handlers import RequestHandlers
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import scoped_session
 
 
 @pytest.fixture(scope="function")
-def test_app() -> Flask:
-    """Create a Flask app for testing UserBlueprint."""
-    app = Flask(__name__)
-    app.config["TESTING"] = True
-    app.config["PROPAGATE_EXCEPTIONS"] = False  # Allow error handlers to work
-    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-    app.config["API_TITLE"] = "UserBlueprint Test API"
-    app.config["API_VERSION"] = "v1"
-    app.config["OPENAPI_VERSION"] = "3.0.2"
-    app.config["SECRET_KEY"] = "test-secret-key"
-    app.config["JWT_SECRET_KEY"] = "jwt-test-secret-key"
-
-    init_db(app)
-    init_jwt(app)
-    RequestHandlers(app)  # Register error handlers
-
-    return app
-
-
-@pytest.fixture(scope="function")
-def db_session(test_app: Flask) -> Iterator["scoped_session"]:
+def db_session(unit_app: Flask) -> Iterator["scoped_session"]:
     """Create a database session for tests."""
-    with test_app.app_context():
+    with unit_app.app_context():
         db.create_all()
         yield db.session
         db.session.remove()
         db.drop_all()
 
 
+# Fixture alias for backward compatibility with test signatures
 @pytest.fixture(scope="function")
-def api(test_app: Flask, db_session: "scoped_session") -> Api:
-    """Create API instance."""
-    return Api(test_app)
+def api(unit_api: "Api") -> "Api":
+    """Alias for unit_api to match test method signatures."""
+    return unit_api
 
 
 class TestUserBlueprintClass:
     """Tests for UserBlueprint class."""
 
-    def test_user_blueprint_instantiation_with_defaults(self, test_app: Flask, api: Api) -> None:
+    def test_user_blueprint_instantiation_with_defaults(self, unit_app: Flask, api: Api) -> None:
         """Test UserBlueprint can be instantiated with default parameters."""
         bp = UserBlueprint()
         api.register_blueprint(bp)
@@ -64,7 +43,7 @@ class TestUserBlueprintClass:
         assert bp.name == "users"
         assert bp.url_prefix == "/api/users/"
 
-    def test_user_blueprint_custom_configuration(self, test_app: Flask, api: Api) -> None:
+    def test_user_blueprint_custom_configuration(self, unit_app: Flask, api: Api) -> None:
         """Test UserBlueprint can be instantiated with custom parameters."""
         bp = UserBlueprint(
             name="custom_users",
@@ -76,45 +55,45 @@ class TestUserBlueprintClass:
         assert bp.name == "custom_users"
         assert bp.url_prefix == "/api/v2/users/"
 
-    def test_user_blueprint_has_crud_endpoints(self, test_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_user_blueprint_has_crud_endpoints(self, unit_app: Flask, api: Api, db_session: "scoped_session") -> None:
         """Test UserBlueprint registers standard CRUD endpoints."""
         bp = UserBlueprint()
         api.register_blueprint(bp)
 
         # Check that CRUD routes are registered
-        with test_app.app_context():
-            rules = [rule.rule for rule in test_app.url_map.iter_rules()]
+        with unit_app.app_context():
+            rules = [rule.rule for rule in unit_app.url_map.iter_rules()]
 
             # Standard CRUD routes
             assert "/api/users/" in rules  # INDEX and POST
             assert "/api/users/<uuid:users_id>" in rules  # GET, PATCH, DELETE
 
-    def test_user_blueprint_has_login_endpoint(self, test_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_user_blueprint_has_login_endpoint(self, unit_app: Flask, api: Api, db_session: "scoped_session") -> None:
         """Test UserBlueprint registers login endpoint."""
         bp = UserBlueprint()
         api.register_blueprint(bp)
 
         # Check login route is registered
-        with test_app.app_context():
-            rules = [rule.rule for rule in test_app.url_map.iter_rules()]
+        with unit_app.app_context():
+            rules = [rule.rule for rule in unit_app.url_map.iter_rules()]
             assert "/api/users/login/" in rules
 
-    def test_user_blueprint_has_me_endpoint(self, test_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_user_blueprint_has_me_endpoint(self, unit_app: Flask, api: Api, db_session: "scoped_session") -> None:
         """Test UserBlueprint registers current user profile endpoint."""
         bp = UserBlueprint()
         api.register_blueprint(bp)
 
         # Check /me route is registered
-        with test_app.app_context():
-            rules = [rule.rule for rule in test_app.url_map.iter_rules()]
+        with unit_app.app_context():
+            rules = [rule.rule for rule in unit_app.url_map.iter_rules()]
             assert "/api/users/me/" in rules
 
-    def test_user_blueprint_login_endpoint_works(self, test_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_user_blueprint_login_endpoint_works(self, unit_app: Flask, api: Api, db_session: "scoped_session") -> None:
         """Test login endpoint returns JWT token."""
         bp = UserBlueprint()
         api.register_blueprint(bp)
 
-        client = test_app.test_client()
+        client = unit_app.test_client()
 
         # Create a test user
         with User.bypass_perms():
@@ -134,13 +113,13 @@ class TestUserBlueprintClass:
         assert data["token_type"] == "bearer"
 
     def test_user_blueprint_login_fails_with_wrong_password(
-        self, test_app: Flask, api: Api, db_session: "scoped_session"
+        self, unit_app: Flask, api: Api, db_session: "scoped_session"
     ) -> None:
         """Test login endpoint rejects wrong password."""
         bp = UserBlueprint()
         api.register_blueprint(bp)
 
-        client = test_app.test_client()
+        client = unit_app.test_client()
 
         # Create a test user
         with User.bypass_perms():
@@ -160,13 +139,13 @@ class TestUserBlueprintClass:
         assert "unauthorized" in data["type"].lower()
 
     def test_user_blueprint_login_fails_for_disabled_user(
-        self, test_app: Flask, api: Api, db_session: "scoped_session"
+        self, unit_app: Flask, api: Api, db_session: "scoped_session"
     ) -> None:
         """Test login endpoint rejects disabled users."""
         bp = UserBlueprint()
         api.register_blueprint(bp)
 
-        client = test_app.test_client()
+        client = unit_app.test_client()
 
         # Create a disabled test user
         with User.bypass_perms():
@@ -186,26 +165,26 @@ class TestUserBlueprintClass:
         assert "disabled" in data["detail"].lower()
 
     def test_user_blueprint_me_endpoint_requires_auth(
-        self, test_app: Flask, api: Api, db_session: "scoped_session"
+        self, unit_app: Flask, api: Api, db_session: "scoped_session"
     ) -> None:
         """Test /me endpoint requires authentication."""
         bp = UserBlueprint()
         api.register_blueprint(bp)
 
-        client = test_app.test_client()
+        client = unit_app.test_client()
 
         # Try to access /me without authentication
         response = client.get("/api/users/me/")
         assert response.status_code == 401
 
     def test_user_blueprint_me_endpoint_returns_current_user(
-        self, test_app: Flask, api: Api, db_session: "scoped_session"
+        self, unit_app: Flask, api: Api, db_session: "scoped_session"
     ) -> None:
         """Test /me endpoint returns current authenticated user."""
         bp = UserBlueprint()
         api.register_blueprint(bp)
 
-        client = test_app.test_client()
+        client = unit_app.test_client()
 
         # Create a test user and login
         with User.bypass_perms():
@@ -231,17 +210,17 @@ class TestUserBlueprintClass:
         assert "id" in data
         assert "password" not in data  # Password should be excluded
 
-    def test_user_blueprint_skip_methods(self, test_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_user_blueprint_skip_methods(self, unit_app: Flask, api: Api, db_session: "scoped_session") -> None:
         """Test UserBlueprint respects skip_methods parameter."""
         bp = UserBlueprint(skip_methods=[CRUDMethod.DELETE])
         api.register_blueprint(bp)
 
         # Check that DELETE route is not registered
-        with test_app.app_context():
+        with unit_app.app_context():
             # Get all routes and their methods
             delete_routes = [
                 rule
-                for rule in test_app.url_map.iter_rules()
+                for rule in unit_app.url_map.iter_rules()
                 if "/api/users/<users_id>" in rule.rule and rule.methods is not None and "DELETE" in rule.methods
             ]
             assert len(delete_routes) == 0
@@ -252,7 +231,7 @@ class TestUserBlueprintClass:
 
         assert issubclass(UserBlueprint, PermsBlueprint)
 
-    def test_user_blueprint_has_permission_decorators(self, test_app: Flask, api: Api) -> None:
+    def test_user_blueprint_has_permission_decorators(self, unit_app: Flask, api: Api) -> None:
         """Test that UserBlueprint has permission-related decorators."""
         bp = UserBlueprint()
         api.register_blueprint(bp)
@@ -266,7 +245,7 @@ class TestUserBlueprintWithCustomUser:
     """Test UserBlueprint with custom User model."""
 
     def test_user_blueprint_with_custom_user_class(
-        self, test_app: Flask, api: Api, db_session: "scoped_session"
+        self, unit_app: Flask, api: Api, db_session: "scoped_session"
     ) -> None:
         """Test UserBlueprint works with custom User model."""
 
@@ -285,7 +264,7 @@ class TestUserBlueprintWithCustomUser:
         assert CustomUser.PUBLIC_REGISTRATION is True
 
     def test_public_registration_makes_post_endpoint_public(
-        self, test_app: Flask, api: Api, db_session: "scoped_session"
+        self, unit_app: Flask, api: Api, db_session: "scoped_session"
     ) -> None:
         """Test that PUBLIC_REGISTRATION=True makes POST endpoint public."""
         from flask_more_smorest.crud.crud_blueprint import CRUDMethod
@@ -303,7 +282,7 @@ class TestUserBlueprintWithCustomUser:
         assert post_config.get("public") is True, "POST should be marked as public when PUBLIC_REGISTRATION=True"
 
     def test_public_registration_allows_unauthenticated_user_creation(
-        self, test_app: Flask, api: Api, db_session: "scoped_session"
+        self, unit_app: Flask, api: Api, db_session: "scoped_session"
     ) -> None:
         """Test that PUBLIC_REGISTRATION=True allows creating users without authentication."""
 
@@ -319,7 +298,7 @@ class TestUserBlueprintWithCustomUser:
         bp = UserBlueprint(model=PublicUserForCreation, schema=PublicUserForCreation.Schema)
         api.register_blueprint(bp)
 
-        client = test_app.test_client()
+        client = unit_app.test_client()
 
         # Try to create a user without authentication - should succeed
         response = client.post(
@@ -332,7 +311,7 @@ class TestUserBlueprintWithCustomUser:
         assert data["email"] == "newuser@example.com"
 
     def test_no_public_registration_requires_auth_for_post(
-        self, test_app: Flask, api: Api, db_session: "scoped_session"
+        self, unit_app: Flask, api: Api, db_session: "scoped_session"
     ) -> None:
         """Test that without PUBLIC_REGISTRATION, POST requires authentication."""
         from flask_more_smorest.crud.crud_blueprint import CRUDMethod
@@ -345,7 +324,7 @@ class TestUserBlueprintWithCustomUser:
         post_config = bp._config.methods.get(CRUDMethod.POST, {})
         assert post_config.get("public") is not True, "POST should NOT be public by default"
 
-        client = test_app.test_client()
+        client = unit_app.test_client()
 
         # Try to create a user without authentication - should fail with 401
         response = client.post(
@@ -360,13 +339,13 @@ class TestUserBlueprintIntegration:
     """Integration tests for UserBlueprint with full app setup."""
 
     def test_complete_user_registration_and_login_flow(
-        self, test_app: Flask, api: Api, db_session: "scoped_session"
+        self, unit_app: Flask, api: Api, db_session: "scoped_session"
     ) -> None:
         """Test complete user flow: create -> login -> access profile -> update."""
         bp = UserBlueprint()
         api.register_blueprint(bp)
 
-        client = test_app.test_client()
+        client = unit_app.test_client()
 
         # Step 1: Create a new user (bypassing perms for test)
         with User.bypass_perms():
@@ -402,8 +381,8 @@ class TestUserBlueprintIntegration:
         get_data = get_response.get_json()
         assert get_data["email"] == "newuser@example.com"
 
-    def test_multiple_user_blueprints(self, test_app: Flask, api: Api, db_session: "scoped_session") -> None:
-        """Test that multiple UserBlueprints can coexist with different configs."""
+    def test_multiple_user_blueprint_instances(self, unit_app: Flask, api: Api, db_session: "scoped_session") -> None:
+        """Test that multiple UserBlueprint instances can coexist with different configs."""
 
         # Create two UserBlueprints with different prefixes
         bp1 = UserBlueprint(name="users_v1", url_prefix="/api/v1/users/")
@@ -412,7 +391,7 @@ class TestUserBlueprintIntegration:
         api.register_blueprint(bp1)
         api.register_blueprint(bp2)
 
-        client = test_app.test_client()
+        client = unit_app.test_client()
 
         # Create a user via v1
         with User.bypass_perms():
@@ -438,45 +417,11 @@ class TestUserBlueprintIntegration:
         assert v2_login.get_json()["access_token"]
 
 
-class TestBackwardCompatibility:
-    """Test backward compatibility with user_bp instance."""
-
-    def test_user_bp_instance_exists(self) -> None:
-        """Test that user_bp instance is available for backward compatibility."""
-        from flask_more_smorest.perms import user_bp
-
-        assert user_bp is not None
-        assert isinstance(user_bp, UserBlueprint)
-        assert user_bp.name == "users"
-
-    def test_user_bp_instance_works(self, test_app: Flask, api: Api, db_session: "scoped_session") -> None:
-        """Test that user_bp instance can be used directly."""
-        from flask_more_smorest.perms import user_bp
-
-        api.register_blueprint(user_bp)
-
-        client = test_app.test_client()
-
-        # Create a test user
-        with User.bypass_perms():
-            user = User(email="test@example.com", password="password123")
-            user.save()
-
-        # Login using user_bp
-        response = client.post(
-            "/api/users/login/",
-            json={"email": "test@example.com", "password": "password123"},
-        )
-
-        assert response.status_code == 200
-        assert "access_token" in response.get_json()
-
-
 class TestCustomUserInheritedColumns:
     """Tests for CustomUser class inheritance of all User columns."""
 
     def test_custom_user_inherits_all_base_columns(
-        self, test_app: Flask, api: Api, db_session: "scoped_session"
+        self, unit_app: Flask, api: Api, db_session: "scoped_session"
     ) -> None:
         """Test that CustomUser inherits all columns from User and BaseModel."""
         # We test against the base User class to avoid column conflicts
@@ -493,7 +438,7 @@ class TestCustomUserInheritedColumns:
         assert "password" in user_columns, "User should have 'password' column"
         assert "is_enabled" in user_columns, "User should have 'is_enabled' column"
 
-    def test_custom_user_column_types_preserved(self, test_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_custom_user_column_types_preserved(self, unit_app: Flask, api: Api, db_session: "scoped_session") -> None:
         """Test that inherited column types are preserved in User."""
         import sqlalchemy as sa
 
@@ -517,14 +462,14 @@ class TestCustomUserInheritedColumns:
         assert isinstance(columns["created_at"].type, sa.DateTime)
         assert isinstance(columns["updated_at"].type, sa.DateTime)
 
-    def test_custom_user_inherits_relationships(self, test_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_custom_user_inherits_relationships(self, unit_app: Flask, api: Api, db_session: "scoped_session") -> None:
         """Test that User has all expected relationships that subclasses inherit."""
         # Check that relationships exist on User
         assert hasattr(User, "roles"), "User should have 'roles' relationship"
         assert hasattr(User, "settings"), "User should have 'settings' relationship"
         assert hasattr(User, "tokens"), "User should have 'tokens' relationship"
 
-    def test_custom_user_inherits_methods(self, test_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_custom_user_inherits_methods(self, unit_app: Flask, api: Api, db_session: "scoped_session") -> None:
         """Test that User has all methods that subclasses inherit."""
         # Check methods from User
         assert hasattr(User, "set_password"), "User should have 'set_password' method"
@@ -553,7 +498,7 @@ class TestCustomUserInheritedColumns:
         assert hasattr(User, "get_by"), "User should have 'get_by' class method"
 
     def test_custom_user_instance_has_all_inherited_columns(
-        self, test_app: Flask, api: Api, db_session: "scoped_session"
+        self, unit_app: Flask, api: Api, db_session: "scoped_session"
     ) -> None:
         """Test that User instances have all expected column values."""
         import uuid
@@ -579,7 +524,7 @@ class TestCustomUserInheritedColumns:
         assert user.is_password_correct("password123")
 
     def test_custom_user_single_table_inheritance_uses_same_table(
-        self, test_app: Flask, api: Api, db_session: "scoped_session"
+        self, unit_app: Flask, api: Api, db_session: "scoped_session"
     ) -> None:
         """Test that User uses the 'user' table and subclasses inherit it."""
         # Verify User uses the correct table

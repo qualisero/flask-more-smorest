@@ -9,7 +9,5 @@ flask\_more\_smorest.sqla.base\_model
    .. autosummary::
    
       BaseModel
-      BaseModelConverter
       BaseModelMeta
-      BaseSchema
    

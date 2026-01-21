@@ -233,25 +233,25 @@ class TestDatabaseInitialization:
         class Model1(BaseModel):
             field1 = db.Column(db.String(50))
 
-            def _can_read(self) -> bool:
+            def _can_read(self, current_user) -> bool:
                 return True
 
-            def _can_write(self) -> bool:
+            def _can_write(self, current_user) -> bool:
                 return True
 
-            def _can_create(self) -> bool:
+            def _can_create(self, current_user) -> bool:
                 return True
 
         class Model2(BaseModel):
             field2 = db.Column(db.Integer)
 
-            def _can_read(self) -> bool:
+            def _can_read(self, current_user) -> bool:
                 return True
 
-            def _can_write(self) -> bool:
+            def _can_write(self, current_user) -> bool:
                 return True
 
-            def _can_create(self) -> bool:
+            def _can_create(self, current_user) -> bool:
                 return True
 
         with app.app_context():

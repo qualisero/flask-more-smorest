@@ -1,7 +1,7 @@
 """SQLAlchemy integration module.
 
 This module provides the core SQLAlchemy integration for flask-more-smorest,
-including the database instance, base model, and migration utilities.
+including the database instance, base model, schema utilities, and migration tools.
 """
 
 from .base_model import BaseModel
@@ -12,9 +12,12 @@ from .migrations import (
     init_migrations,
     upgrade_database,
 )
+from .schema import BaseSchema, create_model_schema
 
 __all__ = [
     "BaseModel",
+    "BaseSchema",
+    "create_model_schema",
     "db",
     "init_db",
     "get_request_query_stats",
