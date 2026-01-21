@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     pass
 
 
-class UserSetting(UserOwnershipMixin, BasePermsModel):
+class UserSetting(UserOwnershipMixin, BasePermsModel):  # noqa: conflict-attribute
     """User-specific key-value settings storage."""
 
     __delegate_to_user__ = True

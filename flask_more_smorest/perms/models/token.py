@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     pass
 
 
-class Token(UserOwnershipMixin, BasePermsModel):
+class Token(UserOwnershipMixin, BasePermsModel):  # noqa: conflict-attribute
     """API tokens for user authentication."""
 
     __delegate_to_user__ = True
