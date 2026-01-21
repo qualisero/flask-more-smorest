@@ -1,7 +1,6 @@
 """User-related models for Flask-More-Smorest.
 
-This module provides a clean re-export of all user-related models,
-maintaining backward compatibility while organizing code into focused modules.
+This module provides a clean re-export of all user-related models.
 """
 
 from __future__ import annotations
