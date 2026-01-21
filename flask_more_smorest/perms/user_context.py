@@ -249,7 +249,7 @@ def get_current_user_id() -> uuid.UUID | None:
 
         if isinstance(user_id, InstrumentedAttribute):
             return cast(uuid.UUID, user_id.property.class_.impl.type.python_type(user_id))
-    except Exception:  # noqa: S110  # Intentionally swallow errors during type checking
+    except Exception:  # nosec: B110  # Intentionally swallow errors during type checking
         pass
 
     return cast(uuid.UUID, user_id)
