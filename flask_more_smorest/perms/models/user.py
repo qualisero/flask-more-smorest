@@ -126,11 +126,11 @@ class User(BasePermsModel):
         # Check for multi-table inheritance BEFORE SQLAlchemy processes the class
         has_custom_tablename = "__tablename__" in cls.__dict__
         has_custom_table_args = "__table_args__" in cls.__dict__
-        has_custom_mapper_args = "__mapper_args__" in cls.__dict__
 
         # Set polymorphic identity for subclasses (if not already set)
         if cls is not User:
             # Check if __mapper_args__ is already defined on this class (not inherited)
+            has_custom_mapper_args = "__mapper_args__" in cls.__dict__
             if not has_custom_mapper_args:
                 # Check if it's in the class's direct __dict__ (might have been set previously)
                 class_mapper_args = cls.__dict__.get("__mapper_args__", None)
@@ -143,18 +143,13 @@ class User(BasePermsModel):
                     cls.__mapper_args__ = {"polymorphic_identity": cls.__name__.lower()}
 
         # Set marker for __table_cls__() if using single-table inheritance
-        if not has_custom_tablename and not has_custom_table_args and not has_custom_mapper_args:
+        # NOTE: We check ONLY for custom __tablename__ and __table_args__, not __mapper_args__
+        # This ensures extend_existing=True is injected even when subclasses define __mapper_args__
+        # (e.g., to set polymorphic_identity), which is the common STI pattern.
+        if not has_custom_tablename and not has_custom_table_args:
             cls._User__is_single_table_inheritance = True
 
         super().__init_subclass__(**kwargs)
-
-        # Also inject post-super() for backwards compatibility and hot reload
-        if not has_custom_table_args and not has_custom_tablename:
-            existing_args = getattr(cls, "__table_args__", {})
-            if isinstance(existing_args, dict):
-                cls.__table_args__ = {"extend_existing": True, **existing_args}
-            else:
-                cls.__table_args__ = {"extend_existing": True}
 
     @classmethod
     def __table_cls__(cls, *args: object, **kwargs: object) -> Any:
