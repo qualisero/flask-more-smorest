@@ -506,3 +506,8 @@ class TenantNotFoundError(NotFoundError):
 
     TITLE = "Tenant Not Found"
     MESSAGE_PREFIX = "Tenant not found."
+
+
+# Domain/Tenant nomenclature aliases for compatibility
+NoDomainAccessError = NoTenantAccessError
+DomainNotFoundError = TenantNotFoundError

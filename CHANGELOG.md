@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-01-22
+
+### Added
+- **Polymorphic Inheritance Support**: Core models now support SQLAlchemy polymorphic inheritance
+  - Added `discriminator` column to `Token` model with default `"token"`
+  - Added `discriminator` column to `UserSetting` model with default `"user_setting"`
+  - Added `__mapper_args__` with `polymorphic_on` and `polymorphic_identity` to both models
+  - Enables applications to subclass these models with custom fields while maintaining ORM relationships
+  - Includes comprehensive documentation and examples in model docstrings
+
+- **Domain/Tenant Nomenclature Aliases**: Added backward-compatible aliases for multi-tenant exceptions
+  - `NoDomainAccessError` as alias for `NoTenantAccessError`
+  - `DomainNotFoundError` as alias for `TenantNotFoundError`
+  - Allows applications to use either "domain" or "tenant" terminology consistently
+
+- **Enhanced User.has_domain_access()**: Improved documentation and functionality
+  - Added comprehensive docstring with usage examples
+  - Documents superadmin automatic access and wildcard role support
+  - Clarifies behavior for `None` (global access) checks
+  - Method already existed but now has proper documentation
+
+### Changed
+- **Improved Model Documentation**: Enhanced docstrings for `Token` and `UserSetting`
+  - Added polymorphic inheritance examples showing how to subclass with custom fields
+  - Clarified that `discriminator` field is managed automatically
+
 ## [0.8.1] - 2026-01-21
 
 ### Added
