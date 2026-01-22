@@ -141,35 +141,47 @@ class BasePermsModel(SQLABaseModel):
         return self._can_create(current_user)
 
     def _can_write(self, current_user: Any) -> bool:
-        """Override in subclasses to implement custom write permission.
+        """Internal permission check for write/update/delete operations.
+
+        This method MUST be overridden by subclasses to define write permissions.
+        It is called by the public `can_write()` and `delete()` methods.
 
         Args:
-            current_user: Current authenticated user, or None
+            current_user: The currently authenticated user object (or None)
 
         Returns:
-            False (deny by default)
+            bool: True if operation is allowed, False otherwise.
+                  Defaults to False (deny all) for safety.
         """
         return False
 
     def _can_create(self, current_user: Any) -> bool:
-        """Override in subclasses to implement custom create permission.
+        """Internal permission check for creation operations.
+
+        This method SHOULD be overridden by subclasses if create logic differs
+        from default (allow all). It is called by `can_create()` and `save()`.
 
         Args:
-            current_user: Current authenticated user, or None
+            current_user: The currently authenticated user object (or None)
 
         Returns:
-            True (allow by default)
+            bool: True if creation is allowed, False otherwise.
+                  Defaults to True (allow all).
         """
         return True
 
     def _can_read(self, current_user: Any) -> bool:
-        """Override in subclasses to implement custom read permission.
+        """Internal permission check for read operations.
+
+        This method SHOULD be overridden by subclasses.
+        It is called by `can_read()` and `get_by()`.
 
         Args:
-            current_user: Current authenticated user, or None
+            current_user: The currently authenticated user object (or None)
 
         Returns:
-            Same as _can_write() by default
+            bool: True if read is allowed, False otherwise.
+                  Defaults to calling `_can_write()` (if you can write, you can read).
         """
         return self._can_write(current_user)
 

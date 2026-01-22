@@ -212,6 +212,34 @@ class ProfileMixin:
             return f"{self.first_name} {self.last_name}"
         return self.first_name or self.last_name or ""
 
+    @classmethod
+    def parse_full_name(cls, full_name: str) -> dict[str, str]:
+        """Parse a full name into first and last name components.
+
+        Strips leading/trailing whitespace and splits on first space.
+        Everything after the first space is considered the last name.
+
+        Args:
+            full_name: The full name string
+
+        Returns:
+            Dictionary with 'first_name' and 'last_name' keys
+        """
+        # Strip and split on any whitespace
+        parts = full_name.strip().split(None, 1)
+        first_name = parts[0]
+        last_name = parts[1] if len(parts) > 1 else ""
+        return {"first_name": first_name, "last_name": last_name}
+
+    @property
+    def avatar(self) -> str | None:
+        """Get avatar URL (alias for avatar_url).
+
+        Override this property to implement custom avatar logic
+        (e.g., generating Gravatar or Initials avatar if avatar_url is missing).
+        """
+        return self.avatar_url
+
 
 class SoftDeleteMixin:
     """Soft delete with deleted_at timestamp and helper methods.

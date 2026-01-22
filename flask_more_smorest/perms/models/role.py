@@ -1,7 +1,7 @@
 """Role and domain models for Flask-More-Smorest.
 
 Provides DefaultUserRole enum, Domain, and UserRole models for
-multi-tenant role-based access control.
+multi-domain role-based access control.
 """
 
 from __future__ import annotations
@@ -30,7 +30,19 @@ class DefaultUserRole(str, enum.Enum):
 
 
 class Domain(BasePermsModel):
-    """Distinct domains within the app for multi-tenant support."""
+    """Distinct domains within the app for multi-domain support."""
+
+    __mapper_args__ = {
+        "polymorphic_on": "discriminator",
+        "polymorphic_identity": "domain",
+    }
+
+    discriminator: Mapped[str] = mapped_column(
+        db.String(50),
+        default="domain",
+        nullable=False,
+        server_default="domain",
+    )
 
     name: Mapped[str] = mapped_column(db.String(255), nullable=False)
     display_name: Mapped[str] = mapped_column(db.String(255), nullable=False)
@@ -59,7 +71,7 @@ class Domain(BasePermsModel):
 
 
 class UserRole(BasePermsModel):
-    """User roles with domain scoping for multi-tenant applications.
+    """User roles with domain scoping for multi-domain applications.
 
     To use custom role enums, simply pass enum values when creating roles:
 
