@@ -396,10 +396,12 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
         # recursively ensure that all kwargs sub-models can be created:
         self.check_create(kwargs.values())
 
+        # Get mapper once for efficiency (instead of on each iteration)
+        mapper = class_mapper(self.__class__)
+
         for key, val in kwargs.items():
             if hasattr(self, key):
                 # use class to check for relationships:
-                mapper = class_mapper(self.__class__)
                 if key in mapper.relationships and mapper.relationships[key].uselist:
                     # Clean up relationships first:
                     setattr(self, key, [])
