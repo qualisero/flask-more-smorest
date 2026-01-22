@@ -494,20 +494,15 @@ class DBError(InternalServerError):
     HTTP_STATUS_CODE = HTTPStatus.INTERNAL_SERVER_ERROR
 
 
-class NoTenantAccessError(ForbiddenError):
-    """User does not have access to the requested tenant."""
+class NoDomainAccessError(ForbiddenError):
+    """User does not have access to the requested domain."""
 
-    TITLE = "Tenant Access Denied"
-    MESSAGE_PREFIX = "User does not have access to this tenant."
-
-
-class TenantNotFoundError(NotFoundError):
-    """Requested tenant was not found."""
-
-    TITLE = "Tenant Not Found"
-    MESSAGE_PREFIX = "Tenant not found."
+    TITLE = "Domain Access Denied"
+    MESSAGE_PREFIX = "User does not have access to this domain."
 
 
-# Domain/Tenant nomenclature aliases for compatibility
-NoDomainAccessError = NoTenantAccessError
-DomainNotFoundError = TenantNotFoundError
+class DomainNotFoundError(NotFoundError):
+    """Requested domain was not found."""
+
+    TITLE = "Domain Not Found"
+    MESSAGE_PREFIX = "Domain not found."

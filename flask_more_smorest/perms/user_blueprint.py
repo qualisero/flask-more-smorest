@@ -135,6 +135,18 @@ class UserBlueprint(PermsBlueprint):
         self._register_login_endpoint()
         self._register_current_user_endpoint()
 
+    def _validate_login(self, user: UserProtocol, data: dict[str, Any]) -> None:
+        """Hook to add custom validation during login.
+
+        Override this method in a subclass to add custom checks.
+        Raise an exception (e.g., UnauthorizedError) if validation fails.
+
+        Args:
+            user: The user object attempting to login
+            data: The login data (email, password)
+        """
+        pass
+
     def _register_login_endpoint(self) -> None:
         """Register the login endpoint."""
         from .models import User as UserModel
@@ -162,6 +174,9 @@ class UserBlueprint(PermsBlueprint):
 
             if not user.is_enabled:
                 raise UnauthorizedError("Account is disabled")
+
+            # Run custom validation hook
+            self._validate_login(user, data)
 
             access_token = create_access_token(identity=user.id)
 

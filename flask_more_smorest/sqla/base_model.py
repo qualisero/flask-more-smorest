@@ -19,7 +19,6 @@ from sqlalchemy.orm import (
     make_transient,
     mapped_column,
 )
-from sqlalchemy.orm.collections import InstrumentedList
 from sqlalchemy.orm.state import InstanceState
 
 from ..error.exceptions import NotFoundError
@@ -399,8 +398,9 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
 
         for key, val in kwargs.items():
             if hasattr(self, key):
-                # TODO: use class to check for relationships:
-                if isinstance(getattr(self, key), InstrumentedList):
+                # use class to check for relationships:
+                mapper = class_mapper(self.__class__)
+                if key in mapper.relationships and mapper.relationships[key].uselist:
                     # Clean up relationships first:
                     setattr(self, key, [])
                     db.session.flush()

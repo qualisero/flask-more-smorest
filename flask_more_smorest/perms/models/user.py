@@ -10,6 +10,7 @@ import logging
 import uuid
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
+import sqlalchemy as sa
 from flask_jwt_extended import current_user as jwt_current_user
 from flask_jwt_extended import exceptions, verify_jwt_in_request
 from sqlalchemy.ext.declarative import declared_attr
@@ -108,7 +109,12 @@ class User(BasePermsModel):
     # Core authentication fields that all User models must have
     email: Mapped[str] = mapped_column(db.String(128), unique=True, nullable=False)
     password: Mapped[bytes | None] = mapped_column(db.LargeBinary(128), nullable=True)
-    is_enabled: Mapped[bool] = mapped_column(db.Boolean(), default=True)
+    is_enabled: Mapped[bool] = mapped_column(
+        db.Boolean(),
+        default=True,
+        nullable=False,
+        server_default=sa.true(),
+    )
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         """Process User subclasses and inject __table_args__ for single-table inheritance.
