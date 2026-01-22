@@ -50,7 +50,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Admin role type - constrained to valid admin roles only
-# Use uppercase values for compatibility with enum names stored in database
+# Use uppercase values for backward compatibility
 AdminRole = Literal["ADMIN", "SUPERADMIN"]
 
 # Role constants - uppercase for backward compatibility

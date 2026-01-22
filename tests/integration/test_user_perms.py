@@ -936,10 +936,10 @@ class TestCustomRoleExtension:
         # Refresh to load relationships
         db_session.refresh(user)
 
-        # Verify all custom roles are listed
+        # Verify all custom roles are listed (now stored as uppercase)
         roles = user.list_roles()
-        assert "editor" in roles
-        assert "author" in roles
+        assert "EDITOR" in roles
+        assert "AUTHOR" in roles
         assert len(roles) == 2
 
     def test_custom_role_enum_to_string_conversion(self, user_perms_app: Flask, db_session: "scoped_session") -> None:
@@ -968,12 +968,19 @@ class TestCustomRoleExtension:
         roles = UserRole.query.filter_by(user_id=user.id).all()
         assert len(roles) == 1
 
-        # Convert stored string back to enum
-        stored_role = roles[0].role  # Returns string "publisher"
-        assert stored_role == BlogRole.PUBLISHER.value
+        # Get the stored role - now stored as uppercase
+        stored_role = roles[0].role  # Returns string "PUBLISHER" (uppercased)
+        assert stored_role == "PUBLISHER"
 
-        # Convert back to enum
-        role_enum = BlogRole(stored_role)
+        # Convert back to enum using case-insensitive lookup
+        # Since we store roles as uppercase, we need to find the matching enum
+        # by comparing values case-insensitively
+        role_enum = None
+        for member in BlogRole:
+            if member.value.upper() == stored_role.upper():
+                role_enum = member
+                break
+        assert role_enum is not None
         assert role_enum == BlogRole.PUBLISHER
 
     def test_mixed_default_and_custom_roles(self, user_perms_app: Flask, db_session: "scoped_session") -> None:
@@ -1014,7 +1021,7 @@ class TestCustomRoleExtension:
         assert user.has_role(CustomAppRole.VIP)
         assert not user.has_role(CustomAppRole.BETA_TESTER)
 
-        # Verify list_roles includes both
+        # Verify list_roles includes both (now stored as uppercase)
         user_roles = user.list_roles()
-        assert "user" in user_roles
-        assert "vip" in user_roles
+        assert "USER" in user_roles
+        assert "VIP" in user_roles

@@ -22,11 +22,15 @@ if TYPE_CHECKING:
 
 
 class DefaultUserRole(str, enum.Enum):
-    """Default user role enumeration."""
+    """Default user role enumeration.
 
-    SUPERADMIN = "superadmin"
-    ADMIN = "admin"
-    USER = "user"
+    Values are uppercase for backward compatibility with applications
+    expecting uppercase role strings.
+    """
+
+    SUPERADMIN = "SUPERADMIN"
+    ADMIN = "ADMIN"
+    USER = "USER"
 
 
 class Domain(BasePermsModel):
@@ -128,9 +132,12 @@ class UserRole(BasePermsModel):
         Args:
             value: Role value (enum or string)
         """
-        # Store enum NAME (uppercase) instead of VALUE (lowercase)
-        # for backward compatibility with existing code that uses enum names
-        self._role = value.name if isinstance(value, enum.Enum) else str(value)
+        # Normalize role to uppercase string for consistency
+        # This handles both enum values (already uppercase) and string inputs
+        if isinstance(value, enum.Enum):
+            self._role = str(value.value).upper()
+        else:
+            self._role = str(value).upper()
 
     def __init__(
         self,
@@ -153,11 +160,12 @@ class UserRole(BasePermsModel):
         if isinstance(domain_id, str):
             raise TypeError("Expected domain_id to be UUID, None or '*'")
 
-        # Handle role parameter
+        # Handle role parameter - normalize to uppercase
         if role is not None:
-            # Store enum NAME (uppercase) instead of VALUE (lowercase)
-            # for backward compatibility with existing code that uses enum names
-            kwargs["_role"] = role.name if isinstance(role, enum.Enum) else str(role)
+            if isinstance(role, enum.Enum):
+                kwargs["_role"] = str(role.value).upper()
+            else:
+                kwargs["_role"] = str(role).upper()
 
         super().__init__(domain_id=domain_id, **kwargs)
 
