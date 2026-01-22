@@ -782,7 +782,7 @@ class TestSuperadminRolePermissions:
 
         # Verify the role was created
         created_role = (
-            db_session.query(UserRole).filter_by(user_id=target_user.id, _role=DefaultUserRole.ADMIN.value).first()
+            db_session.query(UserRole).filter_by(user_id=target_user.id, _role=DefaultUserRole.ADMIN.name).first()
         )
         assert created_role is not None
 
@@ -808,7 +808,7 @@ class TestSuperadminRolePermissions:
 
         # Verify the role was created
         created_role = (
-            db_session.query(UserRole).filter_by(user_id=target_user.id, _role=DefaultUserRole.USER.value).first()
+            db_session.query(UserRole).filter_by(user_id=target_user.id, _role=DefaultUserRole.USER.name).first()
         )
         assert created_role is not None
 

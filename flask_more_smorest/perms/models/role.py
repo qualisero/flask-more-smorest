@@ -128,8 +128,9 @@ class UserRole(BasePermsModel):
         Args:
             value: Role value (enum or string)
         """
-        # Normalize role to string for comparison
-        self._role = value.value if isinstance(value, enum.Enum) else str(value)
+        # Store enum NAME (uppercase) instead of VALUE (lowercase)
+        # for backward compatibility with existing code that uses enum names
+        self._role = value.name if isinstance(value, enum.Enum) else str(value)
 
     def __init__(
         self,
@@ -154,7 +155,9 @@ class UserRole(BasePermsModel):
 
         # Handle role parameter
         if role is not None:
-            kwargs["_role"] = role.value if isinstance(role, enum.Enum) else str(role)
+            # Store enum NAME (uppercase) instead of VALUE (lowercase)
+            # for backward compatibility with existing code that uses enum names
+            kwargs["_role"] = role.name if isinstance(role, enum.Enum) else str(role)
 
         super().__init__(domain_id=domain_id, **kwargs)
 
@@ -178,9 +181,9 @@ class UserRole(BasePermsModel):
                 return True
 
             # Admins can only modify non-admin roles
-            # Conservative string check: assume "admin" or "superadmin" in role name means elevated
-            role_value = self._role.lower()
-            is_elevated_role = "superadmin" in role_value or "admin" in role_value
+            # Check for elevated role names (uppercase) in stored role
+            role_value = self._role.upper()
+            is_elevated_role = "SUPERADMIN" in role_value or "ADMIN" in role_value
 
             return not is_elevated_role and current_user.has_role(ROLE_ADMIN)
         except Exception:

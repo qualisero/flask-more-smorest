@@ -305,7 +305,10 @@ class User(BasePermsModel):
             True
         """
         # Normalize role to string for comparison
-        role_str = role.value if isinstance(role, enum.Enum) else str(role)
+        # Use enum NAME (uppercase) instead of VALUE (lowercase)
+        # for compatibility with roles stored as enum names
+        # Also uppercase string input for case-insensitive matching
+        role_str = role.name if isinstance(role, enum.Enum) else str(role).upper()
 
         roles = cast(list["UserRole"], self.roles)  # type: ignore[name-defined, redundant-cast]  # noqa: F821
         return bool(
