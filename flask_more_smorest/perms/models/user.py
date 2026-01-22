@@ -385,5 +385,21 @@ class User(BasePermsModel):
         return {r.domain_id or "*" for r in self.roles}
 
     def has_domain_access(self, domain_id: uuid.UUID | None) -> bool:
-        """Check if user has access to specified domain."""
+        """Check if user has access to a specific domain.
+
+        Users have access to a domain if they have any role associated with that domain,
+        or if they have a wildcard role (*). Superadmins automatically have access.
+
+        Args:
+            domain_id: Domain UUID to check access for, or None for global access
+
+        Returns:
+            True if user has access to the domain, False otherwise
+
+        Example:
+            >>> user.has_domain_access(domain_id)
+            True
+            >>> user.has_domain_access(None)  # Global access check
+            True
+        """
         return domain_id is None or domain_id in self.domain_ids or "*" in self.domain_ids
