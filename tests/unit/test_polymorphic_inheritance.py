@@ -1,6 +1,6 @@
 """Test polymorphic inheritance for Token and UserSetting models."""
 
-from flask_more_smorest.perms.models import Token, User, UserSetting
+from flask_more_smorest.perms.models import Domain, Token, User, UserSetting
 from flask_more_smorest.sqla import db as sqla_db
 
 
@@ -88,3 +88,35 @@ def test_user_setting_default_discriminator(unit_app, db_session):
     sqla_db.session.commit()
 
     assert setting.discriminator == "user_setting"
+
+
+def test_domain_polymorphic_subclass(unit_app, db_session):
+    """Test that Domain supports polymorphic inheritance via discriminator."""
+
+    class CustomDomain(Domain):
+        __mapper_args__ = {"polymorphic_identity": "custom_domain"}
+
+    sqla_db.create_all()
+
+    domain = CustomDomain(name="test", display_name="Test", active=True)
+    sqla_db.session.add(domain)
+    sqla_db.session.commit()
+
+    assert domain.discriminator == "custom_domain"
+    assert sqla_db.session.query(Domain).count() == 1
+
+
+def test_user_polymorphic_subclass(unit_app, db_session):
+    """Test that User supports polymorphic inheritance via discriminator."""
+
+    class CustomUser(User):
+        __mapper_args__ = {"polymorphic_identity": "custom_user"}
+
+    sqla_db.create_all()
+
+    user = CustomUser(email="custom@example.com", password="test123")
+    sqla_db.session.add(user)
+    sqla_db.session.commit()
+
+    assert user.discriminator == "custom_user"
+    assert sqla_db.session.query(User).count() == 1
