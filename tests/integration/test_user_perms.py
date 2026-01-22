@@ -1025,3 +1025,44 @@ class TestCustomRoleExtension:
         user_roles = user.list_roles()
         assert "USER" in user_roles
         assert "VIP" in user_roles
+
+
+class TestUserBlueprintOperationIds:
+    """Test operationId generation for UserBlueprint endpoints."""
+
+    def test_user_blueprint_generates_operation_ids_for_all_endpoints(self, user_perms_app: Flask) -> None:
+        """Verify UserBlueprint generates operationIds for CRUD and custom endpoints.
+
+        This test specifically verifies the bug fix where function-based routes
+        with @arguments and @response decorators (like /login/ and /me/) were not
+        getting operationIds generated.
+        """
+        from flask_more_smorest.perms import Api
+        from flask_more_smorest.perms.user_blueprint import UserBlueprint
+
+        api = Api(user_perms_app)
+        user_bp = UserBlueprint()
+        api.register_blueprint(user_bp)
+
+        spec = api.spec.to_dict()
+
+        # Verify CRUD endpoints have operationIds
+        assert spec["paths"]["/api/users/"]["get"]["operationId"] == "listUser"
+        assert spec["paths"]["/api/users/"]["post"]["operationId"] == "createUser"
+        assert spec["paths"]["/api/users/{users_id}"]["get"]["operationId"] == "getUser"
+        assert spec["paths"]["/api/users/{users_id}"]["patch"]["operationId"] == "updateUser"
+        assert spec["paths"]["/api/users/{users_id}"]["delete"]["operationId"] == "deleteUser"
+
+        # Verify custom endpoints have operationIds (this was the bug)
+        assert spec["paths"]["/api/users/login/"]["post"]["operationId"] == "login"
+        assert spec["paths"]["/api/users/me/"]["get"]["operationId"] == "getCurrentUserProfile"
+
+        # Verify ALL endpoints in UserBlueprint have operationIds
+        user_paths = {p: spec["paths"][p] for p in spec["paths"] if p.startswith("/api/users/")}
+        missing_operation_ids = []
+        for path, methods in user_paths.items():
+            for method, details in methods.items():
+                if isinstance(details, dict) and "operationId" not in details:
+                    missing_operation_ids.append(f"{method.upper()} {path}")
+
+        assert not missing_operation_ids, f"Missing operationIds for: {missing_operation_ids}"
