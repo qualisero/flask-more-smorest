@@ -4,7 +4,6 @@ This module provides BlueprintOperationIdMixin that extends Flask-Smorest's
 Blueprint to automatically generate OpenAPI operationId values for endpoints.
 """
 
-import functools
 from collections.abc import Callable
 from typing import Any, Final
 
@@ -74,8 +73,10 @@ class BlueprintOperationIdMixin(Blueprint):
                 operation_id = func.__name__
             else:
                 class_name = method_view_class.__name__
-                # TODO: decide if ending in `/` should be enough to consider it a collection
-                if method_name == "get" and class_name.endswith("s") and rule.endswith("/"):
+                # Check for trailing slash to determine if this is a collection endpoint
+                # Collection endpoints (list operations) typically end with /
+                # Single-item endpoints have path parameters and may or may not end with /
+                if method_name == "get" and rule.endswith("/"):
                     operation_id = f"list{class_name}"
                 else:
                     operation_name = HTTP_METHOD_OPERATION_MAP.get(method_name, method_name)
@@ -83,8 +84,8 @@ class BlueprintOperationIdMixin(Blueprint):
             operation_id = convert_snake_to_camel(operation_id)
             operation_id = operation_id[0].lower() + operation_id[1:]
             decorated_func = self.doc(operationId=operation_id)(func)
-            # Use functools.wraps to preserve the function signature
-            return functools.wraps(func)(decorated_func)
+            # Return the decorated function directly - self.doc() already preserves metadata
+            return decorated_func  # type: ignore[no-any-return]
 
         def _route(
             class_or_func: type["MethodView"] | Callable,

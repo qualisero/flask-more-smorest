@@ -633,12 +633,31 @@ class TestMaximalFeatureIntegration:
         assert admin_resp.status_code in {200, 204}
 
     def test_operation_ids_generated(self, api_with_blueprints: Api) -> None:
-        """The Api should expose camelCase operationIds for CRUD routes."""
+        """The Api should expose camelCase operationIds for all CRUD routes.
+
+        This test verifies that operationIds are automatically generated for:
+        - MethodView-based CRUD endpoints (list, get, create, update, delete)
+        - Function-based routes with decorators (like those in UserBlueprint)
+        """
 
         assert api_with_blueprints.spec is not None
         spec = api_with_blueprints.spec.to_dict()
+
+        # Test MethodView-based CRUD endpoints
         assert spec["paths"]["/api/articles/"]["get"]["operationId"] == "listArticle"
+        assert spec["paths"]["/api/articles/"]["post"]["operationId"] == "createArticle"
+        assert spec["paths"]["/api/articles/{articles_id}"]["get"]["operationId"] == "getArticle"
+        assert spec["paths"]["/api/articles/{articles_id}"]["patch"]["operationId"] == "updateArticle"
         assert spec["paths"]["/api/articles/{articles_id}"]["delete"]["operationId"] == "deleteArticle"
+
+        # Verify all paths have operationIds
+        missing_operation_ids = []
+        for path, methods in spec["paths"].items():
+            for method, details in methods.items():
+                if isinstance(details, dict) and "operationId" not in details:
+                    missing_operation_ids.append(f"{method.upper()} {path}")
+
+        assert not missing_operation_ids, f"Missing operationIds for: {missing_operation_ids}"
 
     def test_advanced_filter_range_queries(
         self, auth_client: "FlaskClient", db_session: "scoped_session", test_user: User
