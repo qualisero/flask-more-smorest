@@ -79,9 +79,11 @@ def _create_mock_user(
     mock_user.is_superadmin = is_superadmin
 
     def has_role(role: str) -> bool:
-        if role == "superadmin":
+        # Case-insensitive role check for compatibility
+        role_upper = role.upper() if isinstance(role, str) else role
+        if role_upper == "SUPERADMIN":
             return is_superadmin
-        if role == "admin":
+        if role_upper == "ADMIN":
             return is_admin or is_superadmin
         return False
 
@@ -90,11 +92,11 @@ def _create_mock_user(
     def list_roles() -> list[str]:
         roles = []
         if is_superadmin:
-            roles.append("superadmin")
+            roles.append("SUPERADMIN")
         if is_admin or is_superadmin:
-            roles.append("admin")
+            roles.append("ADMIN")
         if not roles:
-            roles.append("user")
+            roles.append("USER")
         return roles
 
     mock_user.list_roles = list_roles

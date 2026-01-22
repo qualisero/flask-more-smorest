@@ -301,11 +301,12 @@ class User(BasePermsModel):
         Example:
             >>> user.has_role(DefaultUserRole.ADMIN)
             True
-            >>> user.has_role("admin", domain_name="main")
+            >>> user.has_role("ADMIN", domain_name="main")
             True
         """
-        # Normalize role to string for comparison
-        role_str = role.value if isinstance(role, enum.Enum) else str(role)
+        # Normalize role to uppercase string for comparison
+        # This handles both enum values and string inputs
+        role_str = role.value.upper() if isinstance(role, enum.Enum) else str(role).upper()
 
         roles = cast(list["UserRole"], self.roles)  # type: ignore[name-defined, redundant-cast]  # noqa: F821
         return bool(

@@ -50,11 +50,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Admin role type - constrained to valid admin roles only
-AdminRole = Literal["admin", "superadmin"]
+# Use uppercase values for backward compatibility
+AdminRole = Literal["ADMIN", "SUPERADMIN"]
 
-# Role constants
-ROLE_ADMIN: AdminRole = "admin"
-ROLE_SUPERADMIN: AdminRole = "superadmin"
+# Role constants - uppercase for backward compatibility
+ROLE_ADMIN: AdminRole = "ADMIN"
+ROLE_SUPERADMIN: AdminRole = "SUPERADMIN"
 
 
 @runtime_checkable

@@ -27,15 +27,15 @@ class TestMockUserCreation:
         user = _create_mock_user()
         assert not user.is_admin
         assert not user.is_superadmin
-        assert not user.has_role("admin")
-        assert not user.has_role("superadmin")
+        assert not user.has_role("ADMIN")
+        assert not user.has_role("SUPERADMIN")
 
     def test_admin_user_has_admin_role(self) -> None:
         user = _create_mock_user(is_admin=True)
         assert user.is_admin
         assert not user.is_superadmin
-        assert user.has_role("admin")
-        assert not user.has_role("superadmin")
+        assert user.has_role("ADMIN")
+        assert not user.has_role("SUPERADMIN")
 
     def test_superadmin_user_has_both_roles(self) -> None:
         user = _create_mock_user(is_superadmin=True)
@@ -46,17 +46,17 @@ class TestMockUserCreation:
 
     def test_list_roles_regular_user(self) -> None:
         user = _create_mock_user()
-        assert user.list_roles() == ["user"]
+        assert user.list_roles() == ["USER"]
 
     def test_list_roles_admin(self) -> None:
         user = _create_mock_user(is_admin=True)
-        assert "admin" in user.list_roles()
+        assert "ADMIN" in user.list_roles()
 
     def test_list_roles_superadmin(self) -> None:
         user = _create_mock_user(is_superadmin=True)
         roles = user.list_roles()
-        assert "superadmin" in roles
-        assert "admin" in roles
+        assert "SUPERADMIN" in roles
+        assert "ADMIN" in roles
 
 
 class TestAsUserContextManager:
@@ -108,7 +108,7 @@ class TestAsAdminContextManager:
         with app.app_context():
             with as_admin() as admin:
                 assert admin.is_admin
-                assert admin.has_role("admin")
+                assert admin.has_role("ADMIN")
 
     def test_as_admin_with_custom_id(self, app) -> None:
         custom_id = uuid.uuid4()
