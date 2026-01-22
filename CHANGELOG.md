@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-01-22
+
+### Fixed
+- **Role Storage**: Changed role storage from enum NAME to enum VALUE for backward compatibility
+  - All roles (both enum and string) are now stored as uppercase strings
+  - `UserRole.role` setter now stores `value.value.upper()` instead of `value.name`
+  - `User.has_role()` method updated for case-insensitive matching with enum values
+  - Maintains backward compatibility with applications expecting uppercase role strings
+
+### Tests
+- All 293 tests passing
+- Updated role-related tests to expect uppercase stored values
+- Added case-insensitive enum conversion test for custom string enums
+
 ## [0.9.0] - 2026-01-22
 
 ### Changed
