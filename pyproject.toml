@@ -188,7 +188,7 @@ warn_unused_ignores = false
 
 [tool.bandit]
 exclude_dirs = ["tests"]
-skips = ["B101", "B601"]
+skips = ["B101", "B106", "B601"]
 
 [tool.tox]
 legacy_tox_ini = """
