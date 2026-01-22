@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-01-22
+
+### Changed
+- **BREAKING**: Removed "Tenant" terminology from codebase, now using "Domain" consistently
+  - Renamed `NoTenantAccessError` to `NoDomainAccessError`
+  - Renamed `TenantNotFoundError` to `DomainNotFoundError`
+  - Removed legacy backward-compatibility aliases
+  - Updated all references and error messages to use "Domain" instead of "Tenant"
+- **User Model Enhancements**:
+  - Added `is_enabled` column with `server_default=sa.true()`
+  - Added `discriminator` column for polymorphic inheritance support
+  - Added `has_domain_access(self, domain_id)` method for checking domain membership
+  - Login logic now enforces `is_enabled` check
+- **Domain Model**: Added `discriminator` column and polymorphic inheritance support
+- **UserBlueprint**:
+  - Added `_validate_login(self, user, data)` hook for custom login validation
+  - Login endpoint now calls validation hook after password verification
+- **ProfileMixin**:
+  - Added `parse_full_name(cls, full_name)` class method for splitting full names
+  - Added `avatar` property returning `avatar_url` for easier overriding
+- **BasePermsModel**: Improved documentation for `_can_read()`, `_can_write()`, `_can_create()` methods
+- **BaseModel**: Fixed relationship handling in `update()` method for polymorphic models
+
+### Added
+- **Polymorphic Inheritance Tests**: Added comprehensive test coverage for polymorphic inheritance
+  - Tests for `Token` with discriminator `"token"`
+  - Tests for `UserSetting` with discriminator `"user_setting"`
+  - Tests for `Domain` with discriminator `"domain"`
+  - Tests for `User` with custom polymorphic identity
+
+### Tests
+- Updated test count to 295 (all passing)
+- Added `polymorphic_identity` parameter to `Domain` model
+- Added custom User subclass test to verify discriminator behavior
+- Verified polymorphic inheritance works with custom mapper args
+- All code quality checks pass (ruff, mypy, bandit)
+
+### Documentation
+- Updated `pyproject.toml` Bandit config to disable `B106` for tests directory
+- Polymorphic inheritance properly documented in model docstrings
+
 ## [0.8.2] - 2026-01-22
 
 ### Added
