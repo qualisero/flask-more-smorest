@@ -305,6 +305,7 @@ class TestCustomUserModelExtension:
         assert admin_user.has_role(BaseRoleEnum.ADMIN)
 
         # Verify domain relationship works through role
+        assert admin_user.roles[0].domain is not None
         assert admin_user.roles[0].domain.name == "test_domain"
 
         # Regular user
