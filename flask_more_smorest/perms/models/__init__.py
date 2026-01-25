@@ -1,22 +1,21 @@
 """User-related models for Flask-More-Smorest.
 
-This module provides a clean re-export of all user-related models.
+This module exports abstract user-related models. Concrete default
+implementations live in ``flask_more_smorest.perms.models.defaults`` and
+are only loaded when explicitly imported.
 """
 
 from __future__ import annotations
 
-from .role import DefaultUserRole, Domain, UserRole
-from .setting import UserSetting
-from .token import Token
-from .user import User, _get_jwt_current_user, current_user
+from .abstract_role import AbstractDomain, AbstractUserRole
+from .abstract_setting import AbstractUserSetting
+from .abstract_token import AbstractToken
+from .abstract_user import AbstractUser
 
 __all__ = [
-    "User",
-    "UserRole",
-    "Domain",
-    "Token",
-    "UserSetting",
-    "DefaultUserRole",
-    "current_user",
-    "_get_jwt_current_user",
+    "AbstractUser",
+    "AbstractUserRole",
+    "AbstractDomain",
+    "AbstractToken",
+    "AbstractUserSetting",
 ]

@@ -19,7 +19,7 @@ __all__ = ["as_user", "as_admin", "clear_registration"]
 def clear_registration() -> None:
     """Clear the custom user registration.
 
-    This is a proxy to :func:`flask_more_smorest.perms.user_context.clear_registration`
+    This is a proxy to :func:`flask_more_smorest.perms.clear_registration`
     for convenience in test files.
 
     Useful for testing to reset to default JWT behavior after registering
@@ -29,14 +29,15 @@ def clear_registration() -> None:
 
     .. code-block:: python
 
-        from flask_more_smorest.testing import clear_registration, register_user_class
+        from flask_more_smorest.testing import clear_registration
+        from flask_more_smorest.perms import init_fms
 
         def test_with_custom_user():
-            register_user_class(MyUser)
+            init_fms(user=MyUser)
             # ... test ...
             clear_registration()  # Reset for next test
     """
-    from .perms.user_context import clear_registration as _clear_registration
+    from .perms.user_registry import clear_registration as _clear_registration
 
     _clear_registration()
 
@@ -137,13 +138,14 @@ def as_admin(
 
         from flask_more_smorest import User
         from flask_more_smorest.testing import as_admin
-        from flask_more_smorest.perms.models import DefaultUserRole, UserRole
+        from flask_more_smorest.perms.models.defaults import DefaultUserRole, BaseRoleEnum
+        from flask_more_smorest.perms.models.role import UserRole
 
         def test_admin_endpoint(client, db_session):
             # Create admin user
             admin = User(email="admin@example.com", password="password123")
             admin.save()
-            admin.roles.append(UserRole(user=admin, role=DefaultUserRole.ADMIN))
+            admin.roles.append(UserRole(user=admin, role=BaseRoleEnum.ADMIN))
 
             # Test admin-only endpoint
             with as_admin(client, str(admin.id)):
@@ -154,7 +156,7 @@ def as_admin(
 
     .. code-block:: python
 
-        admin.roles.append(UserRole(user=admin, role=DefaultUserRole.SUPERADMIN))
+        admin.roles.append(UserRole(user=admin, role=BaseRoleEnum.SUPERADMIN))
 
         with as_admin(client, str(admin.id), roles=["superadmin"]):
             response = client.delete("/api/users/123/")

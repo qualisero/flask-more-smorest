@@ -1,6 +1,7 @@
-"""User model for Flask-More-Smorest authentication system.
+"""Abstract User model for Flask-More-Smorest authentication system.
 
-Provides User model with email/password auth, roles, settings, and tokens.
+Provides abstract base for User models with email/password auth, roles, settings, and tokens.
+This is an abstract model - no table is created. Inherit from this to create concrete User models.
 """
 
 from __future__ import annotations
@@ -8,80 +9,103 @@ from __future__ import annotations
 import enum
 import logging
 import uuid
-from typing import Self, TypeVar, cast
+from typing import TYPE_CHECKING, Self, TypeVar
 
-from flask_jwt_extended import current_user as jwt_current_user
-from flask_jwt_extended import exceptions, verify_jwt_in_request
+import sqlalchemy as sa
+from sqlalchemy.ext.declarative import declared_attr
+from sqlalchemy.orm import Mapped, mapped_column, relationship  # noqa: I001
 
 from ...error.exceptions import UnprocessableEntity
 from ...utils import check_password_hash, generate_password_hash
+from ..base_perms_model import BasePermsModel
 from ..user_context import AdminRole
-from .abstract_user import AbstractUser
+
+if TYPE_CHECKING:
+    from .abstract_role import AbstractUserRole
+    from .abstract_setting import AbstractUserSetting
+    from .abstract_token import AbstractToken
 
 logger = logging.getLogger(__name__)
 
-UserModelT = TypeVar("UserModelT", bound="User")
 
-# TODO: should probably not have this top-level proxy here and only use get_current_user()
-# current_user: LocalProxy[AbstractUser] = cast("LocalProxy[AbstractUser]", jwt_current_user)
+UserT = TypeVar("UserT", bound="AbstractUser")
 
 
-def _get_jwt_current_user() -> AbstractUser | None:
-    """Get current authenticated user via JWT.
+class AbstractUser(BasePermsModel):
+    """Abstract User model with email/password auth, roles, and domain support.
 
-    This is used as the default fallback when no custom function is registered.
-    Applications should use get_current_user() from user_context instead.
+    This is an abstract base class - it does NOT create a database table.
+    Subclasses must define concrete fields and table configuration.
 
-    Returns:
-        Current user instance if authenticated, None otherwise
-    """
-    try:
-        verify_jwt_in_request()
-    except exceptions.JWTExtendedException:
-        return None
-    except Exception as e:
-        logger.exception("Error verifying JWT for current user: %s", e)
-        return None
+    **Features (all inherited):**
+    - Email/password authentication
+    - Roles management via UserRole relationship
+    - Settings management via UserSetting relationship
+    - Token management via Token relationship
+    - Permission checks (_can_read, _can_write, _can_create)
+    - Admin properties (is_admin, is_superadmin)
+    - Role checking (has_role, list_roles)
 
-    # Resolve LocalProxy to get the actual user object
-    try:
-        resolved = jwt_current_user._get_current_object()
-        return cast("AbstractUser | None", resolved)
-    except (AttributeError, RuntimeError):
-        return None
-
-
-class User(AbstractUser):
-    """User model with email/password auth, roles, and domain support.
-
-    This is a concrete implementation of AbstractUser. For customization,
-    subclass AbstractUser instead of this class.
-
-    Example:
+    **Subclassing example:**
 
     .. code-block:: python
 
-        from flask_more_smorest.perms.models import AbstractUser
+        from flask_more_smorest.perms import AbstractUser, init_fms
 
         class CustomUser(AbstractUser):
-            __tablename__ = "user"
-
-            bio: Mapped[str | None] = mapped_column(db.String(500))
-            age: Mapped[int | None] = mapped_column(db.Integer)
+            # Optional: custom fields only
+            bio: Mapped[str | None] = mapped_column(sa.String(500))
 
             def _can_write(self, current_user) -> bool:
-                if self.age and self.age < 18:
-                    return False  # Minors can't edit
                 return super()._can_write(current_user)
 
-            @property
-            def is_adult(self) -> bool:
-                return self.age is not None and self.age >= 18
+        # Register with the system
+        init_fms(user=CustomUser)
     """
 
+    __abstract__ = True  # No table is created
     __tablename__ = "user"
     __table_args__ = {"extend_existing": True}
-    PUBLIC_REGISTRATION: bool = False
+
+    email: Mapped[str] = mapped_column(sa.String(128), unique=True, nullable=False)
+    password: Mapped[bytes | None] = mapped_column(sa.LargeBinary(128), nullable=True)
+    is_enabled: Mapped[bool] = mapped_column(
+        sa.Boolean(),
+        default=True,
+        nullable=False,
+        server_default=sa.true(),
+    )
+
+    @declared_attr
+    def roles(cls) -> Mapped[list[AbstractUserRole]]:
+        from ..user_registry import get_role_model
+
+        return relationship(
+            lambda: get_role_model(),
+            back_populates="user",
+            cascade="all, delete-orphan",
+            enable_typechecks=False,
+        )
+
+    @declared_attr
+    def settings(cls) -> Mapped[list[AbstractUserSetting]]:
+        from ..user_registry import get_setting_model
+
+        return relationship(
+            lambda: get_setting_model(),
+            back_populates="user",
+            cascade="all, delete-orphan",
+        )
+
+    @declared_attr
+    def tokens(cls) -> Mapped[list[AbstractToken]]:
+        from ..user_registry import get_token_model
+
+        return relationship(
+            lambda: get_token_model(),
+            back_populates="user",
+            cascade="all, delete-orphan",
+        )
 
     def __init__(self, **kwargs: object):
         """Create new user with optional password hashing."""
@@ -93,7 +117,7 @@ class User(AbstractUser):
             self.set_password(password)
 
     @classmethod
-    def get_current_user(cls: type[UserModelT]) -> UserModelT | None:
+    def get_current_user(cls: type[UserT]) -> UserT | None:
         """Get the current authenticated user of this User subclass.
 
         This provides zero-boilerplate typed access to the current user.
@@ -108,7 +132,8 @@ class User(AbstractUser):
         """
         from ..user_context import get_current_user
 
-        return cast("UserModelT | None", get_current_user(cls))
+        # The overload in get_current_user handles the type narrowing
+        return get_current_user(cls)
 
     def normalize_email(self, email: str | None) -> str | None:
         """Normalize email to lowercase for case-insensitive lookups.
@@ -125,7 +150,7 @@ class User(AbstractUser):
         Returns:
             Lowercase email address, or None if email is None
         """
-        return email.lower() if email else None
+        return email.lower() if email else email
 
     def set_password(self, password: str) -> None:
         """Set password with secure hashing."""
@@ -191,7 +216,7 @@ class User(AbstractUser):
             True
         """
         # Normalize role to uppercase string for comparison
-        # This handles both enum values (already uppercase) and string inputs
+        # This handles both enum values and string inputs
         role_str = role.value.upper() if isinstance(role, enum.Enum) else str(role).upper()
 
         roles = self.roles
@@ -215,42 +240,43 @@ class User(AbstractUser):
             current_user: The current authenticated user, or None
         """
 
-        if not current_user:
+        user = current_user
+        if not user:
             return False
         try:
-            return self.id == current_user.id
+            return self.id == user.id or user.is_admin
         except Exception:
             return False
 
-    def _can_write(self, current_user: Self | None) -> bool:
+    def _can_write(self, user: Self | None) -> bool:
         """Default write permission: users can edit their own profile.
 
         Args:
-            current_user: The current authenticated user, or None
+            user: The current authenticated user, or None
         """
-        if not current_user:
-            return False
 
+        if not user:
+            return False
         try:
-            if self.id == current_user.id:
+            if self.id == user.id:
                 return True
             if self.is_admin:
-                return current_user.is_superadmin
-            return current_user.is_admin
+                return user.is_superadmin
+            return user.is_admin
         except Exception:
             return False
 
-    def _can_create(self, current_user: Self | None) -> bool:
+    def _can_create(self, user: Self | None) -> bool:
         """Default create permission: admins can create users, or public registration if enabled.
 
         Args:
-            current_user: The current authenticated user, or None
+            user: The current authenticated user, or None
         """
+
         # Check if public registration is enabled on the class
         if getattr(self.__class__, "PUBLIC_REGISTRATION", False):
             return True
-
-        return current_user is not None and current_user.is_admin
+        return user is not None and user.is_admin
 
     # Concrete methods that use relationships - available to all User models
     @property
@@ -282,6 +308,3 @@ class User(AbstractUser):
             True
         """
         return domain_id is None or domain_id in self.domain_ids or "*" in self.domain_ids
-
-
-# Import uuid for type annotations

@@ -2,14 +2,25 @@
 
 This module provides the permissions system including the Api with auth,
 BasePermsModel with permission checks, user models, and PermsBlueprintMixin.
+
+**Quick Start:**
+
+    from flask_more_smorest.perms import init_fms
+    from flask_more_smorest.perms.models.defaults import DefaultUser
+
+    # Register user models
+    init_fms(user=DefaultUser)
+
+    # Use the UserBlueprint
+    user_bp = UserBlueprint(register=False)
+    api.register_blueprint(user_bp)
+
+    # Note: no global singleton user_bp is provided; create explicitly.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from .user_blueprint import UserBlueprint
 
 from .api import Api
 from .base_perms_model import BasePermsModel
@@ -21,89 +32,48 @@ from .model_mixins import (
     TimestampMixin,
     UserOwnershipMixin,
 )
+from .models import AbstractDomain, AbstractToken, AbstractUser, AbstractUserRole, AbstractUserSetting
 from .perms_blueprint import PermsBlueprint, PermsBlueprintMixin
 from .user_blueprint import UserBlueprint
 from .user_context import (
     ROLE_ADMIN,
     ROLE_SUPERADMIN,
     AdminRole,
-    UserProtocol,
-    clear_registration,
     get_current_user,
     get_current_user_id,
     is_current_user_admin,
     is_current_user_superadmin,
-    register_user_class,
 )
+from .user_registry import clear_registration as _clear_registration
+from .user_registry import get_current_user_func, init_fms
 
-_user_bp: UserBlueprint | None = None
-
-
-def _get_default_user_bp() -> UserBlueprint:
-    """Get or create the default user_bp instance."""
-    global _user_bp
-    if _user_bp is None:
-        _user_bp = UserBlueprint()
-    return _user_bp
+if TYPE_CHECKING:
+    from .user_blueprint import UserBlueprint
 
 
 def __getattr__(name: str) -> object:
-    """Lazy attribute access for default user_bp instance and models/schemas."""
-    if name == "user_bp":
-        return _get_default_user_bp()
+    """Lazy attribute access for schemas."""
 
-    # Type stubs for lazy-loaded objects
     if TYPE_CHECKING:
-        from .models import (
-            DefaultUserRole,
-            Domain,
-            Token,
-            User,
-            UserRole,
-            UserSetting,
-        )
         from .user_schemas import UserSchema
 
-    # Lazy imports for models and schemas to avoid premature table creation
     if name == "UserSchema":
         from .user_schemas import UserSchema
 
         globals()["UserSchema"] = UserSchema
         return UserSchema
 
-    if name in (
-        "User",
-        "UserRole",
-        "Domain",
-        "Token",
-        "UserSetting",
-        "DefaultUserRole",
-    ):
-        from .models import (
-            DefaultUserRole,
-            Domain,
-            Token,
-            User,
-            UserRole,
-            UserSetting,
-        )
-
-        # Cache the imports
-        globals()[name] = locals()[name]
-        return locals()[name]
-
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def clear_registration() -> None:
+    """Clear all user model registrations and helper functions."""
+    _clear_registration()
 
 
 __all__ = [
     "Api",
     "BasePermsModel",
-    "User",
-    "UserRole",
-    "Domain",
-    "Token",
-    "UserSetting",
-    "DefaultUserRole",
     "UserSchema",
     "get_current_user",
     "get_current_user_id",
@@ -118,12 +88,18 @@ __all__ = [
     "PermsBlueprint",
     "UserBlueprint",
     "init_jwt",
+    # Abstract models
+    "AbstractUser",
+    "AbstractUserRole",
+    "AbstractDomain",
+    "AbstractToken",
+    "AbstractUserSetting",
     # User context
-    "UserProtocol",
     "AdminRole",
     "ROLE_ADMIN",
     "ROLE_SUPERADMIN",
-    "register_user_class",
+    # User registry
+    "init_fms",
     "clear_registration",
-    "user_bp",
+    "get_current_user_func",
 ]

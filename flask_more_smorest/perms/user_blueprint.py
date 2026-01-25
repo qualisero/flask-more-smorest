@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from flask_jwt_extended import create_access_token
 
@@ -15,8 +15,8 @@ if TYPE_CHECKING:
     from marshmallow import Schema
 
     from ..sqla.base_model import BaseModel
+    from .models.abstract_user import AbstractUser
 
-from .user_context import UserProtocol
 
 _user_bp: UserBlueprint | None = None
 
@@ -50,11 +50,12 @@ class UserBlueprint(PermsBlueprint):
     Args:
         name: Blueprint name (default: "users")
         import_name: Import name (default: __name__)
-        model: Model class or string (default: User)
+        model: Model class or string (default: User from registry)
         schema: Schema class or string (default: UserSchema)
-        url_prefix: URL prefix for all routes (default: "/api/user/")
+        url_prefix: URL prefix for all routes (default: "/api/users/")
         methods: CRUD methods to enable (default: all methods)
         skip_methods: CRUD methods to disable (default: None)
+        register: If True, register the model with init_fms (default: False)
         **kwargs: Additional arguments passed to CRUDBlueprint
 
     Example:
@@ -63,9 +64,12 @@ class UserBlueprint(PermsBlueprint):
 
         >>> # With custom configuration
         >>> user_bp = UserBlueprint(
-        ...     url_prefix="/api/v2/user/",
+        ...     url_prefix="/api/v2/users/",
         ...     skip_methods=[CRUDMethod.DELETE]
         ... )
+
+        >>> # Register custom user model
+        >>> user_bp = UserBlueprint(model=MyUser, register=True)
 
         >>> # Enable public registration
         >>> class PublicUser(User):
@@ -82,19 +86,28 @@ class UserBlueprint(PermsBlueprint):
         url_prefix: str | None = "/api/users/",
         methods: list[CRUDMethod] | MethodConfigMapping | None = None,
         skip_methods: list[CRUDMethod] | None = None,
+        register: bool = False,
         **kwargs: Any,
     ) -> None:
         """Initialize UserBlueprint with default User model and schema."""
         # Set defaults for model and schema
         if model is None:
-            from .models import User
+            from .user_registry import get_user_model
 
-            model = User
+            model = get_user_model()
 
         if schema is None:
             from .user_schemas import UserSchema
 
             schema = UserSchema
+
+        # Register the model if requested
+        if register and model is not None:
+            from .user_registry import init_fms
+
+            if not isinstance(model, type):
+                raise TypeError("UserBlueprint register=True requires a model class")
+            init_fms(user=cast("type[AbstractUser]", model))
 
         # Use default methods if not specified
         if methods is None:
@@ -135,7 +148,7 @@ class UserBlueprint(PermsBlueprint):
         self._register_login_endpoint()
         self._register_current_user_endpoint()
 
-    def _validate_login(self, user: UserProtocol, data: dict[str, Any]) -> None:
+    def _validate_login(self, user: AbstractUser, data: dict[str, Any]) -> None:
         """Hook to add custom validation during login.
 
         Override this method in a subclass to add custom checks.
@@ -149,7 +162,7 @@ class UserBlueprint(PermsBlueprint):
 
     def _register_login_endpoint(self) -> None:
         """Register the login endpoint."""
-        from .models import User as UserModel
+        from .models.abstract_user import AbstractUser
         from .user_schemas import TokenSchema, UserLoginSchema
 
         @self.public_endpoint
@@ -161,8 +174,8 @@ class UserBlueprint(PermsBlueprint):
 
             user_model_cls: type[BaseModel] = self._config.model_cls
 
-            # Make sure user_model_cls is a subclass of User
-            if not issubclass(user_model_cls, UserModel):
+            # Make sure user_model_cls is a subclass of AbstractUser
+            if not issubclass(user_model_cls, AbstractUser):
                 raise UnauthorizedError("Invalid user model for login")
 
             # Use bypass_perms since this is a public endpoint without auth
@@ -188,7 +201,7 @@ class UserBlueprint(PermsBlueprint):
 
         @self.route("/me/", methods=["GET"])
         @self.response(HTTPStatus.OK, user_schema_cls)
-        def get_current_user_profile() -> UserProtocol:
+        def get_current_user_profile() -> AbstractUser:
             """Get current authenticated user's profile."""
             from .user_context import get_current_user
 

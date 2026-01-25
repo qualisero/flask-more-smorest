@@ -11,6 +11,8 @@ from flask_jwt_extended import exceptions
 from sqlalchemy.orm.state import InstanceState
 from werkzeug.exceptions import Unauthorized
 
+from flask_more_smorest.perms.user_context import ROLE_ADMIN, ROLE_SUPERADMIN
+
 from ..error.exceptions import ForbiddenError, UnauthorizedError
 from ..sqla import BaseModel as SQLABaseModel
 
@@ -35,6 +37,9 @@ class BasePermsModel(SQLABaseModel):
 
     def __init__(self, **kwargs: object) -> None:
         """Initialize model after checking sub-fields can be created."""
+        from .user_registry import ensure_models_initialized
+
+        ensure_models_initialized()
         self.check_create(kwargs.values())
         super().__init__(**kwargs)
 
@@ -57,7 +62,7 @@ class BasePermsModel(SQLABaseModel):
     def _should_bypass_perms(self) -> bool:
         return self.perms_disabled or not has_request_context()
 
-    def _check_admin_bypass(self) -> bool:
+    def _check_admin_bypass(self, current_user: Any) -> bool:
         """Check if current operation should bypass due to admin privileges.
 
         Returns True if:
@@ -79,9 +84,9 @@ class BasePermsModel(SQLABaseModel):
         if getattr(self, "is_admin", False):
             return False
 
-        from .user_context import is_current_user_admin
-
-        return is_current_user_admin()
+        return current_user is not None and (
+            current_user.has_role(ROLE_ADMIN) or current_user.has_role(ROLE_SUPERADMIN)
+        )
 
     def _execute_permission_check(self, check_func: Callable[[], bool], operation: str) -> bool:
         """Execute permission check with consistent error handling.
@@ -105,40 +110,50 @@ class BasePermsModel(SQLABaseModel):
                 raise UnauthorizedError("User must be authenticated")
             raise e
 
-    def can_write(self) -> bool:
+    def can_write(self, current_user: Any = None) -> bool:
         """Check if current user has write permission."""
-        if self._check_admin_bypass():
+
+        if current_user is None:
+            from .user_context import get_current_user
+
+            current_user = get_current_user()
+
+        if self._check_admin_bypass(current_user):
             return True
 
-        from .user_context import get_current_user
-
-        current_user = get_current_user()
         if getattr(sa.inspect(self), "transient", False):
             return self._execute_permission_check(lambda: self._can_create(current_user), "create")
+
         return self._execute_permission_check(lambda: self._can_write(current_user), "write")
 
-    def can_read(self) -> bool:
+    def can_read(self, current_user: Any = None) -> bool:
         """Check if current user has read permission."""
-        if self._check_admin_bypass():
+
+        if current_user is None:
+            from .user_context import get_current_user
+
+            current_user = get_current_user()
+
+        if self._check_admin_bypass(current_user):
             return True
 
         if self.id is None:
             return True  # type: ignore[unreachable]  # mypy false positive
 
-        from .user_context import get_current_user
-
-        current_user = get_current_user()
         return self._execute_permission_check(lambda: self._can_read(current_user), "read")
 
-    def can_create(self) -> bool:
+    def can_create(self, current_user: Any = None) -> bool:
         """Check if current user can create objects."""
-        if self._check_admin_bypass():
+
+        if current_user is None:
+            from .user_context import get_current_user
+
+            current_user = get_current_user()
+
+        if self._check_admin_bypass(current_user):
             return True
 
-        from .user_context import get_current_user
-
-        current_user = get_current_user()
-        return self._can_create(current_user)
+        return self._execute_permission_check(lambda: self._can_create(current_user), "create")
 
     def _can_write(self, current_user: Any) -> bool:
         """Internal permission check for write/update/delete operations.

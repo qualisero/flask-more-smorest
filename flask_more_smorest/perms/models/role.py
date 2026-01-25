@@ -1,6 +1,6 @@
 """Role and domain models for Flask-More-Smorest.
 
-Provides DefaultUserRole enum, Domain, and UserRole models for
+Provides BaseRoleEnum, Domain, and UserRole models for
 multi-domain role-based access control.
 """
 
@@ -9,48 +9,23 @@ from __future__ import annotations
 import enum
 import os
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ...sqla import db
-from ..base_perms_model import BasePermsModel
+from .abstract_role import AbstractDomain, AbstractUserRole
+from .base_roles import BaseRoleEnum
 
-if TYPE_CHECKING:
-    from .user import User
+__all__ = ["BaseRoleEnum", "Domain", "UserRole"]
 
 
-class DefaultUserRole(str, enum.Enum):
-    """Default user role enumeration.
+class Domain(AbstractDomain):
+    """Distinct domains within the app for multi-domain support.
 
-    Values are uppercase for backward compatibility with applications
-    expecting uppercase role strings.
+    This is a concrete implementation of AbstractDomain. For customization,
+    subclass AbstractDomain instead of this class.
     """
-
-    SUPERADMIN = "SUPERADMIN"
-    ADMIN = "ADMIN"
-    USER = "USER"
-
-
-class Domain(BasePermsModel):
-    """Distinct domains within the app for multi-domain support."""
-
-    __mapper_args__ = {
-        "polymorphic_on": "discriminator",
-        "polymorphic_identity": "domain",
-    }
-
-    discriminator: Mapped[str] = mapped_column(
-        db.String(50),
-        default="domain",
-        nullable=False,
-        server_default="domain",
-    )
-
-    name: Mapped[str] = mapped_column(db.String(255), nullable=False)
-    display_name: Mapped[str] = mapped_column(db.String(255), nullable=False)
-    active: Mapped[bool] = mapped_column(db.Boolean, default=True, nullable=False)
 
     @classmethod
     def get_default_domain_id(cls) -> uuid.UUID | None:
@@ -74,7 +49,7 @@ class Domain(BasePermsModel):
         return True
 
 
-class UserRole(BasePermsModel):
+class UserRole(AbstractUserRole):
     """User roles with domain scoping for multi-domain applications.
 
     To use custom role enums, simply pass enum values when creating roles:
@@ -95,26 +70,6 @@ class UserRole(BasePermsModel):
 
     # Store role as string to support any enum
     # No default Role enum - accept any string/enum value
-
-    # Use string reference for User to support custom models
-    user_id: Mapped[uuid.UUID] = mapped_column(sa.Uuid(as_uuid=True), db.ForeignKey("user.id"), nullable=False)
-    domain_id: Mapped[uuid.UUID | None] = mapped_column(
-        sa.Uuid(as_uuid=True),
-        db.ForeignKey("domain.id"),
-        nullable=True,
-        default=None,
-    )
-
-    # Relationships
-    domain: Mapped[Domain | None] = relationship("Domain")
-    user: Mapped[User] = relationship(
-        "User",  # Use string reference to avoid circular import
-        back_populates="roles",
-        enable_typechecks=False,  # allow User subclasses
-    )
-
-    # Store role as string to support custom enums
-    _role: Mapped[str] = mapped_column("role", sa.String(50), nullable=False)
 
     @property
     def role(self) -> str:
@@ -167,7 +122,7 @@ class UserRole(BasePermsModel):
             else:
                 kwargs["_role"] = str(role).upper()
 
-        super().__init__(domain_id=domain_id, **kwargs)
+        super().__init__(domain_id=domain_id, role=role, **kwargs)
 
     def _can_write(self, current_user: Any) -> bool:
         """Permission check for modifying roles.

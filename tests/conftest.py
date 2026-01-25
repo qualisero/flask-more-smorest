@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Generator
 
 import pytest
+from sqlalchemy.orm import clear_mappers
 
 from flask_more_smorest import db
 from flask_more_smorest.perms import clear_registration
@@ -28,20 +30,23 @@ def _cleanup_test_mappers() -> Generator[None, None, None]:
     """
     yield
 
-    # Cleanup SQLAlchemy mappers defined in tests
-    if hasattr(db, "Model") and hasattr(db.Model, "registry"):
-        to_dispose = []
-        for mapper in db.Model.registry.mappers:
-            # Check if class is defined in a test module
-            # We specifically target models defined in the tests/ package
-            if mapper.class_.__module__.startswith("tests."):
-                to_dispose.append(mapper.class_)
+    # Clear all mappers to ensure a clean slate for the next test module
+    clear_mappers()
 
-        for cls in to_dispose:
-            # Remove from registry using internal method if available
-            if hasattr(db.Model.registry, "_dispose_cls"):
-                db.Model.registry._dispose_cls(cls)
+    # Clear metadata to remove table definitions
+    if hasattr(db, "metadata"):
+        db.metadata.clear()
 
-            # Remove table from metadata to allow re-creation
-            if hasattr(cls, "__table__") and cls.__table__ in db.metadata:
-                db.metadata.remove(cls.__table__)
+    # Force re-import of persistent model modules to re-map them
+    # This is necessary because clear_mappers() leaves classes unmapped
+    modules_to_unload = [
+        "flask_more_smorest.perms.models.role",
+        "flask_more_smorest.perms.models.token",
+        "flask_more_smorest.perms.models.setting",
+        "flask_more_smorest.perms.models.defaults",
+        "flask_more_smorest.perms.models.user",
+    ]
+
+    for module_name in modules_to_unload:
+        if module_name in sys.modules:
+            del sys.modules[module_name]

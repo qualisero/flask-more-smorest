@@ -1,12 +1,19 @@
 """User schemas."""
 
+from typing import TYPE_CHECKING
+
 from marshmallow import fields, pre_load
 
 from ..sqla.base_model import BaseSchema
-from .models import User
+from .user_registry import get_user_model
+
+if TYPE_CHECKING:
+    BaseUserSchema = BaseSchema
+else:
+    BaseUserSchema = get_user_model().Schema
 
 
-class UserSchema(User.Schema):
+class UserSchema(BaseUserSchema):
     """Public user schema - extends auto-generated schema."""
 
     password = fields.Str(required=True, load_only=True)

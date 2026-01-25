@@ -105,14 +105,20 @@ class HasUserMixin:
 
     @declared_attr
     def user(cls) -> Mapped["User"]:
-        """Relationship to User model."""
-        from .models.user import User
+        """Relationship to the registered User model.
+
+        Uses lazy resolution via lambda to support custom User models registered
+        through init_fms(). The lambda is evaluated during mapper configuration,
+        allowing get_user_model() to return the correct registered User class.
+        """
+        from .user_registry import get_user_model
 
         backref_name = cls._user_backref_name()
 
-        # Add backref to User model, unless it already exists or is explicitly disabled
-        if backref_name and (hasattr(User, backref_name) or backref_name in ("user_roles", "user_settings", "tokens")):
-            backref_arg = None
+        # Build backref if needed
+        # Standard User relationships: "roles" (from user_roles), "settings" (from user_settings), "tokens"
+        if backref_name and backref_name in ("roles", "settings", "tokens"):
+            backref_arg = None  # Already defined on User model
         elif backref_name:
             backref_arg = backref(
                 backref_name,
@@ -121,11 +127,16 @@ class HasUserMixin:
                 lazy="dynamic",
             )
         else:
-            # backref_name is None, skip backref
             backref_arg = None
 
-        # Use lambda to reference the User class directly, avoiding string lookup ambiguity
-        return relationship(lambda: User, lazy="joined", foreign_keys=[cls.user_id], backref=backref_arg)  # type: ignore[list-item]
+        # Use lambda to get registered User model dynamically
+        # The lambda is called during mapper configuration, not at class definition time
+        return relationship(
+            lambda: get_user_model(),
+            lazy="joined",
+            foreign_keys=[cls.user_id],  # type: ignore[list-item]
+            backref=backref_arg,
+        )
 
 
 class UserOwnershipMixin(HasUserMixin):

@@ -1,11 +1,10 @@
 import logging
 import uuid
-from typing import cast
 
 from flask import Flask
 from flask_jwt_extended import JWTManager
 
-from .user_context import UserProtocol
+from .models.abstract_user import AbstractUser
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +19,6 @@ def init_jwt(app: Flask) -> None:
         RuntimeError: If JWT_SECRET_KEY is not set in production
             (when DEBUG and TESTING are both False)
     """
-    # Import User here to avoid premature table creation
-    from .models import User
-
     jwt_secret = app.config.get("JWT_SECRET_KEY")
     is_production = not app.debug and not app.testing
 
@@ -44,14 +40,16 @@ def init_jwt(app: Flask) -> None:
 
     # Set up user_identity_lookup for JWT
     @jwt.user_identity_loader
-    def user_identity_lookup(user: UserProtocol | uuid.UUID) -> str:
+    def user_identity_lookup(user: AbstractUser | uuid.UUID) -> str:
         return str(user)
 
     # Set up user_lookup_callback for JWT
     @jwt.user_lookup_loader
-    def user_lookup_callback(_jwt_header: dict, jwt_data: dict) -> UserProtocol | None:
+    def user_lookup_callback(_jwt_header: dict, jwt_data: dict) -> AbstractUser | None:
         from ..sqla import db
-        from .user_context import _get_registered_user_class
+        from .user_registry import get_user_model
+
+        User = get_user_model()
 
         identity = jwt_data["sub"]
         user = db.session.get(User, uuid.UUID(identity))
@@ -59,9 +57,4 @@ def init_jwt(app: Flask) -> None:
         if user is None:
             return None
 
-        # Check if user is an instance of the registered custom class
-        registered_cls = _get_registered_user_class()
-        if registered_cls is not None and isinstance(user, registered_cls):
-            return cast(UserProtocol, user)
-
-        return cast(UserProtocol, user)
+        return user

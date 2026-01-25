@@ -16,6 +16,7 @@ from flask_smorest import Api
 from marshmallow import Schema
 
 from flask_more_smorest import BaseModel, CRUDBlueprint, db, init_db
+from flask_more_smorest.perms import init_fms
 
 if TYPE_CHECKING:
     from flask.testing import FlaskClient
@@ -24,6 +25,14 @@ if TYPE_CHECKING:
 @pytest.fixture(scope="function")
 def app() -> Flask:
     """Create a Flask application for testing."""
+    from flask_more_smorest.perms.models.defaults import (
+        DefaultDomain,
+        DefaultToken,
+        DefaultUser,
+        DefaultUserRole,
+        DefaultUserSetting,
+    )
+
     app = Flask(__name__)
     app.config["TESTING"] = True
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
@@ -33,6 +42,13 @@ def app() -> Flask:
     app.config["OPENAPI_VERSION"] = "3.0.2"
     app.config["SECRET_KEY"] = "test-secret-key-crud"
 
+    init_fms(
+        user=DefaultUser,
+        role=DefaultUserRole,
+        token=DefaultToken,
+        domain=DefaultDomain,
+        setting=DefaultUserSetting,
+    )
     # Initialize database
     init_db(app)
 
