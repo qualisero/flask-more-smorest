@@ -1,9 +1,6 @@
 """Type stubs for dynamically created classes in test_user_mixed_defaults.py"""
 
-from typing import Any
 import datetime as dt
-from uuid import UUID
-from sqlalchemy.orm import Mapped
 
 class CustomUserRole:
     """Dynamically created UserRole - uses defaults from AbstractUserRole."""

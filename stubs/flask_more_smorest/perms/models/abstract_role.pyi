@@ -2,11 +2,11 @@
 
 from typing import TYPE_CHECKING, Any, ClassVar
 from uuid import UUID
-import sqlalchemy as sa
+
 from sqlalchemy.orm import Mapped
 
 if TYPE_CHECKING:
-    from .abstract_user import AbstractUser
+    pass
 
 class AbstractDomain:
     __abstract__: bool

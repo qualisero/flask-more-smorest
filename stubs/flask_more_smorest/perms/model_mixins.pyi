@@ -1,12 +1,12 @@
 """Type stubs for model mixins."""
 
 import datetime as dt
-from typing import Any, TYPE_CHECKING
-from uuid import UUID
+from typing import TYPE_CHECKING
+
 from sqlalchemy.orm import Mapped
 
 if TYPE_CHECKING:
-    from .models.abstract_user import AbstractUser
+    pass
 
 class TimestampMixin:
     """Adds authentication-related timestamps: last_login_at, email_verified_at."""

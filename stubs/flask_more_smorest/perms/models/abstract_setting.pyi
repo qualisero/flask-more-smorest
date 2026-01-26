@@ -2,10 +2,11 @@
 
 from typing import TYPE_CHECKING, Any, ClassVar
 from uuid import UUID
+
 from sqlalchemy.orm import Mapped
 
 if TYPE_CHECKING:
-    from .abstract_user import AbstractUser
+    pass
 
 class AbstractUserSetting:
     __abstract__: bool

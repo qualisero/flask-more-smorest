@@ -1,15 +1,16 @@
 """Type stubs for flask_more_smorest.perms module."""
 
-from typing import TYPE_CHECKING, TypeVar, Callable, Any, Literal
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 # Import stubs for mixins
-from .model_mixins import TimestampMixin, ProfileMixin, SoftDeleteMixin
+from .model_mixins import ProfileMixin, SoftDeleteMixin, TimestampMixin
+from .models.abstract_role import AbstractDomain, AbstractUserRole
+from .models.abstract_setting import AbstractUserSetting
+from .models.abstract_token import AbstractToken
 
 # Import abstract types for init_fms signature
 from .models.abstract_user import AbstractUser
-from .models.abstract_role import AbstractUserRole, AbstractDomain
-from .models.abstract_setting import AbstractUserSetting
-from .models.abstract_token import AbstractToken
 
 UserT = TypeVar("UserT")
 RoleT = TypeVar("RoleT")

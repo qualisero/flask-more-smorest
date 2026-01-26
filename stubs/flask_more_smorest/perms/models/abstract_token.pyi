@@ -1,12 +1,12 @@
 """Type stub for AbstractToken."""
 
-from typing import TYPE_CHECKING, Any, ClassVar
-from uuid import UUID
 import datetime as dt
+from typing import TYPE_CHECKING, Any, ClassVar
+
 from sqlalchemy.orm import Mapped
 
 if TYPE_CHECKING:
-    from .abstract_user import AbstractUser
+    pass
 
 class AbstractToken:
     __abstract__: bool
