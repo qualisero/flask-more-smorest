@@ -37,7 +37,7 @@ Testing authenticated endpoints:
 .. code-block:: python
 
     import pytest
-    from flask_more_smorest.perms.models.defaults import DefaultUser
+    from flask_more_smorest.perms.models.defaults import User
     from flask_more_smorest.testing import as_user
 
     def test_get_my_profile(client, db_session):
@@ -57,15 +57,15 @@ Testing admin-only endpoints:
 .. code-block:: python
 
     import pytest
-    from flask_more_smorest.perms.models.defaults import DefaultUser, DefaultUserRole, DefaultUserRoleEnum
+    from flask_more_smorest.perms.models.defaults import User, UserRole, BaseRoleEnum
     from flask_more_smorest.testing import as_admin
 
     def test_admin_endpoint(client, db_session):
         # Create admin user
-        with DefaultUser.bypass_perms():
-            admin = DefaultUser(email="admin@example.com", password="password123")
+        with User.bypass_perms():
+            admin = User(email="admin@example.com", password="password123")
             admin.save()
-            admin.roles.append(DefaultUserRole(user=admin, role=DefaultUserRoleEnum.ADMIN))
+            admin.roles.append(UserRole(user=admin, role=BaseRoleEnum.ADMIN))
 
         # Test admin-only endpoint
         with as_admin(client, str(admin.id)):
@@ -80,7 +80,7 @@ Testing superadmin endpoints:
         with User.bypass_perms():
             admin = User(email="superadmin@example.com", password="password123")
             admin.save()
-            admin.roles.append(UserRole(user=admin, role=DefaultUserRole.SUPERADMIN))
+            admin.roles.append(UserRole(user=admin, role=BaseRoleEnum.SUPERADMIN))
 
         with as_admin(client, str(admin.id), roles=["superadmin"]):
             response = client.delete("/api/users/123/")
@@ -165,24 +165,24 @@ Create reusable test fixtures:
 .. code-block:: python
 
     import pytest
-    from flask_more_smorest.perms.models.defaults import DefaultUser, DefaultUserRole, DefaultUserRoleEnum
+    from flask_more_smorest.perms.models.defaults import User, UserRole, BaseRoleEnum
     from flask_more_smorest.testing import as_user, as_admin
 
     @pytest.fixture
     def test_user(db_session):
         """Create a test user."""
-        with DefaultUser.bypass_perms():
-            user = DefaultUser(email="test@example.com", password="password123")
+        with User.bypass_perms():
+            user = User(email="test@example.com", password="password123")
             user.save()
         return user
 
     @pytest.fixture
     def test_admin(db_session):
         """Create an admin user."""
-        with DefaultUser.bypass_perms():
-            admin = DefaultUser(email="admin@example.com", password="password123")
+        with User.bypass_perms():
+            admin = User(email="admin@example.com", password="password123")
             admin.save()
-            admin.roles.append(DefaultUserRole(user=admin, role=DefaultUserRoleEnum.ADMIN))
+            admin.roles.append(UserRole(user=admin, role=BaseRoleEnum.ADMIN))
         return admin
 
     def test_authenticated_endpoint(client, test_user):
@@ -312,11 +312,11 @@ Test multiple roles:
 
             admin = User(email="admin@example.com", password="password123")
             admin.save()
-            admin.roles.append(UserRole(user=admin, role=DefaultUserRole.ADMIN))
+            admin.roles.append(UserRole(user=admin, role=BaseRoleEnum.ADMIN))
 
             superadmin = User(email="superadmin@example.com", password="password123")
             superadmin.save()
-            superadmin.roles.append(UserRole(user=superadmin, role=DefaultUserRole.SUPERADMIN))
+            superadmin.roles.append(UserRole(user=superadmin, role=BaseRoleEnum.SUPERADMIN))
 
         # Regular user: 403 on admin endpoint
         with as_user(client, str(regular.id)):

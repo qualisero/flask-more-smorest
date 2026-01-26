@@ -9,7 +9,7 @@ Overview
 The user system provides:
 
 - Pre-built ``User`` model with email/password authentication
-- Role-based access control with ``UserRole`` and ``DefaultUserRole``
+- Role-based access control with ``UserRole`` and ``BaseRoleEnum``
 - JWT token management with ``Token`` objects (refresh/API tokens)
 - Profile and timestamp mixins for extended user data
 - Easy extension for custom user models
@@ -21,7 +21,7 @@ Import and use the default user models:
 
 .. code-block:: python
 
-   from flask_more_smorest.perms import User, UserRole, DefaultUserRole
+   from flask_more_smorest.perms import User, UserRole, BaseRoleEnum
 
    # Create a user
    user = User(email="admin@example.com")
@@ -29,14 +29,14 @@ Import and use the default user models:
    user.save()
 
    # Assign admin role
-   UserRole(user=user, role=DefaultUserRole.ADMIN).save()
+   UserRole(user=user, role=BaseRoleEnum.ADMIN).save()
 
    # Verify password
    if user.is_password_correct("secret123"):
        print("Password correct!")
 
    # Check if user has a role
-   if user.has_role(DefaultUserRole.ADMIN):
+   if user.has_role(BaseRoleEnum.ADMIN):
        print("User is an admin!")
 
 User Model
@@ -74,13 +74,13 @@ Role Management:
 .. code-block:: python
 
    # Check if user has a specific role
-   if user.has_role(DefaultUserRole.ADMIN):
+   if user.has_role(BaseRoleEnum.ADMIN):
        print("Admin user")
-   
+
    # Check if user has any role
    if user.has_role():
        print("User has at least one role")
-   
+
    # Get all user roles
    roles = user.roles  # List of UserRole objects
 
@@ -94,30 +94,30 @@ Token Management:
 Default Roles
 -------------
 
-``DefaultUserRole`` enum provides common roles:
+``BaseRoleEnum`` enum provides common roles:
 
 .. code-block:: python
 
-   from flask_more_smorest.perms import DefaultUserRole
+   from flask_more_smorest.perms import BaseRoleEnum
 
    # Available roles
-   DefaultUserRole.SUPERADMIN  # Super administrator
-   DefaultUserRole.ADMIN       # Administrator
-   DefaultUserRole.USER        # Regular user
+   BaseRoleEnum.SUPERADMIN  # Super administrator
+   BaseRoleEnum.ADMIN       # Administrator
+   BaseRoleEnum.USER        # Regular user
 
 Assigning Roles:
 
 .. code-block:: python
 
-   from flask_more_smorest.perms import User, UserRole, DefaultUserRole
+   from flask_more_smorest.perms import User, UserRole, BaseRoleEnum
 
    user = User.query.filter_by(email="user@example.com").first()
-   
+
    # Add admin role
-   UserRole(user=user, role=DefaultUserRole.ADMIN).save()
-   
+   UserRole(user=user, role=BaseRoleEnum.ADMIN).save()
+
    # Add another role
-   UserRole(user=user, role=DefaultUserRole.SUPERADMIN).save()
+   UserRole(user=user, role=BaseRoleEnum.SUPERADMIN).save()
 
 Removing Roles:
 
@@ -126,7 +126,7 @@ Removing Roles:
    # Find and delete specific role
    role = UserRole.query.filter_by(
        user_id=user.id,
-       role=DefaultUserRole.MODERATOR
+       role=BaseRoleEnum.MODERATOR
    ).first()
    if role:
        role.delete()
@@ -151,20 +151,20 @@ The easiest way to add authentication is with ``UserBlueprint``:
    from flask_more_smorest import UserBlueprint
    from flask_more_smorest.perms import init_fms
    from flask_more_smorest.perms.models.defaults import (
-       DefaultDomain,
-       DefaultToken,
-       DefaultUser,
-       DefaultUserRole,
-       DefaultUserSetting,
+       Domain,
+       Token,
+       User,
+       UserRole,
+       UserSetting,
    )
 
    # Register default models explicitly
    init_fms(
-       user=DefaultUser,
-       role=DefaultUserRole,
-       token=DefaultToken,
-       domain=DefaultDomain,
-       setting=DefaultUserSetting,
+       user=User,
+       role=UserRole,
+       token=Token,
+       domain=Domain,
+       setting=UserSetting,
    )
 
    # Instant authentication endpoints
@@ -483,7 +483,7 @@ Here's a complete authentication system:
        Api,
        User,
        UserRole,
-       DefaultUserRole,
+       BaseRoleEnum,
        CRUDBlueprint,
    )
 
@@ -503,17 +503,17 @@ Here's a complete authentication system:
    @auth.route("/register", methods=["POST"])
    def register():
        data = request.get_json()
-       
+
        if User.query.filter_by(email=data["email"]).first():
            return {"error": "Email already exists"}, 400
-       
+
        user = User(email=data["email"])
        user.set_password(data["password"])
        user.save()
-       
+
        # Assign default user role
-       UserRole(user=user, role=DefaultUserRole.USER).save()
-       
+       UserRole(user=user, role=BaseRoleEnum.USER).save()
+
        return {"message": "User created"}, 201
 
    @auth.route("/login", methods=["POST"])

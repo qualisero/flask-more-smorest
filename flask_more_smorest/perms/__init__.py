@@ -6,10 +6,10 @@ BasePermsModel with permission checks, user models, and PermsBlueprintMixin.
 **Quick Start:**
 
     from flask_more_smorest.perms import init_fms
-    from flask_more_smorest.perms.models.defaults import DefaultUser
+    from flask_more_smorest.perms.models.defaults import User
 
     # Register user models
-    init_fms(user=DefaultUser)
+    init_fms(user=User)
 
     # Use the UserBlueprint
     user_bp = UserBlueprint(register=False)

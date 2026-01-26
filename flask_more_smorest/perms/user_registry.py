@@ -6,18 +6,18 @@ canonical integration point for the permissions system.
 **Quick Start:**
 
     from flask_more_smorest.perms import init_fms
-    from flask_more_smorest.perms.models.defaults import DefaultUser
+    from flask_more_smorest.perms.models.defaults import User
 
     # Register custom user model with defaults for others
-    init_fms(user=DefaultUser)
+    init_fms(user=User)
 
     # Or register all models explicitly
     init_fms(
-        user=DefaultUser,
-        role=DefaultUserRole,
-        token=DefaultToken,
-        domain=DefaultDomain,
-        setting=DefaultUserSetting,
+        user=User,
+        role=UserRole,
+        token=Token,
+        domain=Domain,
+        setting=UserSetting,
     )
 
 **Resolution Order:**
@@ -165,36 +165,36 @@ def init_fms(
         if user is not None:
             # Fill in None values with defaults but don't import User
             if role is None:
-                from .models.defaults import DefaultUserRole
+                from .models.defaults import UserRole
 
-                role = DefaultUserRole
+                role = UserRole
             if token is None:
-                from .models.defaults import DefaultToken
+                from .models.defaults import Token
 
-                token = DefaultToken
+                token = Token
             if domain is None:
-                from .models.defaults import DefaultDomain
+                from .models.defaults import Domain
 
-                domain = DefaultDomain
+                domain = Domain
             if setting is None:
-                from .models.defaults import DefaultUserSetting
+                from .models.defaults import UserSetting
 
-                setting = DefaultUserSetting
+                setting = UserSetting
         else:
             # Import all defaults
             from .models.defaults import (
-                DefaultDomain,
-                DefaultToken,
-                DefaultUser,
-                DefaultUserRole,
-                DefaultUserSetting,
+                Domain,
+                Token,
+                User,
+                UserRole,
+                UserSetting,
             )
 
-            user = DefaultUser
-            role = DefaultUserRole if role is None else role
-            token = DefaultToken if token is None else token
-            domain = DefaultDomain if domain is None else domain
-            setting = DefaultUserSetting if setting is None else setting
+            user = User
+            role = UserRole if role is None else role
+            token = Token if token is None else token
+            domain = Domain if domain is None else domain
+            setting = UserSetting if setting is None else setting
 
         # Type checking - AbstractUser and related already imported above
         if not issubclass(user, AbstractUser):

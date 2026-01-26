@@ -25,11 +25,11 @@ def app() -> Generator[Flask, None, None]:
 
     clear_registration()
     init_fms(
-        user=defaults_module.DefaultUser,
-        role=defaults_module.DefaultUserRole,
-        token=defaults_module.DefaultToken,
-        domain=defaults_module.DefaultDomain,
-        setting=defaults_module.DefaultUserSetting,
+        user=defaults_module.User,
+        role=defaults_module.UserRole,
+        token=defaults_module.Token,
+        domain=defaults_module.Domain,
+        setting=defaults_module.UserSetting,
     )
     init_db(app)
     init_jwt(app)
@@ -59,11 +59,11 @@ def unit_app() -> Generator[Flask, None, None]:
 
     clear_registration()
     init_fms(
-        user=defaults_module.DefaultUser,
-        role=defaults_module.DefaultUserRole,
-        token=defaults_module.DefaultToken,
-        domain=defaults_module.DefaultDomain,
-        setting=defaults_module.DefaultUserSetting,
+        user=defaults_module.User,
+        role=defaults_module.UserRole,
+        token=defaults_module.Token,
+        domain=defaults_module.Domain,
+        setting=defaults_module.UserSetting,
     )
     init_db(app)
     init_jwt(app)

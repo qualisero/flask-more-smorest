@@ -1,4 +1,4 @@
-"""Test polymorphic inheritance for defaults_module.DefaultToken and defaults_module.DefaultUserSetting models."""
+"""Test polymorphic inheritance for defaults_module.Token and defaults_module.UserSetting models."""
 
 import uuid
 from typing import Any
@@ -13,22 +13,18 @@ from flask_more_smorest.sqla import db as sqla_db
 
 
 def test_token_polymorphic_subclass(unit_app: Any, db_session: Any) -> None:
-    """Test that defaults_module.DefaultToken supports polymorphic inheritance via discriminator."""
+    """Test that defaults_module.Token supports polymorphic inheritance via discriminator."""
 
     sqla_db.create_all()
 
     # Create a user
-    user = defaults_module.DefaultUser(email="test@example.com", password="test123")
+    user = defaults_module.User(email="test@example.com", password="test123")
     sqla_db.session.add(user)
     sqla_db.session.flush()
 
-    # Create defaults_module.DefaultToken instances
-    token1 = defaults_module.DefaultToken(
-        user_id=user.id, token="token_123", description="defaults_module.DefaultToken 1"
-    )
-    token2 = defaults_module.DefaultToken(
-        user_id=user.id, token="token_456", description="defaults_module.DefaultToken 2"
-    )
+    # Create defaults_module.Token instances
+    token1 = defaults_module.Token(user_id=user.id, token="token_123", description="defaults_module.Token 1")
+    token2 = defaults_module.Token(user_id=user.id, token="token_456", description="defaults_module.Token 2")
     sqla_db.session.add_all([token1, token2])
     sqla_db.session.commit()
 
@@ -37,7 +33,7 @@ def test_token_polymorphic_subclass(unit_app: Any, db_session: Any) -> None:
     assert token2.id is not None
 
     # Verify tokens can be queried
-    all_tokens = sqla_db.session.query(defaults_module.DefaultToken).all()
+    all_tokens = sqla_db.session.query(defaults_module.Token).all()
     assert len(all_tokens) == 2
 
     # Verify relationship works
@@ -45,18 +41,18 @@ def test_token_polymorphic_subclass(unit_app: Any, db_session: Any) -> None:
 
 
 def test_user_setting_polymorphic_subclass(unit_app, db_session):
-    """Test that defaults_module.DefaultUserSetting supports polymorphic inheritance via discriminator."""
+    """Test that defaults_module.UserSetting supports polymorphic inheritance via discriminator."""
 
     sqla_db.create_all()
 
     # Create a user
-    user = defaults_module.DefaultUser(email="test@example.com", password="test123")
+    user = defaults_module.User(email="test@example.com", password="test123")
     sqla_db.session.add(user)
     sqla_db.session.flush()
 
-    # Create defaults_module.DefaultUserSetting instances
-    setting1 = defaults_module.DefaultUserSetting(user_id=user.id, key="theme", value="dark")
-    setting2 = defaults_module.DefaultUserSetting(user_id=user.id, key="language", value="en")
+    # Create defaults_module.UserSetting instances
+    setting1 = defaults_module.UserSetting(user_id=user.id, key="theme", value="dark")
+    setting2 = defaults_module.UserSetting(user_id=user.id, key="language", value="en")
     sqla_db.session.add_all([setting1, setting2])
     sqla_db.session.commit()
 
@@ -65,7 +61,7 @@ def test_user_setting_polymorphic_subclass(unit_app, db_session):
     assert setting2.id is not None
 
     # Verify settings can be queried
-    all_settings = sqla_db.session.query(defaults_module.DefaultUserSetting).all()
+    all_settings = sqla_db.session.query(defaults_module.UserSetting).all()
     assert len(all_settings) == 2
 
     # Verify relationship works
@@ -73,14 +69,14 @@ def test_user_setting_polymorphic_subclass(unit_app, db_session):
 
 
 def test_token_default_discriminator(unit_app, db_session):
-    """Test that defaults_module.DefaultToken has correct default discriminator."""
+    """Test that defaults_module.Token has correct default discriminator."""
     sqla_db.create_all()
 
-    user = defaults_module.DefaultUser(email="test@example.com", password="test123")
+    user = defaults_module.User(email="test@example.com", password="test123")
     sqla_db.session.add(user)
     sqla_db.session.flush()
 
-    token = defaults_module.DefaultToken(user_id=user.id, token="token_123")
+    token = defaults_module.Token(user_id=user.id, token="token_123")
     sqla_db.session.add(token)
     sqla_db.session.commit()
 
@@ -88,14 +84,14 @@ def test_token_default_discriminator(unit_app, db_session):
 
 
 def test_user_setting_default_discriminator(unit_app, db_session):
-    """Test that defaults_module.DefaultUserSetting has correct default discriminator."""
+    """Test that defaults_module.UserSetting has correct default discriminator."""
     sqla_db.create_all()
 
-    user = defaults_module.DefaultUser(email="test@example.com", password="test123")
+    user = defaults_module.User(email="test@example.com", password="test123")
     sqla_db.session.add(user)
     sqla_db.session.flush()
 
-    setting = defaults_module.DefaultUserSetting(user_id=user.id, key="test_key", value="test_value")
+    setting = defaults_module.UserSetting(user_id=user.id, key="test_key", value="test_value")
     sqla_db.session.add(setting)
     sqla_db.session.commit()
 
@@ -103,9 +99,9 @@ def test_user_setting_default_discriminator(unit_app, db_session):
 
 
 def test_domain_polymorphic_subclass(unit_app: Any, db_session: Any) -> None:
-    """Test that defaults_module.DefaultDomain supports polymorphic inheritance via discriminator."""
+    """Test that defaults_module.Domain supports polymorphic inheritance via discriminator."""
 
-    class CustomDefaultDomain(defaults_module.DefaultDomain):
+    class CustomDefaultDomain(defaults_module.Domain):
         __mapper_args__ = {"polymorphic_identity": "custom_domain"}
 
     sqla_db.create_all()
@@ -115,7 +111,7 @@ def test_domain_polymorphic_subclass(unit_app: Any, db_session: Any) -> None:
     sqla_db.session.commit()
 
     assert domain.id is not None
-    assert sqla_db.session.query(defaults_module.DefaultDomain).count() == 1
+    assert sqla_db.session.query(defaults_module.Domain).count() == 1
 
 
 def test_user_polymorphic_subclass(unit_app: Any, db_session: Any) -> None:
