@@ -71,10 +71,14 @@ def _load_defaults() -> Iterator[None]:
     clear_registration()
     db.metadata.clear()
 
-    importlib.reload(user_module)
-    importlib.reload(token_module)
-    importlib.reload(role_module)
-    importlib.reload(setting_module)
+    try:
+        importlib.reload(user_module)
+        importlib.reload(token_module)
+        importlib.reload(role_module)
+        importlib.reload(setting_module)
+    except ImportError:
+        # Modules might have been unloaded by conftest.py cleanup
+        pass
 
     global DefaultDomain, DefaultToken, DefaultUser, DefaultUserRole, DefaultUserSetting, Article, Comment, Topic
     DefaultDomain = defaults_module.DefaultDomain

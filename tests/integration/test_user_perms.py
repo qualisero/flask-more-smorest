@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
@@ -33,111 +34,55 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import scoped_session
 
 
-class CustomUserModel(ProfileMixin, AbstractUser):
-    """Custom User class that extends the base User class.
+@pytest.fixture(scope="module")
+def custom_models() -> SimpleNamespace:
+    """Define custom models dynamically to avoid import-side effects."""
 
-    Adds additional fields specific to this application:
-    - bio: User biography
-    - phone_number: Contact phone number
-    - is_verified: Whether the user has been verified
-    """
+    class CustomUserModel(ProfileMixin, AbstractUser):
+        """Custom User class that extends the base User class."""
 
-    __tablename__ = "user"
+        __tablename__ = "user"
+        bio: Mapped[str | None] = mapped_column(sa.String(500), nullable=True)
+        phone_number: Mapped[str | None] = mapped_column(sa.String(20), nullable=True)
+        is_verified: Mapped[bool] = mapped_column(sa.Boolean(), default=False)
 
-    bio: Mapped[str | None] = mapped_column(sa.String(500), nullable=True)
-    phone_number: Mapped[str | None] = mapped_column(sa.String(20), nullable=True)
-    is_verified: Mapped[bool] = mapped_column(sa.Boolean(), default=False)
+        def _can_write(self, current_user: AbstractUser | None) -> bool:
+            from flask_more_smorest.perms.user_context import is_current_user_admin
 
-    def _can_write(self, current_user: AbstractUser | None) -> bool:
-        """Override write permission to require verification.
+            if is_current_user_admin():
+                return True
+            if not current_user or current_user.id != self.id:
+                return False
+            return self.is_verified  # type: ignore[attr-defined]
 
-        Only verified users can edit their own profiles.
-        Admins can edit any profile regardless of verification.
+    class Note(UserOwnershipMixin, BasePermsModel):
+        __tablename__ = "note"
+        title: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+        content: Mapped[str] = mapped_column(sa.Text, nullable=False)
 
-        Args:
-            current_user: The current authenticated user, or None
-        """
-        from flask_more_smorest.perms.user_context import is_current_user_admin
+    class Document(BasePermsModel):
+        __tablename__ = "document"
+        title: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+        content: Mapped[str] = mapped_column(sa.Text, nullable=False)
+        is_public: Mapped[bool] = mapped_column(sa.Boolean(), default=False)
+        owner_id: Mapped[uuid.UUID] = mapped_column(sa.Uuid(as_uuid=True), sa.ForeignKey("user.id"), nullable=False)
+        owner: Mapped[CustomUserModel] = relationship(CustomUserModel)  # type: ignore[valid-type]
 
-        # Allow admins to write
-        if is_current_user_admin():
-            return True
+        def _can_read(self, current_user: AbstractUser | None) -> bool:
+            if self.is_public:
+                return True
+            return current_user is not None and current_user.id == self.owner_id
 
-        # Check if user is editing their own profile
-        if not current_user or current_user.id != self.id:
-            return False
+        def _can_write(self, current_user: AbstractUser | None) -> bool:
+            return current_user is not None and current_user.id == self.owner_id
 
-        # Require verification for self-edit
-        return self.is_verified  # type: ignore[attr-defined]
+        def _can_create(self, current_user: AbstractUser | None) -> bool:
+            if not current_user:
+                return False
+            owner = db.session.get(CustomUserModel, current_user.id)
+            return owner.is_verified if owner else False  # type: ignore[attr-defined]
 
-
-class Note(UserOwnershipMixin, BasePermsModel):
-    """Note model with UserOwnershipMixin.
-
-    This model demonstrates user-owned resources where:
-    - Users can only read their own notes
-    - Users can only write their own notes
-    """
-
-    __tablename__ = "note"
-
-    title: Mapped[str] = mapped_column(sa.String(200), nullable=False)
-    content: Mapped[str] = mapped_column(sa.Text, nullable=False)
-
-
-class Document(BasePermsModel):
-    """Document model with custom permission rules.
-
-    This model demonstrates custom permission logic where:
-    - Public documents can be read by anyone
-    - Private documents can only be read by the owner
-    - Only the owner can write documents
-    - Only verified users can create documents
-    """
-
-    __tablename__ = "document"
-
-    title: Mapped[str] = mapped_column(sa.String(200), nullable=False)
-    content: Mapped[str] = mapped_column(sa.Text, nullable=False)
-    is_public: Mapped[bool] = mapped_column(sa.Boolean(), default=False)
-    owner_id: Mapped[uuid.UUID] = mapped_column(
-        sa.Uuid(as_uuid=True),
-        sa.ForeignKey("user.id"),
-        nullable=False,
-    )
-
-    owner: Mapped[CustomUserModel] = relationship(CustomUserModel)  # type: ignore[valid-type]
-
-    def _can_read(self, current_user: AbstractUser | None) -> bool:
-        """Custom read permission: public docs readable by all, private only by owner.
-
-        Args:
-            current_user: The current authenticated user, or None
-        """
-        if self.is_public:
-            return True
-
-        return current_user is not None and current_user.id == self.owner_id
-
-    def _can_write(self, current_user: AbstractUser | None) -> bool:
-        """Custom write permission: only owner can write.
-
-        Args:
-            current_user: The current authenticated user, or None
-        """
-        return current_user is not None and current_user.id == self.owner_id
-
-    def _can_create(self, current_user: AbstractUser | None) -> bool:
-        """Custom create permission: only verified users can create documents.
-
-        Args:
-            current_user: The current authenticated user, or None
-        """
-        if not current_user:
-            return False
-
-        owner = db.session.get(CustomUserModel, current_user.id)
-        return owner.is_verified if owner else False  # type: ignore[attr-defined]
+    return SimpleNamespace(CustomUserModel=CustomUserModel, Note=Note, Document=Document)
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -149,14 +94,8 @@ def _reset_registry() -> Iterator[None]:
 
 
 @pytest.fixture(scope="function")
-def user_perms_app() -> Flask:
-    """Create a Flask app for testing user permissions.
-
-    This app demonstrates:
-    - Custom User model extending AbstractUser
-    - DEFAULT implementations for Domain, UserRole, Token, UserSetting
-    - Models with various permission rules
-    """
+def user_perms_app(custom_models: SimpleNamespace) -> Flask:
+    """Create a Flask app for testing user permissions."""
     app = Flask(__name__)
     app.config["TESTING"] = True
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
@@ -167,8 +106,8 @@ def user_perms_app() -> Flask:
     app.config["SECRET_KEY"] = "test-secret-key-user-perms"
     app.config["JWT_SECRET_KEY"] = "jwt-test-secret-key-user-perms"
 
-    # THIS IS THE KEY TEST: Only register custom user, rest should use defaults
-    init_fms(user=CustomUserModel)
+    # Register custom user from fixture
+    init_fms(user=custom_models.CustomUserModel)
     init_db(app)
     init_jwt(app)
 
@@ -186,11 +125,15 @@ def db_session(user_perms_app: Flask) -> Iterator[scoped_session]:
 
 
 @pytest.fixture
-def test_users(user_perms_app: Flask, db_session: scoped_session) -> dict[str, uuid.UUID]:
+def test_users(
+    user_perms_app: Flask, db_session: scoped_session, custom_models: SimpleNamespace
+) -> dict[str, uuid.UUID]:
     """Create test users with different roles and permissions.
 
     Returns user IDs instead of user objects to avoid detached instance issues.
     """
+    CustomUserModel = custom_models.CustomUserModel
+
     # Create a domain using DEFAULT Domain class
     domain = Domain(name="test_domain", display_name="Test Domain")
     db_session.add(domain)
@@ -253,8 +196,10 @@ def user_tokens(
     user_perms_app: Flask,
     db_session: scoped_session,
     test_users: dict[str, uuid.UUID],
+    custom_models: SimpleNamespace,
 ) -> dict[str, str]:
     """JWT tokens for admin, verified, and unverified users."""
+    CustomUserModel = custom_models.CustomUserModel
     with user_perms_app.app_context():
         admin_user = db_session.get(CustomUserModel, test_users["admin_id"])
         verified_user = db_session.get(CustomUserModel, test_users["verified_id"])
@@ -270,8 +215,11 @@ def user_tokens(
 class TestCustomUserModelExtension:
     """Test CustomUserModel with default Domain/UserRole/Token/UserSetting."""
 
-    def test_custom_user_creation(self, db_session: scoped_session, test_users: dict[str, uuid.UUID]) -> None:
+    def test_custom_user_creation(
+        self, db_session: scoped_session, test_users: dict[str, uuid.UUID], custom_models: SimpleNamespace
+    ) -> None:
         """Test that CustomUserModel can be created with custom fields."""
+        CustomUserModel = custom_models.CustomUserModel
         user = db_session.get(CustomUserModel, test_users["verified_id"])
         assert user is not None
         assert user.email == "verified@example.com"
@@ -280,9 +228,10 @@ class TestCustomUserModelExtension:
         assert user.is_verified is True
 
     def test_custom_user_inherits_user_methods(
-        self, db_session: scoped_session, test_users: dict[str, uuid.UUID]
+        self, db_session: scoped_session, test_users: dict[str, uuid.UUID], custom_models: SimpleNamespace
     ) -> None:
         """Test that CustomUserModel inherits User class methods."""
+        CustomUserModel = custom_models.CustomUserModel
         user = db_session.get(CustomUserModel, test_users["verified_id"])
         assert user is not None
         # Test password methods
@@ -294,9 +243,10 @@ class TestCustomUserModelExtension:
         assert not user.has_role(BaseRoleEnum.ADMIN)
 
     def test_custom_user_with_default_domain_and_role(
-        self, db_session: scoped_session, test_users: dict[str, uuid.UUID]
+        self, db_session: scoped_session, test_users: dict[str, uuid.UUID], custom_models: SimpleNamespace
     ) -> None:
         """Test that CustomUserModel works with default Domain and UserRole classes."""
+        CustomUserModel = custom_models.CustomUserModel
         admin_user = db_session.get(CustomUserModel, test_users["admin_id"])
         assert admin_user is not None
 
@@ -320,8 +270,10 @@ class TestCustomUserModelExtension:
         db_session: scoped_session,
         test_users: dict[str, uuid.UUID],
         user_tokens: dict[str, str],
+        custom_models: SimpleNamespace,
     ) -> None:
         """CustomUserModel's custom write permission requiring verification."""
+        CustomUserModel = custom_models.CustomUserModel
         verified_user = db_session.get(CustomUserModel, test_users["verified_id"])
         unverified_user = db_session.get(CustomUserModel, test_users["unverified_id"])
 
