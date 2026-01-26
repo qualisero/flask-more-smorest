@@ -110,9 +110,22 @@ def db_session(app: Flask) -> Iterator[None]:
 
 @pytest.fixture(scope="module", autouse=True)
 def _module_cleanup() -> Iterator[None]:
+    """Clean up at module boundaries to prevent pollution of subsequent test modules."""
     yield
+    # Clear registry
     clear_registration()
+    # Clear metadata
     db.metadata.clear()
+    # Clear SQLAlchemy mappers
+    try:
+        sa.orm.clear_mappers()
+    except Exception:
+        pass
+    # Unload user_schemas module - critical for preventing schema caching pollution
+    import sys
+
+    if "flask_more_smorest.perms.user_schemas" in sys.modules:
+        del sys.modules["flask_more_smorest.perms.user_schemas"]
 
 
 @pytest.fixture(scope="module", autouse=True)
