@@ -284,13 +284,9 @@ Complete Example
     )
 
     # Register all models with FMS
-    init_fms(
-        user=User,
-        role=UserRole,
-        token=Token,
-        domain=Domain,
-        setting=UserSetting,
-    )
+    # Since we're using custom models for User and Domain, we specify those.
+    # UserRole, Token, and UserSetting will be auto-loaded as defaults.
+    init_fms(user=User, domain=Domain)
 
     # Initialize database and JWT
     init_db(app)
@@ -692,6 +688,13 @@ If you're migrating from an existing user system to FMS:
     from flask_more_smorest.perms import init_fms
 
     init_fms(user=MyUser)
+
+.. note:: **Auto-Loading of Defaults**
+
+   When you call ``init_fms(user=MyUser)``, the system automatically
+   imports and registers the default models for UserRole, Token, Domain, and
+   UserSetting. No explicit import of default models is needed unless you
+   need to reference them in your code.
 
 **Step 3: Use FMS UserBlueprint**
 

@@ -147,6 +147,12 @@ Register your custom user class (and optionally a custom getter):
    # Register - everything else derives from this!
    init_fms(user=MyUser, get_current_user=get_flask_login_user)
 
+.. note:: **Auto-Loading of Defaults**
+
+   When you call ``init_fms(user=MyUser)``, the system automatically
+   imports and registers the default models for UserRole, Token, Domain, and
+   UserSetting. No explicit import of default models is needed.
+
 The system automatically provides:
 
 - ``get_current_user()`` - Calls your registered function
