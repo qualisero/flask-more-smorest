@@ -128,6 +128,11 @@ select = [
     "UP",    # pyupgrade
     "B",     # flake8-bugbear
     "C",     # flake8-comprehensions
+    "SIM",   # flake8-simplify (modern python idioms)
+    "PT",    # flake8-pytest-style (better tests)
+    "RET",   # flake8-return (cleaner returns)
+    "RUF",   # Ruff-specific checks
+    "S",     # flake8-bandit (security checks via Ruff - faster than bandit)
 ]
 ignore = [
     "E501",  # line too long (handled by formatter)
@@ -140,11 +145,19 @@ ignore = [
     "B904",  # within except clause, use raise ... from (not always needed)
     "B017",  # pytest.raises(Exception) should be considered evil (OK in tests)
     "UP038", # use X | Y in isinstance call instead of (X, Y) (tuple form is clearer)
+    "S101",  # Allow asserts (Ruff's bandit check)
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # Unused imports OK in __init__
-"tests/*" = ["S101", "S105", "S106", "S107"]  # Allow asserts, hardcoded passwords in tests
+"tests/*" = [
+    "S101",   # Allow asserts
+    "S105",   # Allow hardcoded passwords in tests
+    "S106", 
+    "S107", 
+    "PT009",  # Allow unittest-style assertions if needed
+    "SIM117", # Allow nested context managers if clearer
+]
 
 # Configure import sorting (isort replacement)
 [tool.ruff.lint.isort]

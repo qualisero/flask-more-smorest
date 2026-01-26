@@ -17,7 +17,7 @@ from flask_more_smorest.perms.models.defaults import (
 )
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def app() -> Generator[Flask, None, None]:
     """Base Flask app fixture for unit tests."""
     app = Flask(__name__)
@@ -47,7 +47,7 @@ def app() -> Generator[Flask, None, None]:
         db.drop_all()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def unit_app() -> Generator[Flask, None, None]:
     """Flask app with extended config for API testing."""
     app = Flask(__name__)
@@ -85,13 +85,13 @@ def unit_app() -> Generator[Flask, None, None]:
         db.drop_all()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def unit_api(unit_app: Flask) -> Api:
     """Flask-Smorest API instance for unit tests."""
     return Api(unit_app)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def db_session(app: Flask) -> Generator[None, None, None]:
     """Database session fixture that creates and drops tables.
 
@@ -104,8 +104,8 @@ def db_session(app: Flask) -> Generator[None, None, None]:
         db.drop_all()
 
 
-@pytest.fixture(scope="function")
-def reset_user_context() -> Generator[None, None, None]:
+@pytest.fixture
+def reset_user_context() -> None:
     """Fixture that clears user context registration before each test.
 
     Tests that need to clear registration mid-test should call clear_registration() manually.
@@ -113,4 +113,4 @@ def reset_user_context() -> Generator[None, None, None]:
     from flask_more_smorest.perms import clear_registration
 
     clear_registration()
-    yield
+    return

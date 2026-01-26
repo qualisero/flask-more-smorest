@@ -70,7 +70,7 @@ def _load_defaults() -> Iterator[None]:
     clear_registration()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def app() -> Flask:
     app = Flask(__name__)
     app.config["TESTING"] = True
@@ -89,7 +89,7 @@ def app() -> Flask:
     return app
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def db_session(app: Flask) -> Iterator[None]:
     """Create a database session for tests."""
     with app.app_context():

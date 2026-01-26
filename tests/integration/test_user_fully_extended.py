@@ -73,7 +73,7 @@ else:
     CustomUserBlueprint = cast(type[UserBlueprint], None)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def app(custom_models: SimpleNamespace) -> Flask:
     app = Flask(__name__)
     app.config["TESTING"] = True
@@ -98,7 +98,7 @@ def app(custom_models: SimpleNamespace) -> Flask:
     return app
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def db_session(app: Flask) -> Iterator[None]:
     """Create a database session for tests."""
     with app.app_context():
@@ -419,11 +419,11 @@ def test_fully_extended_models_and_blueprint(app: Flask, db_session: None, custo
     CustomUser = custom_models.CustomUser
 
     api: Api = Api(app)
-    user_bp: CustomUserBlueprint = CustomUserBlueprint(register=False)
+    user_bp: CustomUserBlueprint = CustomUserBlueprint(register=False)  # type: ignore[valid-type]
     api.register_blueprint(user_bp)
 
-    user: CustomUser = CustomUser(email="anne@example.com", bio="Hello World")
-    user.set_password("secret")
+    user: CustomUser = CustomUser(email="anne@example.com", bio="Hello World")  # type: ignore[valid-type]
+    user.set_password("secret")  # type: ignore[attr-defined]
     db.session.add(user)
     db.session.commit()
 

@@ -159,7 +159,7 @@ def _load_defaults() -> Iterator[None]:
     clear_registration()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def maximal_app() -> Flask:
     """Create a Flask app with maximal feature usage.
 
@@ -196,7 +196,7 @@ def maximal_app() -> Flask:
     return app
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def db_session(maximal_app: Flask) -> Iterator["scoped_session"]:
     """Create a database session for tests."""
     with maximal_app.app_context():
@@ -206,13 +206,13 @@ def db_session(maximal_app: Flask) -> Iterator["scoped_session"]:
         db.drop_all()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def api(maximal_app: Flask, db_session: "scoped_session") -> Api:
     """Create API instance."""
     return Api(maximal_app)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def blueprints() -> Iterator[dict[str, CRUDBlueprint]]:
     """Create CRUD blueprints for all models."""
     import sys
@@ -270,7 +270,7 @@ def blueprints() -> Iterator[dict[str, CRUDBlueprint]]:
         del sys.modules["mock_comments"]
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def api_with_blueprints(api: Api, blueprints: dict[str, CRUDBlueprint]) -> Api:
     """Register all CRUD blueprints on the API."""
     api.register_blueprint(blueprints["articles"])
@@ -285,7 +285,7 @@ def client(maximal_app: Flask, api_with_blueprints: Api, db_session: "scoped_ses
     return maximal_app.test_client()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def token_factory(maximal_app: Flask) -> Callable[[uuid.UUID], str]:
     """Return a helper that issues JWTs for a given user ID."""
 
@@ -296,7 +296,7 @@ def token_factory(maximal_app: Flask) -> Callable[[uuid.UUID], str]:
     return _issue
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def test_user(db_session: "scoped_session") -> Iterator[DefaultUser]:
     """Create a test user."""
 
@@ -308,7 +308,7 @@ def test_user(db_session: "scoped_session") -> Iterator[DefaultUser]:
     u.delete()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def test_other_user(db_session: "scoped_session") -> Iterator[DefaultUser]:
     """Create another test user."""
 
@@ -320,7 +320,7 @@ def test_other_user(db_session: "scoped_session") -> Iterator[DefaultUser]:
     u.delete()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def admin_user(db_session: "scoped_session") -> Iterator[DefaultUser]:
     """Create a user with admin privileges scoped to a domain."""
 
@@ -336,7 +336,7 @@ def admin_user(db_session: "scoped_session") -> Iterator[DefaultUser]:
     admin.delete()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def auth_client(
     maximal_app: Flask,
     api_with_blueprints: Api,
@@ -349,7 +349,7 @@ def auth_client(
     return client
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def other_auth_client(
     maximal_app: Flask,
     api_with_blueprints: Api,
@@ -362,7 +362,7 @@ def other_auth_client(
     return client
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def admin_client(
     maximal_app: Flask,
     api_with_blueprints: Api,

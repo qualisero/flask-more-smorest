@@ -12,7 +12,7 @@ from flask_more_smorest import BasePermsModel, db
 from flask_more_smorest.error.exceptions import ForbiddenError
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def dummy_perms_model(app: Flask) -> type[BasePermsModel]:
     class_name = f"DummyPermsModel_{uuid.uuid4().hex}"
 

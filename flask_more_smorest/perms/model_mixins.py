@@ -81,10 +81,7 @@ class HasUserMixin:
         annotations = dict(getattr(cls, "__annotations__", {}))
         source_type = annotations.get(source)
         if source_type is None:
-            if source == "user_id":
-                source_type = Mapped[uuid.UUID]
-            else:
-                source_type = Mapped["User"]
+            source_type = Mapped[uuid.UUID] if source == "user_id" else Mapped["User"]
         annotations[target] = source_type
         cls.__annotations__ = annotations
 

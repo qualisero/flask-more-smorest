@@ -52,10 +52,10 @@ def get_domain_model(expected: type) -> type: ...
 def get_setting_model(expected: type) -> type: ...
 
 __all__ = [
-    "UserBlueprint",
-    "init_fms",
-    "clear_registration",
-    "TimestampMixin",
     "ProfileMixin",
     "SoftDeleteMixin",
+    "TimestampMixin",
+    "UserBlueprint",
+    "clear_registration",
+    "init_fms",
 ]

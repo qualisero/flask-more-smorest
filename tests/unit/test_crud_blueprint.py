@@ -18,8 +18,10 @@ def test_normalize_methods_from_mapping() -> None:
         "DELETE": False,
     }
     normalized = CRUDBlueprint._normalize_methods(None, raw)  # type: ignore[arg-type]
-    assert CRUDMethod.GET in normalized and normalized[CRUDMethod.GET] == {}
-    assert CRUDMethod.POST in normalized and normalized[CRUDMethod.POST] == {"admin_only": True}
+    assert CRUDMethod.GET in normalized
+    assert normalized[CRUDMethod.GET] == {}
+    assert CRUDMethod.POST in normalized
+    assert normalized[CRUDMethod.POST] == {"admin_only": True}
     assert CRUDMethod.DELETE not in normalized
 
 

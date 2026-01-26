@@ -93,7 +93,7 @@ def _reset_registry() -> Iterator[None]:
     clear_registration()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def user_perms_app(custom_models: SimpleNamespace) -> Flask:
     """Create a Flask app for testing user permissions."""
     app = Flask(__name__)
@@ -114,7 +114,7 @@ def user_perms_app(custom_models: SimpleNamespace) -> Flask:
     return app
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def db_session(user_perms_app: Flask) -> Iterator[scoped_session]:
     """Create a database session for tests."""
     with user_perms_app.app_context():

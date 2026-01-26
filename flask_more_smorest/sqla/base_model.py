@@ -237,9 +237,8 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
 
         # don't automatically flush the session to avoid side effects
         with db.session.no_autoflush:
-            result = db.session.execute(db.select(cls).filter_by(**kwargs)).scalar_one_or_none()
+            return db.session.execute(db.select(cls).filter_by(**kwargs)).scalar_one_or_none()
 
-        return result
 
     @classmethod
     def get_by_or_404(cls, **kwargs: str | int | uuid.UUID | bool | None) -> Self:

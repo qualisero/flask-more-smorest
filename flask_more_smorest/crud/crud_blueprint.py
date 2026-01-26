@@ -661,8 +661,7 @@ class CRUDBlueprint(CRUDPaginationMixin, BlueprintOperationIdMixin, Blueprint):
                 def get(_self, **kwargs: Any) -> BaseModel:
                     """Fetch resource by ID."""
                     kwargs[config.res_id_name] = kwargs.pop(config.res_id_param_name)
-                    res = model_cls.get_by_or_404(**kwargs)
-                    return res
+                    return model_cls.get_by_or_404(**kwargs)
 
             if CRUDMethod.PATCH in config.methods:
 

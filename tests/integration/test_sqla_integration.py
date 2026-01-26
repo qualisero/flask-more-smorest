@@ -43,7 +43,7 @@ def _reset_registry() -> Iterator[None]:
     clear_registration()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def app() -> Flask:
     """Create a Flask application for testing."""
     app = Flask(__name__)
@@ -58,7 +58,7 @@ def app() -> Flask:
     return app
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def test_model(app: Flask) -> type[Product]:
     """Create a test model class."""
 

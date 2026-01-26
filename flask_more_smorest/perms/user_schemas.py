@@ -28,7 +28,7 @@ class UserLoginSchema(UserSchema):
     @pre_load
     def normalize_email(self, data: dict, **kwargs: object) -> dict:
         """Normalize email to lowercase for case-insensitive login."""
-        if "email" in data and data["email"]:
+        if data.get("email"):
             data["email"] = data["email"].lower()
         return data
 

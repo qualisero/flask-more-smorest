@@ -36,12 +36,12 @@ if TYPE_CHECKING:
     DefaultUserRole = UserRole
 
 __all__ = [
-    "DefaultUser",
-    "DefaultUserRole",
+    "BaseRoleEnum",
     "DefaultDomain",
     "DefaultToken",
+    "DefaultUser",
+    "DefaultUserRole",
     "DefaultUserSetting",
-    "BaseRoleEnum",
 ]
 
 

@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from flask.testing import FlaskClient
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def app() -> Flask:
     """Create a Flask application for testing."""
     from flask_more_smorest.perms.models.defaults import (
@@ -62,7 +62,7 @@ def custom_schema_name_resolver(schema: type[Schema], **kwargs: str | bool) -> s
     return default_resolver(schema)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def api(app: Flask) -> Api:
     """Create API instance."""
     # NOTE: this is automatically added when using flask_more_smorest.Api instead of flask_smorest.Api
@@ -72,7 +72,7 @@ def api(app: Flask) -> Api:
     return Api(app, spec_kwargs=spec_kwargs)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def product_model(app: Flask) -> type[BaseModel]:
     """Create a Product model for testing."""
 
@@ -100,7 +100,7 @@ def product_model(app: Flask) -> type[BaseModel]:
     return ProductModel
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def product_blueprint(product_model: type[BaseModel]) -> Iterator[CRUDBlueprint]:
     """Create a CRUD blueprint for Product."""
     # We need to set up a mock module for the blueprint to import from

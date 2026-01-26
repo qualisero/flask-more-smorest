@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Self, TypeVar
 
 import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declared_attr
-from sqlalchemy.orm import Mapped, mapped_column, relationship  # noqa: I001
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ...error.exceptions import UnprocessableEntity
 from ...utils import check_password_hash, generate_password_hash

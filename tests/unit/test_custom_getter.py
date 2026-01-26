@@ -1,6 +1,5 @@
 """Unit tests for extending DefaultUser model with custom current user getter."""
 
-import datetime as dt
 import uuid
 from collections.abc import Generator
 
@@ -67,27 +66,12 @@ def build_models() -> (
     class CustomToken(AbstractToken):
         __tablename__ = f"custom_token_{suffix}"
 
-        user_id: Mapped[uuid.UUID] = mapped_column(
-            sa.Uuid(as_uuid=True),
-            db.ForeignKey(f"{user_table}.id"),
-            nullable=False,
-        )
-        token: Mapped[str] = mapped_column(sa.String(1024), nullable=False)
-        description: Mapped[str | None] = mapped_column(sa.String(64), nullable=True)
-        expires_at: Mapped[dt.datetime | None] = mapped_column(sa.DateTime(), nullable=True)
-        revoked: Mapped[bool] = mapped_column(sa.Boolean(), nullable=False, default=False)
-        revoked_at: Mapped[dt.datetime | None] = mapped_column(sa.DateTime(), nullable=True)
+        can_renew: Mapped[bool] = mapped_column(sa.Boolean(), nullable=False, default=True)
 
     class CustomUserSetting(AbstractUserSetting):
         __tablename__ = f"custom_user_setting_{suffix}"
 
-        user_id: Mapped[uuid.UUID] = mapped_column(
-            sa.Uuid(as_uuid=True),
-            db.ForeignKey(f"{user_table}.id"),
-            nullable=False,
-        )
-        key: Mapped[str] = mapped_column(sa.String(80), nullable=False)
-        value: Mapped[str | None] = mapped_column(sa.String(1024), nullable=True)
+        category: Mapped[str] = mapped_column(sa.String(64), nullable=False)
 
     return CustomUser, CustomUserRole, CustomToken, CustomUserSetting  # type: ignore[return-value]
 

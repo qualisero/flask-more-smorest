@@ -31,7 +31,11 @@ def _cleanup_test_mappers() -> Generator[None, None, None]:
     yield
 
     # Clear all mappers to ensure a clean slate for the next test module
-    clear_mappers()
+    try:
+        clear_mappers()
+    except Exception:
+        # Ignore errors during cleanup (e.g. dynamic classes already partially destroyed)
+        pass
 
     # Clear metadata to remove table definitions
     if hasattr(db, "metadata"):

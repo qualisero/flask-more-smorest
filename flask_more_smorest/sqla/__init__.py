@@ -17,12 +17,12 @@ from .schema import BaseSchema, create_model_schema
 __all__ = [
     "BaseModel",
     "BaseSchema",
+    "create_migration",
     "create_model_schema",
     "db",
-    "init_db",
-    "get_request_query_stats",
-    "init_migrations",
-    "create_migration",
-    "upgrade_database",
     "downgrade_database",
+    "get_request_query_stats",
+    "init_db",
+    "init_migrations",
+    "upgrade_database",
 ]

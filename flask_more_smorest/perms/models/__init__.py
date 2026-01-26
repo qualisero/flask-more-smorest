@@ -13,9 +13,9 @@ from .abstract_token import AbstractToken
 from .abstract_user import AbstractUser
 
 __all__ = [
-    "AbstractUser",
-    "AbstractUserRole",
     "AbstractDomain",
     "AbstractToken",
+    "AbstractUser",
+    "AbstractUserRole",
     "AbstractUserSetting",
 ]

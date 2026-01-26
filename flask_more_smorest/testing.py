@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from flask.testing import FlaskClient
 
-__all__ = ["as_user", "as_admin", "clear_registration"]
+__all__ = ["as_admin", "as_user", "clear_registration"]
 
 
 def clear_registration() -> None:

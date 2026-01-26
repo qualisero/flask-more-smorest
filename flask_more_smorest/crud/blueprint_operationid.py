@@ -83,9 +83,9 @@ class BlueprintOperationIdMixin(Blueprint):
                     operation_id = f"{operation_name}{class_name}"
             operation_id = convert_snake_to_camel(operation_id)
             operation_id = operation_id[0].lower() + operation_id[1:]
-            decorated_func = self.doc(operationId=operation_id)(func)
+            from typing import cast
+            return cast(Callable, self.doc(operationId=operation_id)(func))
             # Return the decorated function directly - self.doc() already preserves metadata
-            return decorated_func  # type: ignore[no-any-return]
 
         def _route(
             class_or_func: type["MethodView"] | Callable,

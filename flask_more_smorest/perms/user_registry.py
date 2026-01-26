@@ -232,8 +232,8 @@ def init_fms(
         state["helpers_initialized"] = True
 
     if not is_app_state:
-        global _user_model, _role_model, _token_model, _domain_model, _setting_model, _get_current_user_func  # noqa: PLW0603
-        global _models_initialized, _helpers_initialized  # noqa: PLW0603
+        global _user_model, _role_model, _token_model, _domain_model, _setting_model, _get_current_user_func
+        global _models_initialized, _helpers_initialized
         _user_model = state["user_model"]
         _role_model = state["role_model"]
         _token_model = state["token_model"]
@@ -470,8 +470,8 @@ def clear_registration() -> None:
     state["models_initialized"] = False
     state["helpers_initialized"] = False
 
-    global _user_model, _role_model, _token_model, _domain_model, _setting_model, _get_current_user_func  # noqa: PLW0603
-    global _models_initialized, _helpers_initialized  # noqa: PLW0603
+    global _user_model, _role_model, _token_model, _domain_model, _setting_model, _get_current_user_func
+    global _models_initialized, _helpers_initialized
     _user_model = None
     _role_model = None
     _token_model = None

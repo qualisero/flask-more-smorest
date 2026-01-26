@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import scoped_session
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def db_session(unit_app: Flask) -> Iterator["scoped_session"]:
     """Create a database session for tests."""
     with unit_app.app_context():
@@ -38,7 +38,7 @@ def db_session(unit_app: Flask) -> Iterator["scoped_session"]:
 
 
 # Fixture alias for backward compatibility with test signatures
-@pytest.fixture(scope="function")
+@pytest.fixture
 def api(unit_api: "Api") -> "Api":
     """Alias for unit_api to match test method signatures."""
     return unit_api

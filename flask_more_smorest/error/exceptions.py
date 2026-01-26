@@ -52,10 +52,7 @@ def _get_error_type_uri(error_code: str) -> str:
     Returns:
         URI string for the error type
     """
-    if has_app_context():
-        base_url = current_app.config.get("ERROR_TYPE_BASE_URL", "/errors")
-    else:
-        base_url = "/errors"
+    base_url = current_app.config.get("ERROR_TYPE_BASE_URL", "/errors") if has_app_context() else "/errors"
     return f"{base_url}/{error_code}"
 
 

@@ -134,7 +134,7 @@ def create_model_schema(model_cls: type, *, db_session: Any = None) -> type[Base
     if db_session is None:
         db_session = db.session
 
-    schema_cls = type(
+    return type(
         f"{model_cls.__name__}AutoSchema",
         (BaseSchema,),
         {
@@ -154,4 +154,3 @@ def create_model_schema(model_cls: type, *, db_session: Any = None) -> type[Base
         },
     )
 
-    return schema_cls
