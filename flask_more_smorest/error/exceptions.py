@@ -402,9 +402,9 @@ class UnprocessableEntity(ApiException):
     TITLE = "Validation Error"
     HTTP_STATUS_CODE = HTTPStatus.UNPROCESSABLE_ENTITY
 
-    fields: dict[str, str] = {}
-    location: str | None = None
-    valid_data: dict[str, str | int | bool] | None = None
+    fields: dict[str, str]
+    location: str | None
+    valid_data: dict[str, str | int | bool] | None
 
     def __init__(
         self,

@@ -8,13 +8,7 @@ from flask import Flask
 from flask_more_smorest import Api, db, init_db, init_jwt
 from flask_more_smorest.error.error_handlers import RequestHandlers
 from flask_more_smorest.perms import init_fms
-from flask_more_smorest.perms.models.defaults import (
-    DefaultDomain,
-    DefaultToken,
-    DefaultUser,
-    DefaultUserRole,
-    DefaultUserSetting,
-)
+from flask_more_smorest.perms.models import defaults as defaults_module
 
 
 @pytest.fixture
@@ -31,11 +25,11 @@ def app() -> Generator[Flask, None, None]:
 
     clear_registration()
     init_fms(
-        user=DefaultUser,
-        role=DefaultUserRole,
-        token=DefaultToken,
-        domain=DefaultDomain,
-        setting=DefaultUserSetting,
+        user=defaults_module.DefaultUser,
+        role=defaults_module.DefaultUserRole,
+        token=defaults_module.DefaultToken,
+        domain=defaults_module.DefaultDomain,
+        setting=defaults_module.DefaultUserSetting,
     )
     init_db(app)
     init_jwt(app)
@@ -65,11 +59,11 @@ def unit_app() -> Generator[Flask, None, None]:
 
     clear_registration()
     init_fms(
-        user=DefaultUser,
-        role=DefaultUserRole,
-        token=DefaultToken,
-        domain=DefaultDomain,
-        setting=DefaultUserSetting,
+        user=defaults_module.DefaultUser,
+        role=defaults_module.DefaultUserRole,
+        token=defaults_module.DefaultToken,
+        domain=defaults_module.DefaultDomain,
+        setting=defaults_module.DefaultUserSetting,
     )
     init_db(app)
     init_jwt(app)

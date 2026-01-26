@@ -157,6 +157,7 @@ ignore = [
     "S107", 
     "PT009",  # Allow unittest-style assertions if needed
     "SIM117", # Allow nested context managers if clearer
+    "RUF012", # ClassVar not needed in tests
 ]
 
 # Configure import sorting (isort replacement)

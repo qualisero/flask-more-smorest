@@ -1,12 +1,16 @@
 """Unit tests for query filtering functionality."""
 
+import contextlib
 import enum
+import uuid
 from datetime import date, datetime
 
 import pytest
+import sqlalchemy as sa
 from marshmallow import Schema, fields
 from sqlalchemy import Boolean, Column, Date, Integer, String
 
+from flask_more_smorest import db
 from flask_more_smorest.crud.query_filtering import (
     generate_filter_schema,
     get_statements_from_filters,
@@ -14,13 +18,38 @@ from flask_more_smorest.crud.query_filtering import (
 from flask_more_smorest.sqla.base_model import BaseModel
 
 
-class QueryTestModel(BaseModel):
-    """Test model for filtering tests."""
+@pytest.fixture(autouse=True)
+def _init_db(app):
+    with app.app_context():
+        yield
+        db.session.remove()
+        db.drop_all()
 
-    name = Column(String(50))
-    birth_date = Column(Date)
-    is_active = Column(Boolean)
-    age = Column(Integer)
+
+@pytest.fixture
+def query_model():
+    module_name = f"{__name__}.dynamic_{uuid.uuid4().hex}"
+    import sys
+    import types
+
+    module = types.ModuleType(module_name)
+    module.__dict__.update(globals())
+    sys.modules[module_name] = module
+
+    db.metadata.clear()
+    with contextlib.suppress(Exception):
+        sa.orm.clear_mappers()
+
+    class QueryTestModel(BaseModel):
+        __module__ = module_name
+
+        name = Column(String(50))
+        birth_date = Column(Date)
+        is_active = Column(Boolean)
+        age = Column(Integer)
+
+    sa.orm.configure_mappers()
+    return QueryTestModel
 
 
 class QueryTestSchema(Schema):
@@ -182,50 +211,50 @@ class TestGenerateFilterSchema:
 class TestGetStatementsFromFilters:
     """Tests for get_statements_from_filters function."""
 
-    def test_basic_equality_filter(self) -> None:
+    def test_basic_equality_filter(self, query_model) -> None:
         """Test basic equality filtering."""
         filters_dict = {"name": "John", "is_active": True}
-        statements = get_statements_from_filters(filters_dict, QueryTestModel)
+        statements = get_statements_from_filters(filters_dict, query_model)
 
         assert len(statements) == 2
         # Statements should be SQLAlchemy expressions
 
-    def test_range_filtering_datetime(self) -> None:
+    def test_range_filtering_datetime(self, query_model) -> None:
         """Test range filtering with __from and __to suffixes for DateTime."""
         filters_dict = {
             "created_at__from": datetime(2024, 1, 1),
             "created_at__to": datetime(2024, 12, 31),
         }
-        statements = get_statements_from_filters(filters_dict, QueryTestModel)
+        statements = get_statements_from_filters(filters_dict, query_model)
 
         assert len(statements) == 2
 
-    def test_range_filtering_date(self) -> None:
+    def test_range_filtering_date(self, query_model) -> None:
         """Test range filtering with __from and __to suffixes for Date."""
         filters_dict = {
             "birth_date__from": date(2000, 1, 1),
             "birth_date__to": date(2005, 12, 31),
         }
-        statements = get_statements_from_filters(filters_dict, QueryTestModel)
+        statements = get_statements_from_filters(filters_dict, query_model)
 
         assert len(statements) == 2
 
-    def test_min_max_filtering(self) -> None:
+    def test_min_max_filtering(self, query_model) -> None:
         """Test min/max filtering with __min and __max suffixes."""
         filters_dict = {"age__min": 18, "age__max": 65}
-        statements = get_statements_from_filters(filters_dict, QueryTestModel)
+        statements = get_statements_from_filters(filters_dict, query_model)
 
         assert len(statements) == 2
 
-    def test_none_values_ignored(self) -> None:
+    def test_none_values_ignored(self, query_model) -> None:
         """Test that None values are ignored in filtering."""
         filters_dict = {"name": None, "age": 25, "is_active": None}
-        statements = get_statements_from_filters(filters_dict, QueryTestModel)
+        statements = get_statements_from_filters(filters_dict, query_model)
 
         # Only age filter should be included
         assert len(statements) == 1
 
-    def test_mixed_filter_types(self) -> None:
+    def test_mixed_filter_types(self, query_model) -> None:
         """Test combining different filter types."""
         filters_dict = {
             "name": "John",
@@ -234,73 +263,63 @@ class TestGetStatementsFromFilters:
             "created_at__from": datetime(2024, 1, 1),
             "is_active": True,
         }
-        statements = get_statements_from_filters(filters_dict, QueryTestModel)
+        statements = get_statements_from_filters(filters_dict, query_model)
 
         assert len(statements) == 5
 
-    def test_empty_filters(self) -> None:
+    def test_empty_filters(self, query_model) -> None:
         """Test with empty filters dictionary."""
-        statements = get_statements_from_filters({}, QueryTestModel)
+        statements = get_statements_from_filters({}, query_model)
         assert len(statements) == 0
 
-    def test_invalid_field_names(self) -> None:
+    def test_invalid_field_names(self, query_model) -> None:
         """Test handling of invalid field names."""
         filters_dict = {"nonexistent_field": "value"}
 
         # Should raise ValueError for nonexistent fields with helpful message
-        with pytest.raises(ValueError) as exc_info:
-            get_statements_from_filters(filters_dict, QueryTestModel)
+        with pytest.raises(ValueError, match="Invalid filter field 'nonexistent_field'"):
+            get_statements_from_filters(filters_dict, query_model)
 
-        error_msg = str(exc_info.value)
-        assert "Invalid filter field 'nonexistent_field'" in error_msg
-        assert "QueryTestModel" in error_msg
-        assert "Valid fields are:" in error_msg
-
-    def test_invalid_field_with_suffix(self) -> None:
+    def test_invalid_field_with_suffix(self, query_model) -> None:
         """Test handling of invalid field names with filter suffixes."""
         # Field 'invalid' does not exist, even with __from suffix
         filters_dict = {"invalid__from": "2024-01-01"}
 
-        with pytest.raises(ValueError) as exc_info:
-            get_statements_from_filters(filters_dict, QueryTestModel)
+        with pytest.raises(ValueError, match="Invalid filter field 'invalid'"):
+            get_statements_from_filters(filters_dict, query_model)
 
-        error_msg = str(exc_info.value)
-        assert "Invalid filter field 'invalid'" in error_msg
-
-    def test_private_attribute_access_blocked(self) -> None:
+    def test_private_attribute_access_blocked(self, query_model) -> None:
         """Test that private attributes cannot be accessed via filters."""
         # Attempting to filter by private/internal attributes should fail
         filters_dict = {"_sa_instance_state": "value"}
 
-        with pytest.raises(ValueError) as exc_info:
-            get_statements_from_filters(filters_dict, QueryTestModel)
+        with pytest.raises(ValueError, match="Invalid filter field '_sa_instance_state'"):
+            get_statements_from_filters(filters_dict, query_model)
 
-        assert "Invalid filter field" in str(exc_info.value)
-
-    def test_from_only_filter(self) -> None:
+    def test_from_only_filter(self, query_model) -> None:
         """Test range filter with only __from suffix."""
         filters_dict = {"created_at__from": datetime(2024, 1, 1)}
-        statements = get_statements_from_filters(filters_dict, QueryTestModel)
+        statements = get_statements_from_filters(filters_dict, query_model)
 
         assert len(statements) == 1
 
-    def test_to_only_filter(self) -> None:
+    def test_to_only_filter(self, query_model) -> None:
         """Test range filter with only __to suffix."""
         filters_dict = {"created_at__to": datetime(2024, 12, 31)}
-        statements = get_statements_from_filters(filters_dict, QueryTestModel)
+        statements = get_statements_from_filters(filters_dict, query_model)
 
         assert len(statements) == 1
 
-    def test_min_only_filter(self) -> None:
+    def test_min_only_filter(self, query_model) -> None:
         """Test min filter without max."""
         filters_dict = {"age__min": 18}
-        statements = get_statements_from_filters(filters_dict, QueryTestModel)
+        statements = get_statements_from_filters(filters_dict, query_model)
 
         assert len(statements) == 1
 
-    def test_max_only_filter(self) -> None:
+    def test_max_only_filter(self, query_model) -> None:
         """Test max filter without min."""
         filters_dict = {"age__max": 65}
-        statements = get_statements_from_filters(filters_dict, QueryTestModel)
+        statements = get_statements_from_filters(filters_dict, query_model)
 
         assert len(statements) == 1

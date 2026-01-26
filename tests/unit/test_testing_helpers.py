@@ -7,11 +7,7 @@ import pytest
 from flask import Flask
 
 from flask_more_smorest import Api, UserBlueprint, db
-from flask_more_smorest.perms.models.defaults import (
-    BaseRoleEnum,
-    DefaultUser,
-    DefaultUserRole,
-)
+from flask_more_smorest.perms.models import defaults as defaults_module
 from flask_more_smorest.testing import as_admin, as_user, clear_registration
 
 if TYPE_CHECKING:
@@ -44,8 +40,8 @@ class TestAsUser:
         api.register_blueprint(bp)
 
         # Create test user
-        with DefaultUser.bypass_perms():
-            user = DefaultUser(email="test@example.com", password="password123")
+        with defaults_module.DefaultUser.bypass_perms():
+            user = defaults_module.DefaultUser(email="test@example.com", password="password123")
             user.save()
 
         # Test that as_user sets the header
@@ -61,8 +57,8 @@ class TestAsUser:
         bp = UserBlueprint()
         api.register_blueprint(bp)
 
-        with DefaultUser.bypass_perms():
-            user = DefaultUser(email="claims@example.com", password="password123")
+        with defaults_module.DefaultUser.bypass_perms():
+            user = defaults_module.DefaultUser(email="claims@example.com", password="password123")
             user.save()
 
         client = unit_app.test_client()
@@ -80,10 +76,10 @@ class TestAsAdmin:
         api.register_blueprint(bp)
 
         # Create admin user
-        with DefaultUser.bypass_perms():
-            admin = DefaultUser(email="admin@example.com", password="password123")
+        with defaults_module.DefaultUser.bypass_perms():
+            admin = defaults_module.DefaultUser(email="admin@example.com", password="password123")
             admin.save()
-            admin.roles.append(DefaultUserRole(user=admin, role=BaseRoleEnum.ADMIN))
+            admin.roles.append(defaults_module.DefaultUserRole(user=admin, role=defaults_module.BaseRoleEnum.ADMIN))
 
         client = unit_app.test_client()
         with as_admin(client, str(admin.id)):
@@ -95,10 +91,12 @@ class TestAsAdmin:
         bp = UserBlueprint()
         api.register_blueprint(bp)
 
-        with DefaultUser.bypass_perms():
-            superadmin = DefaultUser(email="superadmin@example.com", password="password123")
+        with defaults_module.DefaultUser.bypass_perms():
+            superadmin = defaults_module.DefaultUser(email="superadmin@example.com", password="password123")
             superadmin.save()
-            superadmin.roles.append(DefaultUserRole(user=superadmin, role=BaseRoleEnum.SUPERADMIN))
+            superadmin.roles.append(
+                defaults_module.DefaultUserRole(user=superadmin, role=defaults_module.BaseRoleEnum.SUPERADMIN)
+            )
 
         client = unit_app.test_client()
         with as_admin(client, str(superadmin.id), roles=["superadmin"]):

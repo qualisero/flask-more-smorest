@@ -3,6 +3,7 @@
 This module tests the BaseModel, database initialization, and migration utilities.
 """
 
+import contextlib
 import uuid
 from collections.abc import Iterator
 from datetime import datetime
@@ -12,7 +13,6 @@ import pytest
 from flask import Flask
 
 from flask_more_smorest import BaseModel, db, init_db
-from flask_more_smorest.perms import init_fms
 
 if TYPE_CHECKING:
     Product = BaseModel  # pyright: ignore[reportAssignmentType]
@@ -40,7 +40,20 @@ def _reset_registry() -> Iterator[None]:
 
     yield
 
+    # Clear registry
     clear_registration()
+    # Clear metadata
+    db.metadata.clear()
+    # Clear SQLAlchemy mappers
+    with contextlib.suppress(Exception):
+        import sqlalchemy as sa
+
+        sa.orm.clear_mappers()
+    # Unload user_schemas module - critical for preventing schema caching pollution
+    import sys
+
+    if "flask_more_smorest.perms.user_schemas" in sys.modules:
+        del sys.modules["flask_more_smorest.perms.user_schemas"]
 
 
 @pytest.fixture
@@ -51,7 +64,10 @@ def app() -> Flask:
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-    init_fms()
+    # Note: We don't call init_fms() here because these tests only use the Product model
+    # which extends BaseModel directly. Calling init_fms() would load default models
+    # and pollute the registry for subsequent test modules.
+
     # Initialize database
     init_db(app)
 

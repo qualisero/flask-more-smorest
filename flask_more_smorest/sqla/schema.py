@@ -97,12 +97,11 @@ class BaseModelConverter(ModelConverter):
         required = False
         allow_none = True
         for pair in prop.local_remote_pairs:
-            if not pair[0].nullable:
-                if prop.uselist is True or self.DIRECTION_MAPPING[prop.direction.name] is False:
-                    allow_none = False
-                    # Do not make required if a default is provided:
-                    if not pair[0].default and not pair[0].server_default:
-                        required = True
+            if not pair[0].nullable and (prop.uselist is True or self.DIRECTION_MAPPING[prop.direction.name] is False):
+                allow_none = False
+                # Do not make required if a default is provided:
+                if not pair[0].default and not pair[0].server_default:
+                    required = True
         # NOTE: always set dump_only to True for relationships (can be overriden in schema)
         kwargs.update({"allow_none": allow_none, "required": required, "dump_only": True})
 

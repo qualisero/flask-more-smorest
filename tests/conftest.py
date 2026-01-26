@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import contextlib
 import sys
 from collections.abc import Generator
 
 import pytest
-from sqlalchemy.orm import clear_mappers
 
 from flask_more_smorest import db
 from flask_more_smorest.perms import clear_registration
@@ -30,12 +30,22 @@ def _cleanup_test_mappers() -> Generator[None, None, None]:
     """
     yield
 
-    # Clear all mappers to ensure a clean slate for the next test module
-    try:
+    # Clear Flask-SQLAlchemy's declarative class registry
+    # This prevents "already contains a class" warnings on re-import
+    if hasattr(db.Model, "_decl_class_registry"):
+        db.Model._decl_class_registry.clear()
+
+    # Clear SQLAlchemy's mapper registry state
+    # This is necessary to fully reset mapper configuration
+    with contextlib.suppress(Exception):
+        from sqlalchemy.orm import clear_mappers
+
         clear_mappers()
-    except Exception:
-        # Ignore errors during cleanup (e.g. dynamic classes already partially destroyed)
-        pass
+        # Also clear the mapper's internal state
+        if hasattr(db.Model, "__mapper__"):
+            mapper_registry = getattr(db.Model.metadata, "_sa_registry", None)
+            if mapper_registry is not None and hasattr(mapper_registry, "_mappers"):
+                mapper_registry._mappers.clear()
 
     # Clear metadata to remove table definitions
     if hasattr(db, "metadata"):
@@ -49,6 +59,7 @@ def _cleanup_test_mappers() -> Generator[None, None, None]:
         "flask_more_smorest.perms.models.setting",
         "flask_more_smorest.perms.models.defaults",
         "flask_more_smorest.perms.models.user",
+        "flask_more_smorest.perms.user_schemas",
     ]
 
     for module_name in modules_to_unload:

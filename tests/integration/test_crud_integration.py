@@ -4,6 +4,7 @@ This module tests the complete CRUD blueprint functionality with a real Flask ap
 using up-to-date features from flask-smorest, SQLAlchemy, and marshmallow_sqlalchemy.
 """
 
+import contextlib
 import uuid
 from collections.abc import Iterator
 from typing import TYPE_CHECKING
@@ -25,13 +26,7 @@ if TYPE_CHECKING:
 @pytest.fixture
 def app() -> Flask:
     """Create a Flask application for testing."""
-    from flask_more_smorest.perms.models.defaults import (
-        DefaultDomain,
-        DefaultToken,
-        DefaultUser,
-        DefaultUserRole,
-        DefaultUserSetting,
-    )
+    from flask_more_smorest.perms.models import defaults as defaults_module
 
     app = Flask(__name__)
     app.config["TESTING"] = True
@@ -43,11 +38,11 @@ def app() -> Flask:
     app.config["SECRET_KEY"] = "test-secret-key-crud"
 
     init_fms(
-        user=DefaultUser,
-        role=DefaultUserRole,
-        token=DefaultToken,
-        domain=DefaultDomain,
-        setting=DefaultUserSetting,
+        user=defaults_module.DefaultUser,
+        role=defaults_module.DefaultUserRole,
+        token=defaults_module.DefaultToken,
+        domain=defaults_module.DefaultDomain,
+        setting=defaults_module.DefaultUserSetting,
     )
     # Initialize database
     init_db(app)
@@ -334,3 +329,23 @@ class TestCRUDIntegration:
             response = client.post("/api/products/", json=product_data)
             # Should return 422 for validation errors
             assert response.status_code == 422
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _module_cleanup() -> Iterator[None]:
+    """Clean up default models at module boundaries to prevent registry pollution."""
+    yield
+    # Clear registry
+    from flask_more_smorest.perms import clear_registration
+
+    clear_registration()
+    # Clear metadata
+    db.metadata.clear()
+    # Clear SQLAlchemy mappers and declarative registry
+
+    with contextlib.suppress(Exception):
+        import sqlalchemy as sa
+
+        sa.orm.clear_mappers()
+        if hasattr(db.Model, "_decl_class_registry"):
+            db.Model._decl_class_registry.clear()

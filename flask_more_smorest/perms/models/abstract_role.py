@@ -49,7 +49,7 @@ class AbstractDomain(BasePermsModel):
 
     __abstract__ = True  # No table is created
     __tablename__ = "domain"
-    __table_args__ = {"extend_existing": True}
+    __table_args__ = {"extend_existing": True}  # noqa: RUF012
 
     name: Mapped[str] = mapped_column(sa.String(255), nullable=False)
     display_name: Mapped[str] = mapped_column(sa.String(255), nullable=False)
@@ -96,7 +96,7 @@ class AbstractUserRole(BasePermsModel):
 
     __abstract__ = True  # No table is created
     __tablename__ = "user_role"
-    __table_args__ = {"extend_existing": True}
+    __table_args__ = {"extend_existing": True}  # noqa: RUF012
 
     user_id: Mapped[uuid.UUID] = mapped_column(sa.Uuid(as_uuid=True), sa.ForeignKey("user.id"), nullable=False)
     domain_id: Mapped[uuid.UUID | None] = mapped_column(

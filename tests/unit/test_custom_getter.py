@@ -1,111 +1,108 @@
-"""Unit tests for extending DefaultUser model with custom current user getter."""
+"""Unit tests for extending defaults_module.DefaultUser model with custom current user getter."""
 
+import contextlib
+import sys
 import uuid
 from collections.abc import Generator
 
 import pytest
 import sqlalchemy as sa
+from flask import Flask
 from sqlalchemy.orm import Mapped, mapped_column
 
-from flask_more_smorest import db
+from flask_more_smorest import db, init_db, init_jwt
 from flask_more_smorest.perms import (
     clear_registration,
     init_fms,
     is_current_user_admin,
     is_current_user_superadmin,
 )
-from flask_more_smorest.perms.models.abstract_role import AbstractUserRole
-from flask_more_smorest.perms.models.abstract_setting import AbstractUserSetting
-from flask_more_smorest.perms.models.abstract_token import AbstractToken
+from flask_more_smorest.perms.models import defaults as defaults_module
 from flask_more_smorest.perms.models.abstract_user import AbstractUser
-from flask_more_smorest.perms.models.defaults import (
-    DefaultDomain,
-    DefaultToken,
-    DefaultUser,
-    DefaultUserRole,
-    DefaultUserSetting,
-)
 
 
-def build_models() -> (
-    tuple[
-        type[AbstractUser],
-        type[AbstractUserRole],
-        type[AbstractToken],
-        type[AbstractUserSetting],
-    ]
-):
-    suffix = uuid.uuid4().hex
-    user_table = f"custom_user_{suffix}"
+def build_models() -> type[AbstractUser]:
+    module_name = f"{__name__}.dynamic_{uuid.uuid4().hex}"
+    import sys
+    import types
+
+    module = types.ModuleType(module_name)
+    module.__dict__.update(globals())
+    sys.modules[module_name] = module
 
     class CustomUser(AbstractUser):  # type: ignore[misc]
-        __tablename__ = user_table
+        __module__ = module_name
         __allow_unmapped__ = True
 
-        id: Mapped[uuid.UUID] = mapped_column(sa.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-        email: Mapped[str] = mapped_column(sa.String(128), unique=True, nullable=False)
-        password: Mapped[bytes | None] = mapped_column(sa.LargeBinary(128), nullable=True)
-        is_enabled: Mapped[bool] = mapped_column(sa.Boolean(), default=True)
+        external_id: Mapped[str | None] = mapped_column(sa.String(64), nullable=True)
+        source_system: Mapped[str | None] = mapped_column(sa.String(64), nullable=True)
 
-    class CustomUserRole(AbstractUserRole):
-        __tablename__ = f"custom_user_role_{suffix}"
+    return CustomUser
 
-        user_id: Mapped[uuid.UUID] = mapped_column(
-            sa.Uuid(as_uuid=True),
-            db.ForeignKey(f"{user_table}.id"),
-            nullable=False,
-        )
-        domain_id: Mapped[uuid.UUID | None] = mapped_column(
-            sa.Uuid(as_uuid=True),
-            db.ForeignKey("domain.id"),
-            nullable=True,
-            default=None,
-        )
-        _role: Mapped[str] = mapped_column("role", sa.String(50), nullable=False)
 
-    class CustomToken(AbstractToken):
-        __tablename__ = f"custom_token_{suffix}"
-
-        can_renew: Mapped[bool] = mapped_column(sa.Boolean(), nullable=False, default=True)
-
-    class CustomUserSetting(AbstractUserSetting):
-        __tablename__ = f"custom_user_setting_{suffix}"
-
-        category: Mapped[str] = mapped_column(sa.String(64), nullable=False)
-
-    return CustomUser, CustomUserRole, CustomToken, CustomUserSetting  # type: ignore[return-value]
+def reset_models() -> None:
+    clear_registration()
+    with contextlib.suppress(Exception):
+        sa.orm.clear_mappers()
+    db.metadata.clear()
+    modules_to_unload = [
+        "flask_more_smorest.perms.models.role",
+        "flask_more_smorest.perms.models.token",
+        "flask_more_smorest.perms.models.setting",
+        "flask_more_smorest.perms.models.defaults",
+        "flask_more_smorest.perms.models.user",
+        "flask_more_smorest.perms.user_schemas",
+    ]
+    for module_name in modules_to_unload:
+        sys.modules.pop(module_name, None)
 
 
 @pytest.fixture(autouse=True)
 def _clear_registration() -> Generator[None, None, None]:
-    clear_registration()
+    reset_models()
     yield
-    clear_registration()
-    init_fms(
-        user=DefaultUser,
-        role=DefaultUserRole,
-        token=DefaultToken,
-        domain=DefaultDomain,
-        setting=DefaultUserSetting,
-    )
+    reset_models()
+
+
+@pytest.fixture
+def unit_app() -> Generator[Flask, None, None]:
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    app.config["SECRET_KEY"] = "test-secret-key"
+    app.config["JWT_SECRET_KEY"] = "jwt-test-secret-key"
+
+    init_db(app)
+    init_jwt(app)
+
+    yield app
+
+    with app.app_context():
+        db.session.remove()
+        db.drop_all()
+
+
+@pytest.fixture
+def db_session(unit_app: Flask) -> Generator[None, None, None]:
+    with unit_app.app_context():
+        yield
+        db.session.remove()
+        db.drop_all()
 
 
 class TestCustomGetter:
-    """Test extending DefaultUser model with custom get_current_user mechanism."""
+    """Test extending defaults_module.DefaultUser model with custom get_current_user mechanism."""
 
     def test_init_fms_with_custom_getter(self, unit_app, db_session) -> None:
         """Test that init_fms with custom getter works."""
 
-        CustomUser, CustomUserRole, CustomToken, CustomUserSetting = build_models()
+        CustomUser = build_models()
 
         clear_registration()
-        init_fms(
-            user=CustomUser,
-            role=CustomUserRole,
-            token=CustomToken,
-            domain=DefaultDomain,
-            setting=CustomUserSetting,
-        )
+        init_fms(user=CustomUser)
+        db.drop_all()
+        db.create_all()
 
         # Create a test user in database with extra attributes
         with CustomUser.bypass_perms():
@@ -135,16 +132,12 @@ class TestCustomGetter:
     def test_custom_getter_overrides_jwt_fallback(self, unit_app, db_session) -> None:
         """Test that custom getter takes precedence over JWT."""
 
-        CustomUser, CustomUserRole, CustomToken, CustomUserSetting = build_models()
+        CustomUser = build_models()
 
         clear_registration()
-        init_fms(
-            user=CustomUser,
-            role=CustomUserRole,
-            token=CustomToken,
-            domain=DefaultDomain,
-            setting=CustomUserSetting,
-        )
+        init_fms(user=CustomUser)
+        db.drop_all()
+        db.create_all()
 
         # Create test users
         with CustomUser.bypass_perms():
@@ -168,16 +161,10 @@ class TestCustomGetter:
     def test_custom_getter_returns_none(self, unit_app, db_session) -> None:
         """Test that custom getter returning None is handled correctly."""
 
-        CustomUser, CustomUserRole, CustomToken, CustomUserSetting = build_models()
+        CustomUser = build_models()
 
         clear_registration()
-        init_fms(
-            user=CustomUser,
-            role=CustomUserRole,
-            token=CustomToken,
-            domain=DefaultDomain,
-            setting=CustomUserSetting,
-        )
+        init_fms(user=CustomUser)
 
         # Custom getter returns None
         def unauthenticated_get_user() -> CustomUser | None:  # type: ignore[valid-type]
@@ -192,28 +179,18 @@ class TestCustomGetter:
     def test_multiple_user_classes(self, unit_app, db_session) -> None:
         """Test that multiple user classes can coexist with different getters."""
 
-        CustomUser1, CustomUserRole1, CustomToken1, CustomUserSetting1 = build_models()
-        CustomUser2, CustomUserRole2, CustomToken2, CustomUserSetting2 = build_models()
+        CustomUser1 = build_models()
 
         clear_registration()
-        init_fms(
-            user=CustomUser1,
-            role=CustomUserRole1,
-            token=CustomToken1,
-            domain=DefaultDomain,
-            setting=CustomUserSetting1,
-        )
+        init_fms(user=CustomUser1)
+        db.drop_all()
+        db.create_all()
 
         # Create test users
         with CustomUser1.bypass_perms():
             employee = CustomUser1(email="employee@example.com", password="password123")
-            employee.employee_id = "EMP001"  # type: ignore[attr-defined]
+            employee.external_id = "EMP001"  # type: ignore[attr-defined]
             employee.save()
-
-        with CustomUser2.bypass_perms():
-            customer = CustomUser2(email="customer@example.com", password="password123")
-            customer.customer_id = "CUST001"  # type: ignore[attr-defined]
-            customer.save()
 
         # Custom getter returns employee
         def get_employee() -> CustomUser1 | None:  # type: ignore[valid-type]
@@ -225,7 +202,21 @@ class TestCustomGetter:
         employee_current = CustomUser1.get_current_user()
         assert employee_current is not None
         assert isinstance(employee_current, CustomUser1)
-        assert employee_current.employee_id == "EMP001"  # type: ignore[attr-defined]
+        assert employee_current.external_id == "EMP001"  # type: ignore[attr-defined]
+
+        db.session.remove()
+        db.drop_all()
+        reset_models()
+
+        CustomUser2 = build_models()
+
+        init_fms(user=CustomUser2)
+        db.create_all()
+
+        with CustomUser2.bypass_perms():
+            customer = CustomUser2(email="customer@example.com", password="password123")
+            customer.external_id = "CUST001"  # type: ignore[attr-defined]
+            customer.save()
 
         # Custom getter returns customer
         def get_customer() -> CustomUser2 | None:  # type: ignore[valid-type]
@@ -236,27 +227,23 @@ class TestCustomGetter:
         customer_current = CustomUser2.get_current_user()
         assert customer_current is not None
         assert isinstance(customer_current, CustomUser2)
-        assert customer_current.customer_id == "CUST001"  # type: ignore[attr-defined]
+        assert customer_current.external_id == "CUST001"  # type: ignore[attr-defined]
 
     def test_custom_getter_with_roles(self, unit_app, db_session) -> None:
         """Test custom getter with role checks."""
 
-        CustomUser, CustomUserRole, CustomToken, CustomUserSetting = build_models()
+        CustomUser = build_models()
 
         clear_registration()
-        init_fms(
-            user=CustomUser,
-            role=CustomUserRole,
-            token=CustomToken,
-            domain=DefaultDomain,
-            setting=CustomUserSetting,
-        )
+        init_fms(user=CustomUser)
+        db.drop_all()
+        db.create_all()
 
         # Create test user with admin role
         with CustomUser.bypass_perms():
             user = CustomUser(email="admin@example.com", password="password123")
             user.save()
-            user.roles.append(CustomUserRole(user=user, role="ADMIN"))
+            user.roles.append(defaults_module.DefaultUserRole(user=user, role=defaults_module.BaseRoleEnum.ADMIN))
 
         # Custom getter returns admin user
         def get_admin() -> CustomUser | None:  # type: ignore[valid-type]

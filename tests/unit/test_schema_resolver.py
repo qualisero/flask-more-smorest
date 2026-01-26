@@ -42,17 +42,13 @@ class TestResolveSchema:
 
     def test_resolve_none_without_default_raises(self) -> None:
         """Test resolving None without default raises ValueError."""
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="No schema provided"):
             resolve_schema(None, "")
-
-        assert "No schema provided" in str(exc_info.value)
 
     def test_resolve_none_with_context_in_error(self) -> None:
         """Test that context is included in error message."""
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="for PATCH method"):
             resolve_schema(None, "", context="PATCH method")
-
-        assert "for PATCH method" in str(exc_info.value)
 
     def test_resolve_string_from_module(self) -> None:
         """Test resolving a string schema name from a module."""
@@ -67,17 +63,13 @@ class TestResolveSchema:
 
     def test_resolve_string_module_not_found(self) -> None:
         """Test that invalid module path raises ValueError."""
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="Could not import module"):
             resolve_schema("SomeSchema", "nonexistent.module.path")
-
-        assert "Could not import module" in str(exc_info.value)
 
     def test_resolve_string_attribute_not_found(self) -> None:
         """Test that missing schema in module raises ValueError."""
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="Could not find schema"):
             resolve_schema("NonExistentSchema", "tests.unit.test_schema_resolver")
-
-        assert "Could not find schema" in str(exc_info.value)
 
     def test_resolve_string_not_schema_subclass(self) -> None:
         """Test that importing non-Schema raises TypeError."""

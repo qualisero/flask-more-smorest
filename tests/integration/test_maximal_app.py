@@ -4,6 +4,7 @@ This test demonstrates a complete Flask app configuration using all major featur
 of flask-more-smorest together, showing how streamlined and simple the setup can be.
 """
 
+import contextlib
 import datetime as dt
 import uuid
 from collections.abc import Callable, Iterator
@@ -25,7 +26,7 @@ from flask_more_smorest import (
     init_db,
     init_jwt,
 )
-from flask_more_smorest.error import ForbiddenError, UnauthorizedError
+from flask_more_smorest.error import ForbiddenError, NotFoundError, UnauthorizedError
 from flask_more_smorest.perms import init_fms, is_current_user_admin
 from flask_more_smorest.perms.models.base_roles import BaseRoleEnum
 
@@ -59,26 +60,19 @@ else:
 
 @pytest.fixture(scope="module", autouse=True)
 def _load_defaults() -> Iterator[None]:
-    import importlib
-
     from flask_more_smorest.perms import clear_registration
     from flask_more_smorest.perms.models import defaults as defaults_module
-    from flask_more_smorest.perms.models import role as role_module
-    from flask_more_smorest.perms.models import setting as setting_module
-    from flask_more_smorest.perms.models import token as token_module
-    from flask_more_smorest.perms.models import user as user_module
+
+    # We rely on conftest.py to have unloaded these modules if they were used in previous tests.
+    # Just importing them here will create fresh classes if they were unloaded.
+    # If they weren't unloaded (first test), they are fresh anyway.
 
     clear_registration()
     db.metadata.clear()
 
-    try:
-        importlib.reload(user_module)
-        importlib.reload(token_module)
-        importlib.reload(role_module)
-        importlib.reload(setting_module)
-    except ImportError:
-        # Modules might have been unloaded by conftest.py cleanup
-        pass
+    # Note: We used to reload() here, but that caused duplicate registration warnings
+    # and NoForeignKeysError because old classes remained in db.Model registry.
+    # Since conftest.py handles unloading, we don't need to force reload here.
 
     global DefaultDomain, DefaultToken, DefaultUser, DefaultUserRole, DefaultUserSetting, Article, Comment, Topic
     DefaultDomain = defaults_module.DefaultDomain
@@ -156,7 +150,20 @@ def _load_defaults() -> Iterator[None]:
 
     yield
 
+    # Clear registry
     clear_registration()
+    # Clear metadata
+    db.metadata.clear()
+    # Clear SQLAlchemy mappers
+    with contextlib.suppress(Exception):
+        import sqlalchemy as sa
+
+        sa.orm.clear_mappers()
+    # Unload user_schemas module - critical for preventing schema caching pollution
+    import sys
+
+    if "flask_more_smorest.perms.user_schemas" in sys.modules:
+        del sys.modules["flask_more_smorest.perms.user_schemas"]
 
 
 @pytest.fixture
@@ -652,7 +659,7 @@ class TestMaximalFeatureIntegration:
         retrieved = Article.get_or_404(article_id)
         assert retrieved.id == article_id
 
-        with pytest.raises(Exception):
+        with pytest.raises(NotFoundError):
             assert Article.get_or_404(uuid.uuid4())
 
         # Test get_by
@@ -664,7 +671,7 @@ class TestMaximalFeatureIntegration:
         retrieved = Article.get_by_or_404(title="Test")
         assert retrieved.title == "Test"
 
-        with pytest.raises(Exception):
+        with pytest.raises(NotFoundError):
             Article.get_by_or_404(title="Nonexistent")
 
     def test_auth_required_for_private_routes(self, client: "FlaskClient") -> None:

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
+from contextlib import suppress
 from typing import TYPE_CHECKING, Literal, TypeVar, cast, overload
 
 # Admin role type - constrained to valid admin roles only
@@ -95,13 +96,11 @@ def get_current_user_id() -> uuid.UUID | None:
         return None
 
     # Handle Mapped[UUID] by extracting the value
-    try:
+    with suppress(Exception):
         from sqlalchemy.orm.attributes import InstrumentedAttribute
 
         if isinstance(user_id, InstrumentedAttribute):
             return cast(uuid.UUID, user_id.property.class_.impl.type.python_type(user_id))
-    except Exception:  # nosec: B110
-        pass
 
     return cast(uuid.UUID, user_id)
 
