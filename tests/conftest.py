@@ -30,20 +30,38 @@ def _cleanup_test_mappers() -> Generator[None, None, None]:
     """
     yield
 
-    # Dispose only test-defined models to avoid unmapping library defaults
-    if hasattr(db, "Model") and hasattr(db.Model, "registry"):
-        to_dispose = []
-        for mapper in list(db.Model.registry.mappers):
-            if mapper.class_.__module__.startswith("tests."):
-                to_dispose.append(mapper.class_)
+    # Clear Flask-SQLAlchemy's declarative class registry
+    # This prevents "already contains a class" warnings on re-import
+    if hasattr(db.Model, "_decl_class_registry"):
+        db.Model._decl_class_registry.clear()
 
-        for cls in to_dispose:
-            with contextlib.suppress(Exception):
-                if hasattr(db.Model.registry, "_dispose_cls"):
-                    db.Model.registry._dispose_cls(cls)
-            if hasattr(cls, "__table__") and cls.__table__ in db.metadata:
-                db.metadata.remove(cls.__table__)
+    # Clear SQLAlchemy's mapper registry state
+    # This is necessary to fully reset mapper configuration
+    with contextlib.suppress(Exception):
+        from sqlalchemy.orm import clear_mappers
 
-    # Unload cached user schemas to avoid stale BaseUserSchema
-    if "flask_more_smorest.perms.user_schemas" in sys.modules:
-        del sys.modules["flask_more_smorest.perms.user_schemas"]
+        clear_mappers()
+        # Also clear the mapper's internal state
+        if hasattr(db.Model, "__mapper__"):
+            mapper_registry = getattr(db.Model.metadata, "_sa_registry", None)
+            if mapper_registry is not None and hasattr(mapper_registry, "_mappers"):
+                mapper_registry._mappers.clear()
+
+    # Clear metadata to remove table definitions
+    if hasattr(db, "metadata"):
+        db.metadata.clear()
+
+    # Force re-import of persistent model modules to re-map them
+    # This is necessary because clear_mappers() leaves classes unmapped
+    modules_to_unload = [
+        "flask_more_smorest.perms.models.role",
+        "flask_more_smorest.perms.models.token",
+        "flask_more_smorest.perms.models.setting",
+        "flask_more_smorest.perms.models.defaults",
+        "flask_more_smorest.perms.models.user",
+        "flask_more_smorest.perms.user_schemas",
+    ]
+
+    for module_name in modules_to_unload:
+        if module_name in sys.modules:
+            del sys.modules[module_name]

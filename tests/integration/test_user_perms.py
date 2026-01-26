@@ -2,7 +2,7 @@
 
 This test demonstrates:
 - Creating a CustomUserModel class that extends AbstractUser
-- Using DEFAULT implementations for Domain, UserRole, Token, UserSetting (not custom)
+- Using DEFAULT implementations for defaults_module.DefaultDomain, defaults_module.DefaultUserRole, Token, UserSetting (not custom)
 - Testing that init_fms(user=CustomUser) works with defaults for other models
 - Testing a model with UserOwnershipMixin for permission access
 - Testing a model with custom permission rules
@@ -26,9 +26,8 @@ from flask_more_smorest.error.exceptions import ForbiddenError
 from flask_more_smorest.perms import clear_registration, init_fms
 from flask_more_smorest.perms.base_perms_model import BasePermsModel
 from flask_more_smorest.perms.model_mixins import ProfileMixin, UserOwnershipMixin
+from flask_more_smorest.perms.models import defaults as defaults_module
 from flask_more_smorest.perms.models.abstract_user import AbstractUser
-from flask_more_smorest.perms.models.base_roles import BaseRoleEnum
-from flask_more_smorest.perms.models.role import Domain, UserRole
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import scoped_session
@@ -134,12 +133,12 @@ def test_users(
     """
     CustomUserModel = custom_models.CustomUserModel
 
-    # Create a domain using DEFAULT Domain class
-    domain = Domain(name="test_domain", display_name="Test Domain")
+    # Create a domain using DEFAULT defaults_module.DefaultDomain class
+    domain = defaults_module.DefaultDomain(name="test_domain", display_name="Test defaults_module.DefaultDomain")
     db_session.add(domain)
     db_session.commit()
 
-    # Create users with roles using DEFAULT UserRole class
+    # Create users with roles using DEFAULT defaults_module.DefaultUserRole class
     with CustomUserModel.bypass_perms():
         # Admin user (verified)
         admin_user = CustomUserModel(
@@ -148,7 +147,7 @@ def test_users(
             bio="Admin user bio",
             phone_number="111-111-1111",
             is_verified=True,
-            roles=[UserRole(role=BaseRoleEnum.ADMIN, domain_id=domain.id)],
+            roles=[defaults_module.DefaultUserRole(role=defaults_module.BaseRoleEnum.ADMIN, domain_id=domain.id)],
         )
         db_session.add(admin_user)
         db_session.commit()
@@ -160,7 +159,7 @@ def test_users(
             bio="Verified user bio",
             phone_number="222-222-2222",
             is_verified=True,
-            roles=[UserRole(role=BaseRoleEnum.USER, domain_id=domain.id)],
+            roles=[defaults_module.DefaultUserRole(role=defaults_module.BaseRoleEnum.USER, domain_id=domain.id)],
         )
         db_session.add(verified_user)
         db_session.commit()
@@ -177,7 +176,9 @@ def test_users(
         db_session.commit()
 
         # test adding role separately:
-        unverified_role = UserRole(user_id=unverified_user.id, role=BaseRoleEnum.USER, domain_id=domain.id)
+        unverified_role = defaults_module.DefaultUserRole(
+            user_id=unverified_user.id, role=defaults_module.BaseRoleEnum.USER, domain_id=domain.id
+        )
         db_session.add(unverified_role)
 
         db_session.commit()
@@ -213,7 +214,7 @@ def user_tokens(
 
 
 class TestCustomUserModelExtension:
-    """Test CustomUserModel with default Domain/UserRole/Token/UserSetting."""
+    """Test CustomUserModel with default defaults_module.DefaultDomain/defaults_module.DefaultUserRole/Token/UserSetting."""
 
     def test_custom_user_creation(
         self, db_session: scoped_session, test_users: dict[str, uuid.UUID], custom_models: SimpleNamespace
@@ -239,20 +240,20 @@ class TestCustomUserModelExtension:
         assert not user.is_password_correct("wrong_password")
 
         # Test role methods
-        assert user.has_role(BaseRoleEnum.USER)
-        assert not user.has_role(BaseRoleEnum.ADMIN)
+        assert user.has_role(defaults_module.BaseRoleEnum.USER)
+        assert not user.has_role(defaults_module.BaseRoleEnum.ADMIN)
 
     def test_custom_user_with_default_domain_and_role(
         self, db_session: scoped_session, test_users: dict[str, uuid.UUID], custom_models: SimpleNamespace
     ) -> None:
-        """Test that CustomUserModel works with default Domain and UserRole classes."""
+        """Test that CustomUserModel works with default defaults_module.DefaultDomain and defaults_module.DefaultUserRole classes."""
         CustomUserModel = custom_models.CustomUserModel
         admin_user = db_session.get(CustomUserModel, test_users["admin_id"])
         assert admin_user is not None
 
         # Verify roles relationship works
         assert len(admin_user.roles) == 1
-        assert admin_user.has_role(BaseRoleEnum.ADMIN)
+        assert admin_user.has_role(defaults_module.BaseRoleEnum.ADMIN)
 
         # Verify domain relationship works through role
         assert admin_user.roles[0].domain is not None
@@ -261,8 +262,8 @@ class TestCustomUserModelExtension:
         # Regular user
         regular_user = db_session.get(CustomUserModel, test_users["verified_id"])
         assert regular_user is not None
-        assert regular_user.has_role(BaseRoleEnum.USER)
-        assert not regular_user.has_role(BaseRoleEnum.ADMIN)
+        assert regular_user.has_role(defaults_module.BaseRoleEnum.USER)
+        assert not regular_user.has_role(defaults_module.BaseRoleEnum.ADMIN)
 
     def test_custom_user_custom_permissions(
         self,

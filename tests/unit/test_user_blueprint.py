@@ -2,6 +2,8 @@
 
 # pyright: reportAttributeAccessIssue=false
 
+import contextlib
+import sys
 import uuid
 from collections.abc import Iterator
 from typing import TYPE_CHECKING
@@ -14,14 +16,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from flask_more_smorest import Api, UserBlueprint, db
 from flask_more_smorest.crud.crud_blueprint import CRUDMethod
 from flask_more_smorest.perms import clear_registration, init_fms
-from flask_more_smorest.perms.models.abstract_role import AbstractUserRole
-from flask_more_smorest.perms.models.abstract_setting import AbstractUserSetting
-from flask_more_smorest.perms.models.abstract_token import AbstractToken
+from flask_more_smorest.perms.models import defaults as defaults_module
 from flask_more_smorest.perms.models.abstract_user import AbstractUser
-from flask_more_smorest.perms.models.defaults import (
-    DefaultDomain,
-    DefaultUser,
-)
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import scoped_session
@@ -44,39 +40,40 @@ def api(unit_api: "Api") -> "Api":
     return unit_api
 
 
-def build_models() -> (
-    tuple[
-        type[AbstractUser],
-        type[AbstractUserRole],
-        type[AbstractToken],
-        type[AbstractUserSetting],
-    ]
-):
-    suffix = uuid.uuid4().hex
-    user_table = f"blueprint_user_{suffix}"
+def build_models() -> type[AbstractUser]:
+    module_name = f"{__name__}.dynamic_{uuid.uuid4().hex}"
+    import sys
+    import types
+
+    module = types.ModuleType(module_name)
+    module.__dict__.update(globals())
+    sys.modules[module_name] = module
 
     class CustomUser(AbstractUser):
-        __tablename__ = user_table
+        __module__ = module_name
         __allow_unmapped__ = True
+        PUBLIC_REGISTRATION = True
 
         some_custom_field: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
 
-    class CustomUserRole(AbstractUserRole):
-        __tablename__ = f"blueprint_user_role_{suffix}"
+    return CustomUser
 
-        some_custom_role_field: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
 
-    class CustomToken(AbstractToken):
-        __tablename__ = f"blueprint_token_{suffix}"
-
-        some_custom_token_field: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
-
-    class CustomUserSetting(AbstractUserSetting):
-        __tablename__ = f"blueprint_user_setting_{suffix}"
-
-        some_custom_setting_field: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
-
-    return CustomUser, CustomUserRole, CustomToken, CustomUserSetting  # type: ignore[return-value]
+def reset_models() -> None:
+    clear_registration()
+    db.metadata.clear()
+    with contextlib.suppress(Exception):
+        sa.orm.clear_mappers()
+    modules_to_unload = [
+        "flask_more_smorest.perms.models.role",
+        "flask_more_smorest.perms.models.token",
+        "flask_more_smorest.perms.models.setting",
+        "flask_more_smorest.perms.models.defaults",
+        "flask_more_smorest.perms.models.user",
+        "flask_more_smorest.perms.user_schemas",
+    ]
+    for module_name in modules_to_unload:
+        sys.modules.pop(module_name, None)
 
 
 class TestUserBlueprintClass:
@@ -143,8 +140,8 @@ class TestUserBlueprintClass:
         client = unit_app.test_client()
 
         # Create a test user
-        with DefaultUser.bypass_perms():
-            user = DefaultUser(email="test@example.com", password="password123")
+        with defaults_module.DefaultUser.bypass_perms():
+            user = defaults_module.DefaultUser(email="test@example.com", password="password123")
             user.save()
 
         # Login
@@ -167,8 +164,8 @@ class TestUserBlueprintClass:
         client = unit_app.test_client()
 
         # Create a test user
-        with DefaultUser.bypass_perms():
-            user = DefaultUser(email="test@example.com", password="password123")
+        with defaults_module.DefaultUser.bypass_perms():
+            user = defaults_module.DefaultUser(email="test@example.com", password="password123")
             user.save()
 
         # Login with wrong password
@@ -189,8 +186,8 @@ class TestUserBlueprintClass:
         client = unit_app.test_client()
 
         # Create a disabled test user
-        with DefaultUser.bypass_perms():
-            user = DefaultUser(email="test@example.com", password="password123")
+        with defaults_module.DefaultUser.bypass_perms():
+            user = defaults_module.DefaultUser(email="test@example.com", password="password123")
             user.is_enabled = False
             user.save()
 
@@ -225,8 +222,8 @@ class TestUserBlueprintClass:
         client = unit_app.test_client()
 
         # Create a test user
-        with DefaultUser.bypass_perms():
-            user = DefaultUser(email="test@example.com", password="password123")
+        with defaults_module.DefaultUser.bypass_perms():
+            user = defaults_module.DefaultUser(email="test@example.com", password="password123")
             user.save()
             user_id = user.id
 
@@ -284,24 +281,42 @@ class TestUserBlueprintClass:
 
 
 class TestUserBlueprintWithCustomUser:
-    """Test UserBlueprint with custom DefaultUser model."""
+    """Test UserBlueprint with custom defaults_module.DefaultUser model."""
+
+    @pytest.fixture(autouse=True)
+    def _restore_defaults(self, unit_app: Flask) -> Iterator[None]:
+        with unit_app.app_context():
+            reset_models()
+            init_fms(
+                user=defaults_module.DefaultUser,
+                role=defaults_module.DefaultUserRole,
+                token=defaults_module.DefaultToken,
+                domain=defaults_module.DefaultDomain,
+                setting=defaults_module.DefaultUserSetting,
+            )
+            db.create_all()
+        yield
+        with unit_app.app_context():
+            reset_models()
+            init_fms(
+                user=defaults_module.DefaultUser,
+                role=defaults_module.DefaultUserRole,
+                token=defaults_module.DefaultToken,
+                domain=defaults_module.DefaultDomain,
+                setting=defaults_module.DefaultUserSetting,
+            )
+            db.create_all()
 
     def test_user_blueprint_with_custom_user_class(
         self, unit_app: Flask, api: Api, db_session: "scoped_session"
     ) -> None:
-        """Test UserBlueprint works with custom DefaultUser model."""
+        """Test UserBlueprint works with custom defaults_module.DefaultUser model."""
 
-        CustomUser, CustomUserRole, CustomToken, CustomUserSetting = build_models()
+        reset_models()
+        CustomUser = build_models()
 
         with unit_app.app_context():
-            clear_registration()
-            init_fms(
-                user=CustomUser,
-                role=CustomUserRole,
-                token=CustomToken,
-                domain=DefaultDomain,
-                setting=CustomUserSetting,
-            )
+            init_fms(user=CustomUser)
 
         # Create blueprint with custom user model
         bp = UserBlueprint(model=CustomUser, schema=CustomUser.Schema)
@@ -319,17 +334,11 @@ class TestUserBlueprintWithCustomUser:
         """Test that PUBLIC_REGISTRATION=True makes POST endpoint public."""
         from flask_more_smorest.crud.crud_blueprint import CRUDMethod
 
-        CustomUser, CustomUserRole, CustomToken, CustomUserSetting = build_models()
+        reset_models()
+        CustomUser = build_models()
 
         with unit_app.app_context():
-            clear_registration()
-            init_fms(
-                user=CustomUser,
-                role=CustomUserRole,
-                token=CustomToken,
-                domain=DefaultDomain,
-                setting=CustomUserSetting,
-            )
+            init_fms(user=CustomUser)
 
         # Create blueprint with public registration user
         bp = UserBlueprint(model=CustomUser, schema=CustomUser.Schema)
@@ -344,17 +353,11 @@ class TestUserBlueprintWithCustomUser:
     ) -> None:
         """Test that PUBLIC_REGISTRATION=True allows creating users without authentication."""
 
-        CustomUser, CustomUserRole, CustomToken, CustomUserSetting = build_models()
+        reset_models()
+        CustomUser = build_models()
 
         with unit_app.app_context():
-            clear_registration()
-            init_fms(
-                user=CustomUser,
-                role=CustomUserRole,
-                token=CustomToken,
-                domain=DefaultDomain,
-                setting=CustomUserSetting,
-            )
+            init_fms(user=CustomUser)
 
             # Recreate tables to include CustomUser
             db.drop_all()
@@ -382,7 +385,7 @@ class TestUserBlueprintWithCustomUser:
         """Test that without PUBLIC_REGISTRATION, POST requires authentication."""
         from flask_more_smorest.crud.crud_blueprint import CRUDMethod
 
-        # Default DefaultUser has PUBLIC_REGISTRATION=False
+        # Default defaults_module.DefaultUser has PUBLIC_REGISTRATION=False
         bp = UserBlueprint()
         api.register_blueprint(bp)
 
@@ -414,8 +417,8 @@ class TestUserBlueprintIntegration:
         client = unit_app.test_client()
 
         # Step 1: Create a new user (bypassing perms for test)
-        with DefaultUser.bypass_perms():
-            user = DefaultUser(email="newuser@example.com", password="securepass123")
+        with defaults_module.DefaultUser.bypass_perms():
+            user = defaults_module.DefaultUser(email="newuser@example.com", password="securepass123")
             user.save()
             user_id = user.id
 
@@ -465,11 +468,11 @@ class TestCustomUserInheritedColumns:
     def test_custom_user_instance_has_all_inherited_columns(
         self, unit_app: Flask, api: Api, db_session: "scoped_session"
     ) -> None:
-        """Test that DefaultUser instances have all expected column values."""
+        """Test that defaults_module.DefaultUser instances have all expected column values."""
 
-        # Create a DefaultUser instance
-        with DefaultUser.bypass_perms():
-            user = DefaultUser(
+        # Create a defaults_module.DefaultUser instance
+        with defaults_module.DefaultUser.bypass_perms():
+            user = defaults_module.DefaultUser(
                 email="testuser@example.com",
                 password="password123",
             )
