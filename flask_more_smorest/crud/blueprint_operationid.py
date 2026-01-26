@@ -84,6 +84,7 @@ class BlueprintOperationIdMixin(Blueprint):
             operation_id = convert_snake_to_camel(operation_id)
             operation_id = operation_id[0].lower() + operation_id[1:]
             from typing import cast
+
             return cast(Callable, self.doc(operationId=operation_id)(func))
             # Return the decorated function directly - self.doc() already preserves metadata
 

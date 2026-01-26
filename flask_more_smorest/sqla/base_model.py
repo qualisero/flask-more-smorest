@@ -239,7 +239,6 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
         with db.session.no_autoflush:
             return db.session.execute(db.select(cls).filter_by(**kwargs)).scalar_one_or_none()
 
-
     @classmethod
     def get_by_or_404(cls, **kwargs: str | int | uuid.UUID | bool | None) -> Self:
         """Get resource by field values or raise 404.

@@ -5,10 +5,12 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from sqlalchemy.orm import Mapped
 
+from flask_more_smorest.perms.base_perms_model import BasePermsModel
+
 if TYPE_CHECKING:
     pass
 
-class AbstractToken:
+class AbstractToken(BasePermsModel):
     __abstract__: bool
     __tablename__: str
     __table_args__: ClassVar[dict[str, bool] | tuple[Any, ...]]

@@ -153,4 +153,3 @@ def create_model_schema(model_cls: type, *, db_session: Any = None) -> type[Base
             )
         },
     )
-

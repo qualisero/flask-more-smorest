@@ -261,10 +261,7 @@ def custom_models() -> Iterator[SimpleNamespace]:
             if current_user is None:
                 return False
             # Owner can write their own tokens
-            if self.user_id == current_user.id:
-                return True
-            # Admins can revoke but not modify other fields
-            return False
+            return self.user_id == current_user.id
 
         def _can_create(self, current_user: CustomUser | None) -> bool:
             if current_user is None:

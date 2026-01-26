@@ -42,47 +42,21 @@ def build_models() -> (
         __tablename__ = user_table
         __allow_unmapped__ = True
 
-        id: Mapped[uuid.UUID] = mapped_column(sa.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-        email: Mapped[str] = mapped_column(sa.String(128), unique=True, nullable=False)
-        password: Mapped[bytes | None] = mapped_column(sa.LargeBinary(128), nullable=True)
-        is_enabled: Mapped[bool] = mapped_column(sa.Boolean(), default=True)
+        custom_user_field: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
 
     class CustomUserRole(AbstractUserRole):
         __tablename__ = f"user_ext_role_{suffix}"
 
-        user_id: Mapped[uuid.UUID] = mapped_column(
-            sa.Uuid(as_uuid=True),
-            sa.ForeignKey(f"{user_table}.id"),
-            nullable=False,
-        )
-        domain_id: Mapped[uuid.UUID | None] = mapped_column(
-            sa.Uuid(as_uuid=True),
-            sa.ForeignKey("domain.id"),
-            nullable=True,
-            default=None,
-        )
-        _role: Mapped[str] = mapped_column("role", sa.String(50), nullable=False)
+        custom_role_field: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
 
     class CustomToken(AbstractToken):
         __tablename__ = f"user_ext_token_{suffix}"
-
-        user_id: Mapped[uuid.UUID] = mapped_column(
-            sa.Uuid(as_uuid=True),
-            sa.ForeignKey(f"{user_table}.id"),
-            nullable=False,
-        )
-        token: Mapped[str] = mapped_column(sa.String(1024), nullable=False)
+        custom_token_field: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
 
     class CustomUserSetting(AbstractUserSetting):
         __tablename__ = f"user_ext_setting_{suffix}"
 
-        user_id: Mapped[uuid.UUID] = mapped_column(
-            sa.Uuid(as_uuid=True),
-            sa.ForeignKey(f"{user_table}.id"),
-            nullable=False,
-        )
-        key: Mapped[str] = mapped_column(sa.String(80), nullable=False)
-        value: Mapped[str | None] = mapped_column(sa.String(1024), nullable=True)
+        custom_setting_field: Mapped[str | None] = mapped_column(sa.String(100), nullable=True)
 
     return CustomUser, CustomUserRole, CustomToken, CustomUserSetting  # type: ignore[return-value]
 
