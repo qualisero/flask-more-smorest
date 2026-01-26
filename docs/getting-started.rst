@@ -131,26 +131,17 @@ Get instant authentication with ``UserBlueprint``:
 
    from flask_more_smorest import UserBlueprint
    from flask_more_smorest.perms import init_fms
-   from flask_more_smorest.perms.models.defaults import (
-       DefaultDomain,
-       DefaultToken,
-       DefaultUser,
-       DefaultUserRole,
-       DefaultUserSetting,
-   )
 
-   # Register default models explicitly
-   init_fms(user=
-       user=DefaultUser,
-       role=DefaultUserRole,
-       token=DefaultToken,
-       domain=DefaultDomain,
-       setting=DefaultUserSetting,
-   )
+   # Register all default models - no imports needed!
+   init_fms()
 
    # Instant login and profile endpoints
    user_bp = UserBlueprint(register=False)
    api.register_blueprint(user_bp)
+
+   # Or use custom User with auto-loaded defaults for others:
+   # from myapp.models import User
+   # init_fms(user=User)  # UserRole, Token, Domain, UserSetting auto-loaded
 
 This automatically provides:
 

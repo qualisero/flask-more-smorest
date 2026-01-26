@@ -663,6 +663,40 @@ def test_defaults_type_helpers() -> None:
         assert_type(User.get_current_user(), User | None)
 
 
+def test_init_fms_auto_loads_all_defaults() -> None:
+    """Test that init_fms() with no arguments auto-loads all default models.
+
+    This verifies the auto-loading behavior: when you call init_fms() without
+    any arguments, it automatically imports and registers User, UserRole, Token,
+    Domain, and UserSetting from flask_more_smorest.perms.models.defaults.
+    No explicit import of default models is required.
+    """
+    # Clear any previous registration
+    clear_registration()
+
+    # Call init_fms() with NO arguments - should auto-load all defaults
+    init_fms()
+
+    # Import defaults module (should already be auto-loaded by init_fms)
+    from flask_more_smorest.perms.models.defaults import (
+        Domain,
+        Token,
+        User,
+        UserRole,
+        UserSetting,
+    )
+
+    # Verify all default models were registered
+    assert get_user_model(User) is User
+    assert get_role_model(UserRole) is UserRole
+    assert get_token_model(Token) is Token
+    assert get_domain_model(Domain) is Domain
+    assert get_setting_model(UserSetting) is UserSetting
+
+    # Re-clear for other tests
+    clear_registration()
+
+
 def test_defaults_current_user_none_when_not_authenticated(app: Flask, db_session: None) -> None:
     """Test get_current_user returns None when not authenticated."""
     with app.app_context():

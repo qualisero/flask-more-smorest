@@ -5,13 +5,18 @@ canonical integration point for the permissions system.
 
 **Quick Start:**
 
+    # Use all default models (no imports needed)
     from flask_more_smorest.perms import init_fms
-    from flask_more_smorest.perms.models.defaults import User
+    init_fms()
 
-    # Register custom user model with defaults for others
+    # Or register custom user model with defaults for others
+    from flask_more_smorest.perms import init_fms
+    from myapp.models import User
     init_fms(user=User)
 
     # Or register all models explicitly
+    from flask_more_smorest.perms import init_fms
+    from myapp.models import User, UserRole, Token, Domain, UserSetting
     init_fms(
         user=User,
         role=UserRole,

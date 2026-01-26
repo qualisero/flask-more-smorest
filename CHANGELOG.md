@@ -7,6 +7,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-01-26
+
+### Added
+- **User Registry System**: Centralized registry for user model registration
+  - `init_fms(user, role, token, domain, setting)` - Single entry point for model registration
+  - `get_user_model()`, `get_role_model()`, `get_token_model()`, `get_domain_model()`, `get_setting_model()` - Runtime model access
+  - Enables flexible model configuration with fallback to defaults
+
+- **Abstract Model Bases**: Clean separation between abstract and concrete models
+  - `AbstractUser`, `AbstractUserRole`, `AbstractToken`, `AbstractDomain`, `AbstractUserSetting`
+  - Abstract models define core structure without table names
+  - Concrete defaults inherit from abstracts with explicit table definitions
+
+- **Type Stubs for Perms Module**: Complete type hints for better IDE support
+  - `stubs/flask_more_smorest/perms/__init__.pyi`
+  - `stubs/flask_more_smorest/perms/model_mixins.pyi`
+  - `stubs/flask_more_smorest/perms/models/*.pyi` - Type stubs for all abstract models
+
+- **ProfileMixin Tests**: Added dedicated test file for profile functionality
+  - Tests for `full_name` property
+  - Tests for `parse_full_name()` class method
+  - Tests for `avatar` property
+
+- **Integration Test Suite**: Comprehensive integration tests for user model patterns
+  - `test_user_defaults.py` - Default models with init_fms
+  - `test_user_mixed_defaults.py` - Mixed custom/defaults pattern
+  - `test_user_fully_extended.py` - Fully custom models
+  - `test_user_demoapp_integration.py` - Complex real-world integration pattern
+
+### Changed
+- **Model Registration Pattern**: Moved from implicit imports to explicit registration
+  - Users must call `init_fms()` to register custom models
+  - Default models are lazy-loaded and only registered if no custom model provided
+  - Allows full customization while maintaining backwards compatibility for simple cases
+
+- **UserBlueprint**: Removed singleton pattern, now requires explicit instantiation
+  - No longer exports a global `user_bp` singleton
+  - Users must create their own `UserBlueprint` instances
+  - Provides better isolation and testability
+
+- **Type Stubs**: Enhanced type safety across the codebase
+  - Added type hints for UserProtocol with `typing.Protocol`
+  - Improved mypy coverage for permissions module
+  - Better IDE autocomplete and type checking
+
+- **Documentation Updates**: Comprehensive documentation improvements
+  - Renamed `iaoport-style-integration.rst` to `demoapp-style-integration.rst`
+  - Updated all references from 'iaoport' to 'demoapp'
+  - Updated Iao prefix to Demo throughout the codebase
+
+- **Test Suite**: Major consolidation and cleanup
+  - Merged `test_testing_utils.py` into `test_testing_helpers.py`
+  - Removed `test_user_extension.py` (tests covered by integration tests)
+  - Reduced test_user_blueprint.py by 42%
+  - Reduced test_custom_getter.py by 22%
+  - Reduced test_user_model_schema.py by 77%
+  - Overall test LOC reduced by 44% while maintaining 87% coverage
+
+### Fixed
+- **Test Isolation**: Fixed test pollution issues in integration tests
+  - Properly clean up SQLAlchemy registries between tests
+  - Move models to fixtures to prevent cross-test contamination
+  - Handle module reloading for dynamic model creation
+
+- **Mypy Issues**: Resolved all type checking issues across the repository
+  - Fixed incompatible `is_enabled` definition in CustomUser
+  - Added None checks for domain in user permissions
+  - Resolved relationship typing in polymorphic models
+
+- **User Context**: Fixed user context initialization and cleanup
+  - Properly reset user registration between tests
+  - Clear SQLAlchemy mappers at module scope
+  - Fix authenticated context usage in permission checks
+
+### Tests
+- **Test Coverage**: Maintained 87% coverage with 44% fewer test LOC
+- **Test Count**: 340 tests passing (227 unit tests, 113 integration tests)
+- **Quality Checks**: All checks passing (ruff, mypy, bandit)
+
+### Documentation
+- **Type Stubs**: Added comprehensive type hints for the perms module
+- **Integration Guides**: Updated documentation for all user model integration patterns
+- **Migration Guides**: Added guidance for migrating from old implicit import pattern to explicit `init_fms()` pattern
+
 ## [0.9.1] - 2026-01-22
 
 ### Fixed

@@ -150,22 +150,9 @@ The easiest way to add authentication is with ``UserBlueprint``:
 
    from flask_more_smorest import UserBlueprint
    from flask_more_smorest.perms import init_fms
-   from flask_more_smorest.perms.models.defaults import (
-       Domain,
-       Token,
-       User,
-       UserRole,
-       UserSetting,
-   )
 
-   # Register default models explicitly
-   init_fms(
-       user=User,
-       role=UserRole,
-       token=Token,
-       domain=Domain,
-       setting=UserSetting,
-   )
+   # Register all default models - no imports needed!
+   init_fms()
 
    # Instant authentication endpoints
    user_bp = UserBlueprint(register=False)
