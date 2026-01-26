@@ -45,24 +45,18 @@ else:
 
 @pytest.fixture(scope="module", autouse=True)
 def _load_defaults() -> Iterator[None]:
-    import importlib
-
     from flask_more_smorest.perms.models import defaults as defaults_module
-    from flask_more_smorest.perms.models import role as role_module
-    from flask_more_smorest.perms.models import setting as setting_module
-    from flask_more_smorest.perms.models import token as token_module
-    from flask_more_smorest.perms.models import user as user_module
+
+    # We rely on conftest.py to have unloaded these modules if they were used in previous tests.
+    # Just importing them here will create fresh classes if they were unloaded.
+    # If they weren't unloaded (first test), they are fresh anyway.
 
     clear_registration()
     db.metadata.clear()
 
-    try:
-        importlib.reload(user_module)
-        importlib.reload(token_module)
-        importlib.reload(role_module)
-        importlib.reload(setting_module)
-    except ImportError:
-        pass
+    # Note: We used to reload() here, but that caused duplicate registration warnings
+    # and NoForeignKeysError because old classes remained in db.Model registry.
+    # Since conftest.py handles unloading, we don't need to force reload here.
 
     global DefaultDomain, DefaultToken, DefaultUser, DefaultUserRole, DefaultUserSetting
     DefaultDomain = defaults_module.DefaultDomain
@@ -343,10 +337,12 @@ def test_defaults_role_create_permissions(app: Flask, db_session: None) -> None:
     # User role
     user_role: DefaultUserRole = DefaultUserRole(user_id=user.id, domain_id=domain.id, role=BaseRoleEnum.USER)
 
-    # Admin cannot create admin roles
-    assert admin_role._can_create(admin) is False
-    # Admin can create user roles
-    assert user_role._can_create(admin) is True
+    token = create_access_token(identity=str(admin.id))
+    with app.test_request_context(headers={"Authorization": f"Bearer {token}"}):
+        # Admin cannot create admin roles
+        assert admin_role._can_create(admin) is False
+        # Admin can create user roles
+        assert user_role._can_create(admin) is True
 
 
 def test_defaults_role_read_permissions(app: Flask, db_session: None) -> None:
@@ -434,18 +430,25 @@ def test_defaults_token_create_permissions(app: Flask, db_session: None) -> None
     assert owner_token.can_create(owner) is True
     assert owner_token.can_create(other) is True
 
-    # Test within request context
-    with app.test_request_context():
-        # Owner can create their own token
+    # Test within request context - context must match the actor for get_or_404 to work
+
+    # 1. Owner can create their own token
+    token = create_access_token(identity=str(owner.id))
+    with app.test_request_context(headers={"Authorization": f"Bearer {token}"}):
         assert owner_token.can_create(owner) is True
 
-        # Other user cannot create token for owner (no write permission)
+    # 2. Other user cannot create token for owner (no write permission or cannot read user)
+    token = create_access_token(identity=str(other.id))
+    with app.test_request_context(headers={"Authorization": f"Bearer {token}"}):
         assert owner_token.can_create(other) is False
 
-        # Admin can create token for any user
+    # 3. Admin can create token for any user
+    token = create_access_token(identity=str(admin.id))
+    with app.test_request_context(headers={"Authorization": f"Bearer {token}"}):
         assert owner_token.can_create(admin) is True
 
-        # Unauthenticated cannot create
+    # 4. Unauthenticated cannot create
+    with app.test_request_context():
         assert owner_token.can_create(None) is False
 
 
@@ -509,17 +512,24 @@ def test_defaults_setting_create_permissions(app: Flask, db_session: None) -> No
     assert owner_setting.can_create(other) is True
 
     # Test within request context
-    with app.test_request_context():
-        # Owner can create their own setting
+
+    # 1. Owner can create their own setting
+    token = create_access_token(identity=str(owner.id))
+    with app.test_request_context(headers={"Authorization": f"Bearer {token}"}):
         assert owner_setting.can_create(owner) is True
 
-        # Other user cannot create setting for owner (no write permission)
+    # 2. Other user cannot create setting for owner
+    token = create_access_token(identity=str(other.id))
+    with app.test_request_context(headers={"Authorization": f"Bearer {token}"}):
         assert owner_setting.can_create(other) is False
 
-        # Admin can create setting for any user
+    # 3. Admin can create setting for any user
+    token = create_access_token(identity=str(admin.id))
+    with app.test_request_context(headers={"Authorization": f"Bearer {token}"}):
         assert owner_setting.can_create(admin) is True
 
-        # Unauthenticated cannot create
+    # 4. Unauthenticated cannot create
+    with app.test_request_context():
         assert owner_setting.can_create(None) is False
 
 
