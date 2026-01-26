@@ -37,7 +37,7 @@ Testing authenticated endpoints:
 .. code-block:: python
 
     import pytest
-    from flask_more_smorest import User
+    from flask_more_smorest.perms.models.defaults import DefaultUser
     from flask_more_smorest.testing import as_user
 
     def test_get_my_profile(client, db_session):
@@ -57,16 +57,15 @@ Testing admin-only endpoints:
 .. code-block:: python
 
     import pytest
-    from flask_more_smorest import User
+    from flask_more_smorest.perms.models.defaults import DefaultUser, DefaultUserRole, DefaultUserRoleEnum
     from flask_more_smorest.testing import as_admin
-    from flask_more_smorest.perms.models import DefaultUserRole, UserRole
 
     def test_admin_endpoint(client, db_session):
         # Create admin user
-        with User.bypass_perms():
-            admin = User(email="admin@example.com", password="password123")
+        with DefaultUser.bypass_perms():
+            admin = DefaultUser(email="admin@example.com", password="password123")
             admin.save()
-            admin.roles.append(UserRole(user=admin, role=DefaultUserRole.ADMIN))
+            admin.roles.append(DefaultUserRole(user=admin, role=DefaultUserRoleEnum.ADMIN))
 
         # Test admin-only endpoint
         with as_admin(client, str(admin.id)):
@@ -151,10 +150,10 @@ Clear Registration
 
    .. code-block:: python
 
-       from flask_more_smorest.testing import clear_registration, register_user_class
+       from flask_more_smorest.testing import clear_registration, init_fms
 
        def test_with_custom_user():
-           register_user_class(MyUser)
+           init_fms(user=MyUser)
            # ... test ...
            clear_registration()  # Reset for next test
 
@@ -166,25 +165,24 @@ Create reusable test fixtures:
 .. code-block:: python
 
     import pytest
-    from flask_more_smorest import User
+    from flask_more_smorest.perms.models.defaults import DefaultUser, DefaultUserRole, DefaultUserRoleEnum
     from flask_more_smorest.testing import as_user, as_admin
-    from flask_more_smorest.perms.models import DefaultUserRole, UserRole
 
     @pytest.fixture
     def test_user(db_session):
         """Create a test user."""
-        with User.bypass_perms():
-            user = User(email="test@example.com", password="password123")
+        with DefaultUser.bypass_perms():
+            user = DefaultUser(email="test@example.com", password="password123")
             user.save()
         return user
 
     @pytest.fixture
     def test_admin(db_session):
         """Create an admin user."""
-        with User.bypass_perms():
-            admin = User(email="admin@example.com", password="password123")
+        with DefaultUser.bypass_perms():
+            admin = DefaultUser(email="admin@example.com", password="password123")
             admin.save()
-            admin.roles.append(UserRole(user=admin, role=DefaultUserRole.ADMIN))
+            admin.roles.append(DefaultUserRole(user=admin, role=DefaultUserRoleEnum.ADMIN))
         return admin
 
     def test_authenticated_endpoint(client, test_user):
@@ -265,7 +263,7 @@ to reset between tests:
 
 .. code-block:: python
 
-    from flask_more_smorest.testing import clear_registration, register_user_class
+    from flask_more_smorest.testing import clear_registration, init_fms
     from flask_more_smorest.perms import get_current_user
 
     class MockUser:
@@ -279,7 +277,7 @@ to reset between tests:
 
     def test_with_custom_user():
         # Register mock user
-        register_user_class(MockUser)
+        init_fms(user=MockUser)
 
         # Test your code
         user = get_current_user()

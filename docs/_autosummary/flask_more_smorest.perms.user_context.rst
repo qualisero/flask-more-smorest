@@ -13,7 +13,7 @@ flask\_more\_smorest.perms.user\_context
       get_current_user_id
       is_current_user_admin
       is_current_user_superadmin
-      register_user_class
+      init_fms
    
    .. rubric:: Classes
 

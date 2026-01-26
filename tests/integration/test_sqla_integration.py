@@ -4,12 +4,43 @@ This module tests the BaseModel, database initialization, and migration utilitie
 """
 
 import uuid
+from collections.abc import Iterator
 from datetime import datetime
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from flask import Flask
 
 from flask_more_smorest import BaseModel, db, init_db
+from flask_more_smorest.perms import init_fms
+
+if TYPE_CHECKING:
+    Product = BaseModel  # pyright: ignore[reportAssignmentType]
+else:
+    Product = cast(type[BaseModel], None)
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _reset_registry() -> Iterator[None]:
+    from flask_more_smorest.perms import clear_registration
+
+    clear_registration()
+    db.metadata.clear()
+
+    global Product
+
+    class Product(BaseModel):
+        """A simple product model for testing."""
+
+        __module__ = __name__
+
+        name = db.Column(db.String(100), nullable=False)
+        description = db.Column(db.String(500))
+        count = db.Column(db.Integer, default=0)
+
+    yield
+
+    clear_registration()
 
 
 @pytest.fixture(scope="function")
@@ -20,18 +51,11 @@ def app() -> Flask:
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+    init_fms()
     # Initialize database
     init_db(app)
 
     return app
-
-
-class Product(BaseModel):
-    """A simple product model for testing."""
-
-    name = db.Column(db.String(100), nullable=False)
-    description = db.Column(db.String(500))
-    count = db.Column(db.Integer, default=0)
 
 
 @pytest.fixture(scope="function")

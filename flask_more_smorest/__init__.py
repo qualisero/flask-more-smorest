@@ -98,15 +98,13 @@ if TYPE_CHECKING:
 
     # User models are typed via perms module delegation
     from .perms import (
-        DefaultUserRole,
-        Domain,
-        Token,
-        User,
-        UserRole,
-        UserSetting,
+        AbstractDomain,
+        AbstractToken,
+        AbstractUser,
+        AbstractUserRole,
+        AbstractUserSetting,
         get_current_user,
         get_current_user_id,
-        user_bp,
     )
 
     # Testing helpers
@@ -126,7 +124,6 @@ __all__ = [
     "CRUDBlueprint",
     "CRUDMethod",
     "UserBlueprint",
-    "user_bp",
     "BlueprintAccessMixin",
     "BlueprintOperationIdMixin",
     # Database and models
@@ -137,12 +134,11 @@ __all__ = [
     "init_db",
     # User models and authentication
     "init_jwt",
-    "User",
-    "UserRole",
-    "UserSetting",
-    "Domain",
-    "Token",
-    "DefaultUserRole",
+    "AbstractUser",
+    "AbstractUserRole",
+    "AbstractDomain",
+    "AbstractToken",
+    "AbstractUserSetting",
     "get_current_user",
     "get_current_user_id",
     # User model mixins
@@ -171,15 +167,13 @@ def __getattr__(name: str) -> object:
     """Proxy attribute lookups to the perms package for lazy loading."""
 
     delegated_names = {
-        "User",
-        "UserRole",
-        "UserSetting",
-        "Domain",
-        "Token",
-        "DefaultUserRole",
+        "AbstractUser",
+        "AbstractUserRole",
+        "AbstractDomain",
+        "AbstractToken",
+        "AbstractUserSetting",
         "get_current_user",
         "get_current_user_id",
-        "user_bp",
         # Testing helpers
         "as_user",
         "as_admin",

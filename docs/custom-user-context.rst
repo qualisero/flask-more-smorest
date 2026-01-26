@@ -33,7 +33,7 @@ Register your custom user class (and optionally a custom getter):
 
 .. code-block:: python
 
-   from flask_more_smorest.perms import register_user_class
+   from flask_more_smorest.perms import init_fms
 
    def my_get_user():
        from flask import session
@@ -41,7 +41,7 @@ Register your custom user class (and optionally a custom getter):
        return MyUser.query.get(user_id) if user_id else None
 
    # Register - everything else derives from this!
-   register_user_class(MyUser, get_current_user=my_get_user)
+   init_fms(user=MyUser, get_current_user=my_get_user)
 
 That's it! No classes, no base class, no multiple methods to override.
 
@@ -58,7 +58,7 @@ How It Works
 
 The user context system is elegantly simple:
 
-1. **Register** your user class with ``register_user_class()``
+1. **Register** your user class with ``init_fms(user=)``
 2. **Optionally provide** a custom getter (default: JWT-based)
 3. **All other functions** automatically derive from your registration
 4. **Your user object** just needs an ``id`` attribute and optional ``has_role()`` method
@@ -66,7 +66,7 @@ The user context system is elegantly simple:
 .. code-block:: python
 
    from flask_more_smorest.perms import (
-       register_user_class,
+       init_fms,
        get_current_user,
        get_current_user_id,
        is_current_user_admin,
@@ -78,7 +78,7 @@ The user context system is elegantly simple:
        user_id = request.headers.get('X-User-ID')
        return MyUser.query.get(user_id) if user_id else None
 
-   register_user_class(MyUser, get_current_user=my_get_user)
+   init_fms(user=MyUser, get_current_user=my_get_user)
 
    # Now you can use:
    user = get_current_user()          # Calls my_get_user()
@@ -94,12 +94,12 @@ Integrate with Flask-Login's session-based authentication:
 .. code-block:: python
 
    from flask_login import current_user
-   from flask_more_smorest.perms import register_user_class
+   from flask_more_smorest.perms import init_fms
 
    def get_flask_login_user():
        return current_user if not current_user.is_anonymous else None
 
-   register_user_class(MyUser, get_current_user=get_flask_login_user)
+   init_fms(user=MyUser, get_current_user=get_flask_login_user)
 
    # Now all permission checks use Flask-Login's current_user
    from flask_more_smorest.perms import is_current_user_admin
@@ -125,7 +125,7 @@ If you have a custom JWT implementation:
 
    import jwt
    from flask import request
-   from flask_more_smorest.perms import register_user_class
+   from flask_more_smorest.perms import init_fms
 
    def decode_token():
        token = request.headers.get('Authorization', '').replace('Bearer ', '')
@@ -140,7 +140,7 @@ If you have a custom JWT implementation:
            return MyUser.query.get(payload.get('user_id'))
        return None
 
-   register_user_class(MyUser, get_current_user=get_jwt_user)
+   init_fms(user=MyUser, get_current_user=get_jwt_user)
 
 OAuth Integration (Google, GitHub, etc.)
 -----------------------------------------
@@ -149,7 +149,7 @@ OAuth Integration (Google, GitHub, etc.)
 
    from authlib.integrations.flask_client import OAuth
    from flask import session
-   from flask_more_smorest.perms import register_user_class
+   from flask_more_smorest.perms import init_fms
 
    oauth = OAuth()
 
@@ -165,7 +165,7 @@ OAuth Integration (Google, GitHub, etc.)
        user_id = session.get('user_id')
        return MyUser.query.get(user_id) if user_id else None
 
-   register_user_class(MyUser, get_current_user=get_oauth_user)
+   init_fms(user=MyUser, get_current_user=get_oauth_user)
 
    # OAuth callback handler
    @app.route('/auth/google/callback')
@@ -184,7 +184,7 @@ SAML Integration
 
    from flask_saml2 import SP as SAMLSP
    from flask import session
-   from flask_more_smorest.perms import register_user_class
+   from flask_more_smorest.perms import init_fms
 
    saml = SAMLSP(...)
 
@@ -192,7 +192,7 @@ SAML Integration
        user_id = session.get('user_id')
        return MyUser.query.get(user_id) if user_id else None
 
-   register_user_class(MyUser, get_current_user=get_saml_user)
+   init_fms(user=MyUser, get_current_user=get_saml_user)
 
    # SAML assertion consumer service
    @app.route('/saml/acs')
@@ -208,7 +208,7 @@ LDAP Integration
 .. code-block:: python
 
    from flask import session
-   from flask_more_smorest.perms import register_user_class
+   from flask_more_smorest.perms import init_fms
    import ldap3
 
    def get_ldap_user():
@@ -227,7 +227,7 @@ LDAP Integration
        user = MyUser.get_or_create_from_ldap(username)
        return user
 
-   register_user_class(MyUser, get_current_user=get_ldap_user)
+   init_fms(user=MyUser, get_current_user=get_ldap_user)
 
 Multi-Tenant Applications
 -------------------------
@@ -237,7 +237,7 @@ Different user models per tenant:
 .. code-block:: python
 
    from flask import g
-   from flask_more_smorest.perms import register_user_class
+   from flask_more_smorest.perms import init_fms
 
    def get_tenant_user_model(tenant_id: str):
        """Get the User model class for a specific tenant."""
@@ -252,7 +252,7 @@ Different user models per tenant:
        user_id = session.get('user_id')
        return UserClass.query.get(user_id) if user_id else None
 
-   register_user_class(get_tenant_user_model(g.tenant_id), get_current_user=get_tenant_user)
+   init_fms(user=get_tenant_user_model(g.tenant_id), get_current_user=get_tenant_user)
 
    # Tenant middleware
    @app.before_request
@@ -300,7 +300,7 @@ If your custom User model has a different role system:
        user_id = session.get('user_id')
        return MyUser.query.get(user_id) if user_id else None
 
-   register_user_class(MyUser, get_current_user=get_custom_role_user)
+   init_fms(user=MyUser, get_current_user=get_custom_role_user)
 
    # Your User model just needs role properties:
    class MyUser:
@@ -345,7 +345,7 @@ Clear registration in tests:
 
 .. code-block:: python
 
-   from flask_more_smorest.perms import register_user_class, clear_registration
+   from flask_more_smorest.perms import init_fms, clear_registration
 
    def test_with_custom_user():
        # Register mock user
@@ -358,7 +358,7 @@ Clear registration in tests:
            def list_roles(self) -> list[str]:
                return ['admin']
 
-       register_user_class(MockUser)
+       init_fms(user=MockUser)
 
        # Test your code
        user = get_current_user()

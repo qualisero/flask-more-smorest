@@ -117,9 +117,7 @@ class HasUserMixin:
 
         # Build backref if needed
         # Standard User relationships: "roles" (from user_roles), "settings" (from user_settings), "tokens"
-        if backref_name and backref_name in ("roles", "settings", "tokens"):
-            backref_arg = None  # Already defined on User model
-        elif backref_name:
+        if backref_name and backref_name not in ("roles", "settings", "tokens"):
             backref_arg = backref(
                 backref_name,
                 cascade="all, delete-orphan",

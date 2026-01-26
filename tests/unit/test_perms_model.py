@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 
 import pytest
+import sqlalchemy as sa
 from _pytest.monkeypatch import MonkeyPatch
 from flask import Flask
 
@@ -95,3 +96,32 @@ def test_can_write_uses_write_when_persisted(
         assert instance.can_write()
 
     assert called == ["write"]
+
+
+class TestCheckCreateCycles:
+    """Tests for permission checking with cyclic relationships."""
+
+    def test_check_create_handles_cycles_without_recursion_error(self, app: Flask) -> None:
+        """check_create should gracefully handle cyclic graphs without recursion errors.
+
+        The exact permission outcome is not important here; we only assert that
+        a self-referential structure does not cause a RecursionError.
+        """
+
+        class Node(BasePermsModel):
+            __allow_unmapped__ = True
+
+            id = db.Column(sa.Integer, primary_key=True)
+            parent_id = db.Column(sa.Integer, sa.ForeignKey("node.id"))
+            parent = db.relationship("Node", remote_side=[id], backref="children")
+
+        with app.app_context():
+            db.create_all()
+
+            root = Node()
+            # Create a self-cycle
+            root.parent = root  # pyright: ignore[reportAttributeAccessIssue]
+
+            # Should not raise RecursionError due to cycle; any permission
+            # exceptions would be raised explicitly instead.
+            root.check_create([root])

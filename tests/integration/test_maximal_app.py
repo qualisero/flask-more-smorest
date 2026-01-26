@@ -7,35 +7,152 @@ of flask-more-smorest together, showing how streamlined and simple the setup can
 import datetime as dt
 import uuid
 from collections.abc import Callable, Iterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from flask import Flask
 from flask_jwt_extended import create_access_token
+from sqlalchemy.orm import Mapped
 
 from flask_more_smorest import (
     Api,
     BasePermsModel,
     CRUDBlueprint,
     CRUDMethod,
-    DefaultUserRole,
-    Domain,
     TimestampMixin,
-    Token,
-    User,
     UserOwnershipMixin,
-    UserRole,
-    UserSetting,
     db,
     init_db,
     init_jwt,
 )
 from flask_more_smorest.error import ForbiddenError, UnauthorizedError
-from flask_more_smorest.perms import is_current_user_admin
+from flask_more_smorest.perms import init_fms, is_current_user_admin
+from flask_more_smorest.perms.models.base_roles import BaseRoleEnum
 
 if TYPE_CHECKING:
     from flask.testing import FlaskClient
     from sqlalchemy.orm import scoped_session
+
+    from flask_more_smorest.perms.models.defaults import (
+        DefaultDomain,
+        DefaultToken,
+        DefaultUser,
+        DefaultUserRole,
+        DefaultUserSetting,
+    )
+
+    Article = BasePermsModel  # pyright: ignore[reportAssignmentType]
+    Comment = BasePermsModel  # pyright: ignore[reportAssignmentType]
+    Topic = BasePermsModel  # pyright: ignore[reportAssignmentType]
+    article_topics = None
+else:
+    DefaultDomain = cast(type[Any], None)
+    DefaultToken = cast(type[Any], None)
+    DefaultUser = cast(type[Any], None)
+    DefaultUserRole = cast(type[Any], None)
+    DefaultUserSetting = cast(type[Any], None)
+    Article = cast(type[Any], None)
+    Comment = cast(type[Any], None)
+    Topic = cast(type[Any], None)
+    article_topics = cast(Any, None)
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _load_defaults() -> Iterator[None]:
+    import importlib
+
+    from flask_more_smorest.perms import clear_registration
+    from flask_more_smorest.perms.models import defaults as defaults_module
+    from flask_more_smorest.perms.models import role as role_module
+    from flask_more_smorest.perms.models import setting as setting_module
+    from flask_more_smorest.perms.models import token as token_module
+    from flask_more_smorest.perms.models import user as user_module
+
+    clear_registration()
+    db.metadata.clear()
+
+    importlib.reload(user_module)
+    importlib.reload(token_module)
+    importlib.reload(role_module)
+    importlib.reload(setting_module)
+
+    global DefaultDomain, DefaultToken, DefaultUser, DefaultUserRole, DefaultUserSetting, Article, Comment, Topic
+    DefaultDomain = defaults_module.DefaultDomain
+    DefaultToken = defaults_module.DefaultToken
+    DefaultUser = defaults_module.DefaultUser
+    DefaultUserRole = defaults_module.DefaultUserRole
+    DefaultUserSetting = defaults_module.DefaultUserSetting
+
+    class Article(UserOwnershipMixin, TimestampMixin, BasePermsModel):
+        """Article model demonstrating multiple features."""
+
+        __module__ = __name__
+        __tablename__ = "article"
+        __user_field_name__ = "author_id"
+        __user_relationship_name__ = "author"
+
+        title: Mapped[str] = db.Column(db.String(200), nullable=False)
+        content: Mapped[str] = db.Column(db.Text, nullable=False)
+        published: Mapped[bool] = db.Column(db.Boolean, default=False)
+        view_count: Mapped[int] = db.Column(db.Integer, default=0)
+
+        def _can_read(self, current_user) -> bool:
+            """Published articles can be read by anyone."""
+            return self.published or self.can_write()
+
+    class Comment(UserOwnershipMixin, TimestampMixin, BasePermsModel):
+        """Comment model for articles."""
+
+        __module__ = __name__
+        __tablename__ = "comment"
+        __user_field_name__ = "author_id"
+        __user_relationship_name__ = "author"
+
+        content: Mapped[str] = db.Column(db.Text, nullable=False)
+        article_id: Mapped[uuid.UUID] = db.Column(db.UUID, db.ForeignKey(Article.id), nullable=False)
+
+        # Relationships - no backref needed for testing
+        article: Mapped[Article] = db.relationship(Article, foreign_keys=[article_id])  # type: ignore[assignment]
+
+        def _can_read(self, current_user) -> bool:
+            """Comments are readable if article is readable."""
+            return self.article._can_read(current_user) if self.article else True
+
+    class Topic(TimestampMixin, BasePermsModel):
+        """Topic model for articles.
+
+        Only admins can create topics.
+        """
+
+        __module__ = __name__
+        __tablename__ = "topic"
+
+        name: Mapped[str] = db.Column(db.String(50), nullable=False)
+        description: Mapped[str | None] = db.Column(db.Text, nullable=True)
+
+        # Relationship to articles
+        articles: Mapped[list[Article]] = db.relationship(  # type: ignore[assignment]
+            "Article",
+            secondary="article_topics",
+            backref="topics",
+        )
+
+        def _can_create(self, current_user) -> bool:
+            """Only admins can create topics."""
+            return is_current_user_admin()
+
+    globals().update({"Article": Article, "Comment": Comment, "Topic": Topic})
+
+    global article_topics
+    article_topics = db.Table(
+        "article_topics",
+        db.Column("article_id", db.UUID, db.ForeignKey("article.id"), primary_key=True),
+        db.Column("topic_id", db.UUID, db.ForeignKey("topic.id"), primary_key=True),
+    )
+
+    yield
+
+    clear_registration()
 
 
 @pytest.fixture(scope="function")
@@ -61,6 +178,13 @@ def maximal_app() -> Flask:
     app.config["SECRET_KEY"] = "demo-secret-key"
     app.config["JWT_SECRET_KEY"] = "jwt-demo-secret-key"
 
+    init_fms(
+        user=DefaultUser,
+        role=DefaultUserRole,
+        token=DefaultToken,
+        domain=DefaultDomain,
+        setting=DefaultUserSetting,
+    )
     # Initialize database + JWT
     init_db(app)
     init_jwt(app)
@@ -82,64 +206,6 @@ def db_session(maximal_app: Flask) -> Iterator["scoped_session"]:
 def api(maximal_app: Flask, db_session: "scoped_session") -> Api:
     """Create API instance."""
     return Api(maximal_app)
-
-
-class Article(UserOwnershipMixin, TimestampMixin, BasePermsModel):
-    """Article model demonstrating multiple features."""
-
-    __user_field_name__ = "author_id"
-    __user_relationship_name__ = "author"
-
-    title = db.Column(db.String(200), nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    published = db.Column(db.Boolean, default=False)
-    view_count = db.Column(db.Integer, default=0)
-
-    def _can_read(self, current_user) -> bool:
-        """Published articles can be read by anyone."""
-        return self.published or self.can_write()
-
-
-class Comment(UserOwnershipMixin, TimestampMixin, BasePermsModel):
-    """Comment model for articles."""
-
-    __user_field_name__ = "author_id"
-    __user_relationship_name__ = "author"
-
-    content = db.Column(db.Text, nullable=False)
-    article_id = db.Column(db.UUID, db.ForeignKey(Article.id), nullable=False)
-
-    # Relationships - no backref needed for testing
-    article = db.relationship(Article, foreign_keys=[article_id])
-
-    def _can_read(self, current_user) -> bool:
-        """Comments are readable if article is readable."""
-        return self.article._can_read(current_user) if self.article else True
-
-
-class Topic(TimestampMixin, BasePermsModel):
-    """Topic model for articles.
-
-    Only admins can create topics.
-    """
-
-    name = db.Column(db.String(50), nullable=False)
-    description = db.Column(db.Text, nullable=True)
-
-    # Relationship to articles
-    articles = db.relationship("Article", secondary="article_topics", backref="topics")
-
-    def _can_create(self, current_user) -> bool:
-        """Only admins can create topics."""
-        return is_current_user_admin()
-
-
-# Association table for Article-Topic many-to-many relationship
-article_topics = db.Table(
-    "article_topics",
-    db.Column("article_id", db.UUID, db.ForeignKey("article.id"), primary_key=True),
-    db.Column("topic_id", db.UUID, db.ForeignKey("topic.id"), primary_key=True),
-)
 
 
 @pytest.fixture(scope="function")
@@ -227,10 +293,10 @@ def token_factory(maximal_app: Flask) -> Callable[[uuid.UUID], str]:
 
 
 @pytest.fixture(scope="function")
-def test_user(db_session: "scoped_session") -> Iterator[User]:
+def test_user(db_session: "scoped_session") -> Iterator[DefaultUser]:
     """Create a test user."""
 
-    u = User(email="test@test.com", password="password")
+    u = DefaultUser(email="test@test.com", password="password")
     db.session.add(u)
     db.session.commit()
     yield u
@@ -239,10 +305,10 @@ def test_user(db_session: "scoped_session") -> Iterator[User]:
 
 
 @pytest.fixture(scope="function")
-def test_other_user(db_session: "scoped_session") -> Iterator[User]:
+def test_other_user(db_session: "scoped_session") -> Iterator[DefaultUser]:
     """Create another test user."""
 
-    u = User(email="another@example.com", password="password2")
+    u = DefaultUser(email="another@example.com", password="password2")
     db.session.add(u)
     db.session.commit()
     yield u
@@ -251,14 +317,14 @@ def test_other_user(db_session: "scoped_session") -> Iterator[User]:
 
 
 @pytest.fixture(scope="function")
-def admin_user(db_session: "scoped_session") -> Iterator[User]:
+def admin_user(db_session: "scoped_session") -> Iterator[DefaultUser]:
     """Create a user with admin privileges scoped to a domain."""
 
-    domain = Domain(name="primary-domain", display_name="Primary Domain")
-    admin = User(email="admin@test.com", password="password")
+    domain = DefaultDomain(name="primary-domain", display_name="Primary Domain")
+    admin = DefaultUser(email="admin@test.com", password="password")
     db.session.add_all([domain, admin])
     db.session.commit()
-    role = UserRole(user=admin, role=DefaultUserRole.ADMIN, domain=domain)
+    role = DefaultUserRole(user=admin, role=BaseRoleEnum.ADMIN, domain=domain)
     db.session.add(role)
     db.session.commit()
     yield admin
@@ -270,7 +336,7 @@ def admin_user(db_session: "scoped_session") -> Iterator[User]:
 def auth_client(
     maximal_app: Flask,
     api_with_blueprints: Api,
-    test_user: User,
+    test_user: DefaultUser,
     token_factory: Callable[[uuid.UUID], str],
 ) -> "FlaskClient":
     """Create an authenticated client for testing."""
@@ -283,7 +349,7 @@ def auth_client(
 def other_auth_client(
     maximal_app: Flask,
     api_with_blueprints: Api,
-    test_other_user: User,
+    test_other_user: DefaultUser,
     token_factory: Callable[[uuid.UUID], str],
 ) -> "FlaskClient":
     """Create an authenticated client for another test user."""
@@ -296,7 +362,7 @@ def other_auth_client(
 def admin_client(
     maximal_app: Flask,
     api_with_blueprints: Api,
-    admin_user: User,
+    admin_user: DefaultUser,
     token_factory: Callable[[uuid.UUID], str],
 ) -> "FlaskClient":
     """Create an authenticated admin client for admin-only routes."""
@@ -308,7 +374,7 @@ def admin_client(
 class TestMaximalFeatureIntegration:
     """Integration tests demonstrating maximal feature usage."""
 
-    def test_pagination(self, auth_client: "FlaskClient", db_session: "scoped_session", test_user: User) -> None:
+    def test_pagination(self, auth_client: "FlaskClient", db_session: "scoped_session", test_user: DefaultUser) -> None:
         """Test pagination functionality."""
         import json
 
@@ -353,7 +419,7 @@ class TestMaximalFeatureIntegration:
         self,
         auth_client: "FlaskClient",
         admin_client: "FlaskClient",
-        test_user: User,
+        test_user: DefaultUser,
     ) -> None:
         """Test complete CRUD lifecycle for articles."""
 
@@ -396,7 +462,7 @@ class TestMaximalFeatureIntegration:
         response = admin_client.delete(f"/api/articles/{article_id}")
         assert response.status_code in [200, 204]
 
-    def test_filtering_articles(self, auth_client: "FlaskClient", test_user: User) -> None:
+    def test_filtering_articles(self, auth_client: "FlaskClient", test_user: DefaultUser) -> None:
         """Test filtering functionality on articles."""
         # Create multiple articles
         articles_data = [
@@ -432,7 +498,7 @@ class TestMaximalFeatureIntegration:
         assert len(articles) == 2
         assert all(a["published"] is True for a in articles)
 
-    def test_related_models(self, db_session: "scoped_session", test_user: User) -> None:
+    def test_related_models(self, db_session: "scoped_session", test_user: DefaultUser) -> None:
         """Test relationships between articles and comments."""
 
         # Create an article
@@ -465,7 +531,7 @@ class TestMaximalFeatureIntegration:
         auth_client: "FlaskClient",
         other_auth_client: "FlaskClient",
         admin_client: "FlaskClient",
-        test_user: User,
+        test_user: DefaultUser,
     ) -> None:
         """Test permission system on models."""
 
@@ -524,7 +590,7 @@ class TestMaximalFeatureIntegration:
         assert "published" in schema.fields
         assert "view_count" in schema.fields
 
-    def test_timestamps_are_automatic(self, db_session: "scoped_session", test_user: User) -> None:
+    def test_timestamps_are_automatic(self, db_session: "scoped_session", test_user: DefaultUser) -> None:
         """Test that timestamps are automatically set and updated."""
 
         article = Article(title="Test", content="Test content", published=True, author_id=test_user.id)
@@ -551,7 +617,7 @@ class TestMaximalFeatureIntegration:
         response = auth_client.get("/api/comments/")
         assert response.status_code == 200
 
-    def test_uuid_primary_keys(self, db_session: "scoped_session", test_user: User) -> None:
+    def test_uuid_primary_keys(self, db_session: "scoped_session", test_user: DefaultUser) -> None:
         """Test that models use UUID primary keys."""
 
         article = Article(
@@ -566,7 +632,7 @@ class TestMaximalFeatureIntegration:
         assert article.id is not None
         assert isinstance(article.id, uuid.UUID)
 
-    def test_model_convenience_methods(self, db_session: "scoped_session", test_user: User) -> None:
+    def test_model_convenience_methods(self, db_session: "scoped_session", test_user: DefaultUser) -> None:
         """Test BaseModel convenience methods (get, get_or_404, etc.)."""
 
         article = Article(title="Test", content="Test", published=True, author_id=test_user.id)
@@ -641,7 +707,7 @@ class TestMaximalFeatureIntegration:
         """
 
         assert api_with_blueprints.spec is not None
-        spec = api_with_blueprints.spec.to_dict()
+        spec = cast(dict[str, Any], api_with_blueprints.spec.to_dict())
 
         # Test MethodView-based CRUD endpoints
         assert spec["paths"]["/api/articles/"]["get"]["operationId"] == "listArticle"
@@ -660,7 +726,7 @@ class TestMaximalFeatureIntegration:
         assert not missing_operation_ids, f"Missing operationIds for: {missing_operation_ids}"
 
     def test_advanced_filter_range_queries(
-        self, auth_client: "FlaskClient", db_session: "scoped_session", test_user: User
+        self, auth_client: "FlaskClient", db_session: "scoped_session", test_user: DefaultUser
     ) -> None:
         """Query parameters with __min/__from suffixes should filter results."""
 
@@ -691,28 +757,28 @@ class TestMaximalFeatureIntegration:
     def test_user_domain_role_and_token_models(self, db_session: "scoped_session") -> None:
         """Domain, UserRole, Token, and UserSetting models integrate end-to-end."""
 
-        domain = Domain(name="tenant-a", display_name="Tenant A")
-        user = User(email="role@test.com", password="password")
+        domain = DefaultDomain(name="tenant-a", display_name="Tenant A")
+        user = DefaultUser(email="role@test.com", password="password")
         db.session.add_all([domain, user])
         db.session.commit()
 
-        role = UserRole(user=user, role=DefaultUserRole.ADMIN, domain=domain)
-        setting = UserSetting(user=user, key="theme", value="dark")
-        token = Token(user=user, token="secret-token")
+        role = DefaultUserRole(user=user, role=BaseRoleEnum.ADMIN, domain=domain)
+        setting = DefaultUserSetting(user=user, key="theme", value="dark")
+        token = DefaultToken(user=user, token="secret-token")
         db.session.add_all([role, setting, token])
         db.session.commit()
 
-        assert user.has_role(DefaultUserRole.ADMIN)
+        assert user.has_role(BaseRoleEnum.ADMIN)
         assert user.has_domain_access(domain.id)
         assert user.num_tokens == 1
         assert user.settings[0].value == "dark"
 
-        with UserRole.bypass_perms():
+        with DefaultUserRole.bypass_perms():
             role.delete()
         db.session.expire(user, ["roles"])
         assert user.roles == []
 
-    def test_get_clone_creates_distinct_record(self, db_session: "scoped_session", test_user: User) -> None:
+    def test_get_clone_creates_distinct_record(self, db_session: "scoped_session", test_user: DefaultUser) -> None:
         """BaseModel.get_clone should produce a detached copy with new UUID."""
 
         article = Article(
@@ -737,7 +803,7 @@ class TestMaximalFeatureIntegration:
         self,
         auth_client: "FlaskClient",
         other_auth_client: "FlaskClient",
-        test_user: User,
+        test_user: DefaultUser,
     ) -> None:
         """User cannot update an article they don't own."""
 
@@ -760,7 +826,7 @@ class TestMaximalFeatureIntegration:
         self,
         auth_client: "FlaskClient",
         other_auth_client: "FlaskClient",
-        test_user: User,
+        test_user: DefaultUser,
     ) -> None:
         """User cannot delete an article they don't own."""
 
@@ -781,7 +847,7 @@ class TestMaximalFeatureIntegration:
     def test_admin_override_permissions(
         self,
         admin_client: "FlaskClient",
-        test_user: User,
+        test_user: DefaultUser,
     ) -> None:
         """Admin can update/delete articles owned by others."""
 
@@ -806,7 +872,7 @@ class TestMaximalFeatureIntegration:
 
         assert Article.get(article.id) is None
 
-    def test_bypass_perms_context_manager(self, test_user: User) -> None:
+    def test_bypass_perms_context_manager(self, test_user: DefaultUser) -> None:
         """Context manager should bypass permission checks."""
 
         article = Article(title="Test", content="Content", published=True, author_id=test_user.id)
@@ -819,7 +885,7 @@ class TestMaximalFeatureIntegration:
 
         assert Article.get(article.id) is None
 
-    def test_unauthorized_direct_access_fails(self, client: "FlaskClient", test_user: User) -> None:
+    def test_unauthorized_direct_access_fails(self, client: "FlaskClient", test_user: DefaultUser) -> None:
         """Direct model access without auth should fail if request context exists."""
 
         # Create a draft article (private)
@@ -833,7 +899,7 @@ class TestMaximalFeatureIntegration:
             assert article.can_read() is False
 
     def test_create_permission_restriction(
-        self, auth_client: "FlaskClient", admin_client: "FlaskClient", test_user: User
+        self, auth_client: "FlaskClient", admin_client: "FlaskClient", test_user: DefaultUser
     ) -> None:
         """Only admins can create Topics."""
 

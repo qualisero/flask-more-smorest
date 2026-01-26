@@ -44,7 +44,7 @@ def as_user(user: Any) -> Generator[Any, None, None]:
         >>> with as_user(test_user):
         ...     assert article.can_write() == True
     """
-    from flask_more_smorest.perms.user_context import _get_state
+    from flask_more_smorest.perms.user_registry import _get_state
 
     state, _ = _get_state()
     original_getter = state.get("get_current_user_func")

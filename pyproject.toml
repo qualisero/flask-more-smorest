@@ -64,6 +64,7 @@ sphinx = "^7.2.6"
 sphinx-rtd-theme = "^2.0.0"
 myst-parser = "^2.0.0"
 sphinx-autodoc-typehints = "^2.0.0"
+pyright = "^1.1.408"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -168,6 +169,27 @@ strict_equality = true
 show_error_codes = true
 disable_error_code = ["untyped-decorator"]
 
+[tool.pyright]
+include = ["flask_more_smorest", "tests"]
+exclude = ["**/__pycache__", "**/.mypy_cache", "**/node_modules", "**/*.egg-info"]
+typeCheckingMode = "standard"
+reportIncompatibleMethodOverride = "warning"
+reportUnknownMemberType = "warning"
+reportUnknownVariableType = "warning"
+reportUnknownArgumentType = "warning"
+reportUnknownParameterType = "warning"
+reportAttributeAccessIssue = "warning"
+stubPath = "./stubs;./stubs/test_stubs"
+
+[[tool.pyright.executionEnvironments]]
+root = "tests"
+reportUnknownMemberType = "none"
+reportUnknownVariableType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownParameterType = "none"
+reportAttributeAccessIssue = "none"
+reportIncompatibleMethodOverride = "none"
+
 
 [[tool.mypy.overrides]]
 module = [
@@ -187,8 +209,8 @@ warn_return_any = false
 warn_unused_ignores = false
 
 [tool.bandit]
-exclude_dirs = ["tests"]
-skips = ["B101", "B106", "B601"]
+exclude_dirs = ["tests/__pycache__"]
+skips = ["B101", "B105", "B106", "B107", "B601"]
 
 [tool.tox]
 legacy_tox_ini = """

@@ -7,6 +7,14 @@ from flask import Flask
 
 from flask_more_smorest import Api, db, init_db, init_jwt
 from flask_more_smorest.error.error_handlers import RequestHandlers
+from flask_more_smorest.perms import init_fms
+from flask_more_smorest.perms.models.defaults import (
+    DefaultDomain,
+    DefaultToken,
+    DefaultUser,
+    DefaultUserRole,
+    DefaultUserSetting,
+)
 
 
 @pytest.fixture(scope="function")
@@ -19,6 +27,16 @@ def app() -> Generator[Flask, None, None]:
     app.config["SECRET_KEY"] = "test-secret-key"
     app.config["JWT_SECRET_KEY"] = "jwt-test-secret-key"
 
+    from flask_more_smorest.perms import clear_registration
+
+    clear_registration()
+    init_fms(
+        user=DefaultUser,
+        role=DefaultUserRole,
+        token=DefaultToken,
+        domain=DefaultDomain,
+        setting=DefaultUserSetting,
+    )
     init_db(app)
     init_jwt(app)
 
@@ -43,6 +61,16 @@ def unit_app() -> Generator[Flask, None, None]:
     app.config["SECRET_KEY"] = "test-secret-key"
     app.config["JWT_SECRET_KEY"] = "jwt-test-secret-key"
 
+    from flask_more_smorest.perms import clear_registration
+
+    clear_registration()
+    init_fms(
+        user=DefaultUser,
+        role=DefaultUserRole,
+        token=DefaultToken,
+        domain=DefaultDomain,
+        setting=DefaultUserSetting,
+    )
     init_db(app)
     init_jwt(app)
     RequestHandlers(app)  # Register error handlers
@@ -82,7 +110,7 @@ def reset_user_context() -> Generator[None, None, None]:
 
     Tests that need to clear registration mid-test should call clear_registration() manually.
     """
-    from flask_more_smorest.perms.user_context import clear_registration
+    from flask_more_smorest.perms import clear_registration
 
     clear_registration()
     yield

@@ -85,9 +85,26 @@ Get instant authentication with ``UserBlueprint``:
 .. code-block:: python
 
    from flask_more_smorest import UserBlueprint
+   from flask_more_smorest.perms import init_fms
+   from flask_more_smorest.perms.models.defaults import (
+       DefaultDomain,
+       DefaultToken,
+       DefaultUser,
+       DefaultUserRole,
+       DefaultUserSetting,
+   )
+
+   # Register default models explicitly
+   init_fms(
+       user=DefaultUser,
+       role=DefaultUserRole,
+       token=DefaultToken,
+       domain=DefaultDomain,
+       setting=DefaultUserSetting,
+   )
 
    # Instant login and profile endpoints
-   user_bp = UserBlueprint()
+   user_bp = UserBlueprint(register=False)
    api.register_blueprint(user_bp)
 
 This provides ``POST /api/users/login/``, ``GET /api/users/me/``, and full CRUD for user management.

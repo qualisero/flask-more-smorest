@@ -140,9 +140,26 @@ Get instant authentication with `UserBlueprint`:
 
 ```python
 from flask_more_smorest import UserBlueprint
+from flask_more_smorest.perms import init_fms
+from flask_more_smorest.perms.models.defaults import (
+    DefaultDomain,
+    DefaultToken,
+    DefaultUser,
+    DefaultUserRole,
+    DefaultUserSetting,
+)
+
+# Register default models explicitly
+init_fms(
+    user=DefaultUser,
+    role=DefaultUserRole,
+    token=DefaultToken,
+    domain=DefaultDomain,
+    setting=DefaultUserSetting,
+)
 
 # Instant login and profile endpoints
-user_bp = UserBlueprint()  # Creates /api/users/login/ and /api/users/me/
+user_bp = UserBlueprint(register=False)  # Creates /api/users/login/ and /api/users/me/
 api.register_blueprint(user_bp)
 ```
 
@@ -157,25 +174,33 @@ This provides:
 Add custom fields by inheriting from `User`:
 
 ```python
-from flask_more_smorest import User, UserBlueprint
+from flask_more_smorest import UserBlueprint
+from flask_more_smorest.perms import init_fms
+from flask_more_smorest.perms.abstract_user import AbstractUser
 from flask_more_smorest.sqla import db
 from sqlalchemy.orm import Mapped, mapped_column
 
-class Employee(User):
+class Employee(AbstractUser):
+    email: Mapped[str] = mapped_column(db.String(128), unique=True, nullable=False)
+    password: Mapped[bytes | None] = mapped_column(db.LargeBinary(128), nullable=True)
+    is_enabled: Mapped[bool] = mapped_column(db.Boolean(), default=True)
     employee_id: Mapped[str] = mapped_column(db.String(32), unique=True)
     department: Mapped[str] = mapped_column(db.String(100))
 
+# Register custom user model
+init_fms(user=Employee)
+
 # Use custom user model in blueprint
-employee_bp = UserBlueprint(model=Employee, schema=Employee.Schema)
+employee_bp = UserBlueprint(model=Employee, register=False)
 ```
 
 ### Enable public registration
 
 ```python
-class PublicUser(User):
+class PublicUser(Employee):
     PUBLIC_REGISTRATION = True  # Allow unauthenticated user creation
 
-public_bp = UserBlueprint(model=PublicUser, schema=PublicUser.Schema)
+public_bp = UserBlueprint(model=PublicUser, register=False)
 ```
 
 ### Getting the current user
@@ -183,13 +208,13 @@ public_bp = UserBlueprint(model=PublicUser, schema=PublicUser.Schema)
 Access the authenticated user using the class method for type-safe results:
 
 ```python
-from flask_more_smorest import User
+from flask_more_smorest.perms.models.defaults import DefaultUser
 
 # In your route or permission check
-user = User.get_current_user()  # Returns User | None
+user = DefaultUser.get_current_user()  # Returns DefaultUser | None
 
 # With a custom user class
-class MyUser(User):
+class MyUser(Employee):
     employee_id = mapped_column(db.String(32))
 
 user = MyUser.get_current_user()  # Returns MyUser | None (properly typed)
@@ -206,10 +231,10 @@ The class method provides typed access and is the preferred way to get the curre
 If you already have a User model, configure flask-more-smorest to use it:
 
 ```python
-from flask_more_smorest.perms import register_user_class
+from flask_more_smorest.perms import init_fms
 from my_app.auth import get_current_user
 
-register_user_class(MyUser, get_current_user=get_current_user)
+init_fms(user=MyUser, get_current_user=get_current_user)
 # Permission system now uses your User model
 ```
 
@@ -280,13 +305,12 @@ def log_stats(response):
 Flask-More-Smorest provides testing helpers for authenticated endpoints:
 
 ```python
-from flask_more_smorest import User
+from flask_more_smorest.perms.models.defaults import DefaultUser, DefaultUserRole, BaseRoleEnum
 from flask_more_smorest.testing import as_user, as_admin
-from flask_more_smorest.perms.models import DefaultUserRole, UserRole
 
 # Create test user
-with User.bypass_perms():
-    user = User(email="test@example.com", password="password123")
+with DefaultUser.bypass_perms():
+    user = DefaultUser(email="test@example.com", password="password123")
     user.save()
 
 # Test authenticated endpoint
@@ -295,8 +319,8 @@ with as_user(client, str(user.id)):
     assert response.status_code == 200
 
 # Test admin endpoint
-admin = User(email="admin@example.com", password="password123")
-admin.roles.append(UserRole(user=admin, role=DefaultUserRole.ADMIN))
+admin = DefaultUser(email="admin@example.com", password="password123")
+admin.roles.append(DefaultUserRole(user=admin, role=BaseRoleEnum.ADMIN))
 
 with as_admin(client, str(admin.id)):
     response = client.get("/api/users/")

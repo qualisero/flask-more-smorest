@@ -200,10 +200,7 @@ def test_user_context_included_in_debug_mode() -> None:
     import uuid
 
     from flask_more_smorest import init_jwt
-    from flask_more_smorest.perms.user_context import (
-        clear_registration,
-        register_user_class,
-    )
+    from flask_more_smorest.perms import clear_registration, init_fms
 
     app = Flask(__name__)
     app.config["DEBUG"] = True
@@ -232,7 +229,7 @@ def test_user_context_included_in_debug_mode() -> None:
 
     try:
         with app.app_context():
-            register_user_class(MockUser, get_current_user=get_mock_user)
+            init_fms(get_current_user=get_mock_user)  # type: ignore[type-var]  # type: ignore[type-var]
             with app.test_request_context():
                 try:
                     raise DummyException("test error")
@@ -259,10 +256,7 @@ def test_user_context_not_included_in_production() -> None:
     """Test that user context is not included in production mode."""
     import uuid
 
-    from flask_more_smorest.perms.user_context import (
-        clear_registration,
-        register_user_class,
-    )
+    from flask_more_smorest.perms import clear_registration, init_fms
 
     app = Flask(__name__)
     app.config["DEBUG"] = False
@@ -285,7 +279,7 @@ def test_user_context_not_included_in_production() -> None:
 
     try:
         with app.app_context():
-            register_user_class(MockUser, get_current_user=get_mock_user)
+            init_fms(get_current_user=get_mock_user)  # type: ignore[type-var]
             with app.test_request_context():
                 try:
                     raise DummyException("test error")

@@ -130,9 +130,26 @@ Get instant authentication with ``UserBlueprint``:
 .. code-block:: python
 
    from flask_more_smorest import UserBlueprint
+   from flask_more_smorest.perms import init_fms
+   from flask_more_smorest.perms.models.defaults import (
+       DefaultDomain,
+       DefaultToken,
+       DefaultUser,
+       DefaultUserRole,
+       DefaultUserSetting,
+   )
+
+   # Register default models explicitly
+   init_fms(user=
+       user=DefaultUser,
+       role=DefaultUserRole,
+       token=DefaultToken,
+       domain=DefaultDomain,
+       setting=DefaultUserSetting,
+   )
 
    # Instant login and profile endpoints
-   user_bp = UserBlueprint()
+   user_bp = UserBlueprint(register=False)
    api.register_blueprint(user_bp)
 
 This automatically provides:
@@ -145,12 +162,13 @@ Enable public registration:
 
 .. code-block:: python
 
-   from flask_more_smorest import User, UserBlueprint
+   from flask_more_smorest import UserBlueprint
+   from flask_more_smorest.perms.models.defaults import DefaultUser
 
-   class PublicUser(User):
+   class PublicUser(DefaultUser):
        PUBLIC_REGISTRATION = True  # Allow unauthenticated user creation
 
-   public_bp = UserBlueprint(model=PublicUser, schema=PublicUser.Schema)
+   public_bp = UserBlueprint(model=PublicUser, register=False)
    api.register_blueprint(public_bp)
 
 Filtering and Pagination

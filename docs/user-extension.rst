@@ -29,10 +29,10 @@ Use direct inheritance when you want to add fields to the built-in User model wh
 
 .. code-block:: python
 
-   from flask_more_smorest import User
+   from flask_more_smorest.perms.models.defaults import DefaultUser
    from sqlalchemy.orm import Mapped, mapped_column
 
-   class CustomUser(User):
+   class CustomUser(DefaultUser):
        # Uses "user" table (single-table inheritance)
        bio: Mapped[str | None] = mapped_column(db.String(500), nullable=True)
        phone: Mapped[str | None] = mapped_column(db.String(20), nullable=True)
@@ -53,7 +53,7 @@ All User instances automatically include:
 
 .. code-block:: python
 
-   class VerifiedUser(User):
+   class VerifiedUser(DefaultUser):
        is_verified: Mapped[bool] = mapped_column(db.Boolean, default=False)
 
        def _can_write(self) -> bool:
@@ -93,7 +93,7 @@ Use separate tables when you have distinct types of users that need their own sc
 
 .. code-block:: python
 
-   class ContractorUser(User):
+   class ContractorUser(DefaultUser):
        __tablename__ = "contractor_users"
        id: Mapped[uuid.UUID] = mapped_column(
            sa.Uuid(as_uuid=True),
@@ -139,13 +139,13 @@ Register your custom user class (and optionally a custom getter):
 .. code-block:: python
 
    from flask_login import current_user
-   from flask_more_smorest.perms import register_user_class
+   from flask_more_smorest.perms import init_fms
 
    def get_flask_login_user():
        return current_user if not current_user.is_anonymous else None
 
    # Register - everything else derives from this!
-   register_user_class(MyUser, get_current_user=get_flask_login_user)
+   init_fms(user=MyUser, get_current_user=get_flask_login_user)
 
 The system automatically provides:
 
@@ -189,19 +189,19 @@ Your custom User model should implement ``UserProtocol`` for compatibility:
 .. code-block:: python
 
    from flask_login import current_user
-   from flask_more_smorest.perms import register_user_class
+   from flask_more_smorest.perms import init_fms
 
    def get_flask_login_user():
        return current_user if not current_user.is_anonymous else None
 
-   register_user_class(MyUser, get_current_user=get_flask_login_user)
+   init_fms(user=MyUser, get_current_user=get_flask_login_user)
 
 *Custom OAuth (Google, GitHub, etc.):*
 
 .. code-block:: python
 
    from authlib.integrations.flask_client import OAuth
-   from flask_more_smorest.perms import register_user_class
+   from flask_more_smorest.perms import init_fms
 
    oauth = OAuth()
 
@@ -210,7 +210,7 @@ Your custom User model should implement ``UserProtocol`` for compatibility:
        user_id = session.get('user_id')
        return MyUser.query.get(user_id) if user_id else None
 
-   register_user_class(MyUser, get_current_user=get_oauth_user)
+   init_fms(user=MyUser, get_current_user=get_oauth_user)
 
    # Your User model needs has_role method:
    class MyUser:
@@ -225,14 +225,14 @@ Your custom User model should implement ``UserProtocol`` for compatibility:
 .. code-block:: python
 
    from flask import g
-   from flask_more_smorest.perms import register_user_class
+   from flask_more_smorest.perms import init_fms
 
    def get_tenant_user():
        if not hasattr(g, 'tenant_id'):
            return None
        return get_tenant_user_model(g.tenant_id).get_current_user()
 
-   register_user_class(get_tenant_user_model(g.tenant_id), get_current_user=get_tenant_user)
+   init_fms(user=get_tenant_user_model(g.tenant_id), get_current_user=get_tenant_user)
 
    # Your User model needs has_role method:
    class MyUser:
@@ -319,7 +319,7 @@ Multi-Tenant SaaS Application
 
 .. code-block:: python
 
-   class TenantUser(User):
+   class TenantUser(DefaultUser):
        tenant_id: Mapped[uuid.UUID] = mapped_column(db.ForeignKey('tenant.id'))
        feature_flags: Mapped[dict] = mapped_column(db.JSON, default={})
 
