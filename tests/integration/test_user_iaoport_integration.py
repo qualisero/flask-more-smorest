@@ -1,4 +1,4 @@
-"""Integration test: iaoport‑style FMS integration (custom models + blueprint)."""
+"""Integration test: iaoport-style FMS integration (custom models + blueprint)."""
 
 from __future__ import annotations
 

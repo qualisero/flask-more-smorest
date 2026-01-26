@@ -80,7 +80,7 @@ class User(AbstractUser):
     """
 
     __tablename__ = "user"
-    __table_args__ = {"extend_existing": True}
+    __table_args__ = {"extend_existing": True}  # noqa: RUF012
     PUBLIC_REGISTRATION: bool = False
 
     def __init__(self, **kwargs: object):

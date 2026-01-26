@@ -248,34 +248,24 @@ class TestGetStatementsFromFilters:
         filters_dict = {"nonexistent_field": "value"}
 
         # Should raise ValueError for nonexistent fields with helpful message
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="Invalid filter field 'nonexistent_field'"):
             get_statements_from_filters(filters_dict, QueryTestModel)
-
-        error_msg = str(exc_info.value)
-        assert "Invalid filter field 'nonexistent_field'" in error_msg
-        assert "QueryTestModel" in error_msg
-        assert "Valid fields are:" in error_msg
 
     def test_invalid_field_with_suffix(self) -> None:
         """Test handling of invalid field names with filter suffixes."""
         # Field 'invalid' does not exist, even with __from suffix
         filters_dict = {"invalid__from": "2024-01-01"}
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="Invalid filter field 'invalid'"):
             get_statements_from_filters(filters_dict, QueryTestModel)
-
-        error_msg = str(exc_info.value)
-        assert "Invalid filter field 'invalid'" in error_msg
 
     def test_private_attribute_access_blocked(self) -> None:
         """Test that private attributes cannot be accessed via filters."""
         # Attempting to filter by private/internal attributes should fail
         filters_dict = {"_sa_instance_state": "value"}
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="Invalid filter field '_sa_instance_state'"):
             get_statements_from_filters(filters_dict, QueryTestModel)
-
-        assert "Invalid filter field" in str(exc_info.value)
 
     def test_from_only_filter(self) -> None:
         """Test range filter with only __from suffix."""

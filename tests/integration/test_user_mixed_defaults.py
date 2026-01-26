@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import uuid
 from collections.abc import Iterator
@@ -37,12 +38,10 @@ def _module_cleanup() -> Iterator[None]:
     # Clear metadata
     db.metadata.clear()
     # Clear SQLAlchemy mappers
-    try:
+    with contextlib.suppress(Exception):
         import sqlalchemy as sa
 
         sa.orm.clear_mappers()
-    except Exception:
-        pass
     # Unload user_schemas module - critical for preventing schema caching pollution
     import sys
 

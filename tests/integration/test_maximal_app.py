@@ -25,7 +25,7 @@ from flask_more_smorest import (
     init_db,
     init_jwt,
 )
-from flask_more_smorest.error import ForbiddenError, UnauthorizedError
+from flask_more_smorest.error import ForbiddenError, NotFoundError, UnauthorizedError
 from flask_more_smorest.perms import init_fms, is_current_user_admin
 from flask_more_smorest.perms.models.base_roles import BaseRoleEnum
 
@@ -652,7 +652,7 @@ class TestMaximalFeatureIntegration:
         retrieved = Article.get_or_404(article_id)
         assert retrieved.id == article_id
 
-        with pytest.raises(Exception):
+        with pytest.raises(NotFoundError):
             assert Article.get_or_404(uuid.uuid4())
 
         # Test get_by
@@ -664,7 +664,7 @@ class TestMaximalFeatureIntegration:
         retrieved = Article.get_by_or_404(title="Test")
         assert retrieved.title == "Test"
 
-        with pytest.raises(Exception):
+        with pytest.raises(NotFoundError):
             Article.get_by_or_404(title="Nonexistent")
 
     def test_auth_required_for_private_routes(self, client: "FlaskClient") -> None:

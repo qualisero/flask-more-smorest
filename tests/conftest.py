@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import contextlib
 import sys
 from collections.abc import Generator
 
 import pytest
-from sqlalchemy.orm import clear_mappers
 
 from flask_more_smorest import db
 from flask_more_smorest.perms import clear_registration
@@ -30,27 +30,20 @@ def _cleanup_test_mappers() -> Generator[None, None, None]:
     """
     yield
 
-    # Clear all mappers to ensure a clean slate for the next test module
-    try:
-        clear_mappers()
-    except Exception:
-        # Ignore errors during cleanup (e.g. dynamic classes already partially destroyed)
-        pass
+    # Dispose only test-defined models to avoid unmapping library defaults
+    if hasattr(db, "Model") and hasattr(db.Model, "registry"):
+        to_dispose = []
+        for mapper in list(db.Model.registry.mappers):
+            if mapper.class_.__module__.startswith("tests."):
+                to_dispose.append(mapper.class_)
 
-    # Clear metadata to remove table definitions
-    if hasattr(db, "metadata"):
-        db.metadata.clear()
+        for cls in to_dispose:
+            with contextlib.suppress(Exception):
+                if hasattr(db.Model.registry, "_dispose_cls"):
+                    db.Model.registry._dispose_cls(cls)
+            if hasattr(cls, "__table__") and cls.__table__ in db.metadata:
+                db.metadata.remove(cls.__table__)
 
-    # Force re-import of persistent model modules to re-map them
-    # This is necessary because clear_mappers() leaves classes unmapped
-    modules_to_unload = [
-        "flask_more_smorest.perms.models.role",
-        "flask_more_smorest.perms.models.token",
-        "flask_more_smorest.perms.models.setting",
-        "flask_more_smorest.perms.models.defaults",
-        "flask_more_smorest.perms.models.user",
-    ]
-
-    for module_name in modules_to_unload:
-        if module_name in sys.modules:
-            del sys.modules[module_name]
+    # Unload cached user schemas to avoid stale BaseUserSchema
+    if "flask_more_smorest.perms.user_schemas" in sys.modules:
+        del sys.modules["flask_more_smorest.perms.user_schemas"]

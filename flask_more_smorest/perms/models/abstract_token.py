@@ -43,7 +43,7 @@ class AbstractToken(UserOwnershipMixin, BasePermsModel):
 
     __abstract__ = True  # No table is created
     __tablename__ = "token"
-    __table_args__ = {"extend_existing": True}
+    __table_args__ = {"extend_existing": True}  # noqa: RUF012
     __delegate_to_user__ = True  # Delegate permission checks to user
     __user_backref_name__ = "tokens"  # Backref on User model
 

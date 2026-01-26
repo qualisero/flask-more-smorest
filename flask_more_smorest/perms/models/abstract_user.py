@@ -65,7 +65,7 @@ class AbstractUser(BasePermsModel):
 
     __abstract__ = True  # No table is created
     __tablename__ = "user"
-    __table_args__ = {"extend_existing": True}
+    __table_args__ = {"extend_existing": True}  # noqa: RUF012
 
     email: Mapped[str] = mapped_column(sa.String(128), unique=True, nullable=False)
     password: Mapped[bytes | None] = mapped_column(sa.LargeBinary(128), nullable=True)

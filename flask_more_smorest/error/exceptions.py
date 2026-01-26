@@ -21,7 +21,7 @@ import sys
 import traceback
 from http import HTTPStatus
 from pprint import pformat
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from flask import current_app, has_app_context, has_request_context, make_response, request
 
@@ -402,9 +402,9 @@ class UnprocessableEntity(ApiException):
     TITLE = "Validation Error"
     HTTP_STATUS_CODE = HTTPStatus.UNPROCESSABLE_ENTITY
 
-    fields: dict[str, str] = {}
-    location: str | None = None
-    valid_data: dict[str, str | int | bool] | None = None
+    fields: ClassVar[dict[str, str]] = {}
+    location: ClassVar[str | None] = None
+    valid_data: ClassVar[dict[str, str | int | bool] | None] = None
 
     def __init__(
         self,
