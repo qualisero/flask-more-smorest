@@ -142,20 +142,20 @@ Get instant authentication with `UserBlueprint`:
 from flask_more_smorest import UserBlueprint
 from flask_more_smorest.perms import init_fms
 from flask_more_smorest.perms.models.defaults import (
-    DefaultDomain,
-    DefaultToken,
-    DefaultUser,
-    DefaultUserRole,
-    DefaultUserSetting,
+    Domain,
+    Token,
+    User,
+    UserRole,
+    UserSetting,
 )
 
 # Register default models explicitly
 init_fms(
-    user=DefaultUser,
-    role=DefaultUserRole,
-    token=DefaultToken,
-    domain=DefaultDomain,
-    setting=DefaultUserSetting,
+    user=User,
+    role=UserRole,
+    token=Token,
+    domain=Domain,
+    setting=UserSetting,
 )
 
 # Instant login and profile endpoints
@@ -176,7 +176,7 @@ Add custom fields by inheriting from `User`:
 ```python
 from flask_more_smorest import UserBlueprint
 from flask_more_smorest.perms import init_fms
-from flask_more_smorest.perms.abstract_user import AbstractUser
+from flask_more_smorest.perms.models.abstract_user import AbstractUser
 from flask_more_smorest.sqla import db
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -208,18 +208,27 @@ public_bp = UserBlueprint(model=PublicUser, register=False)
 Access the authenticated user using the class method for type-safe results:
 
 ```python
-from flask_more_smorest.perms.models.defaults import DefaultUser
+from flask_more_smorest.perms.models.defaults import User
+from flask_more_smorest.perms import get_current_user
 
-# In your route or permission check
-user = DefaultUser.get_current_user()  # Returns DefaultUser | None
+# In your route or permission check (recommended)
+user = get_current_user()  # Returns User | None (or your registered User model)
 
 # With a custom user class
 class MyUser(Employee):
     employee_id = mapped_column(db.String(32))
 
-user = MyUser.get_current_user()  # Returns MyUser | None (properly typed)
+user = get_current_user()
+if isinstance(user, MyUser):
+    print(f"User {user.email} is logged in")
+```
 
-# Check if user is authenticated
+Or use the class method on your user model:
+
+```python
+from flask_more_smorest.perms.models.defaults import User
+
+user = User.get_current_user()  # Returns User | None
 if user:
     print(f"User {user.email} is logged in")
 ```
@@ -254,7 +263,7 @@ curl http://localhost:5000/health
 {
   "status": "healthy",
   "timestamp": "2026-01-11T08:30:00+00:00",
-  "version": "0.6.0",
+  "version": "0.9.2",
   "database": "connected"
 }
 ```
@@ -305,12 +314,12 @@ def log_stats(response):
 Flask-More-Smorest provides testing helpers for authenticated endpoints:
 
 ```python
-from flask_more_smorest.perms.models.defaults import DefaultUser, DefaultUserRole, BaseRoleEnum
+from flask_more_smorest.perms.models.defaults import User, UserRole, BaseRoleEnum
 from flask_more_smorest.testing import as_user, as_admin
 
 # Create test user
-with DefaultUser.bypass_perms():
-    user = DefaultUser(email="test@example.com", password="password123")
+with User.bypass_perms():
+    user = User(email="test@example.com", password="password123")
     user.save()
 
 # Test authenticated endpoint
@@ -319,8 +328,8 @@ with as_user(client, str(user.id)):
     assert response.status_code == 200
 
 # Test admin endpoint
-admin = DefaultUser(email="admin@example.com", password="password123")
-admin.roles.append(DefaultUserRole(user=admin, role=BaseRoleEnum.ADMIN))
+admin = User(email="admin@example.com", password="password123")
+admin.roles.append(UserRole(user=admin, role=BaseRoleEnum.ADMIN))
 
 with as_admin(client, str(admin.id)):
     response = client.get("/api/users/")

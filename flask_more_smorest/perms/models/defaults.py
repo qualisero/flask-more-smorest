@@ -12,10 +12,10 @@ For full customization, inherit from the abstract bases in abstract_*.py.
 **Quick start:**
 
     from flask_more_smorest.perms import init_fms
-    from flask_more_smorest.perms.models.defaults import DefaultUser
+    from flask_more_smorest.perms.models.defaults import User
 
     # Register the defaults
-    init_fms(user=DefaultUser)
+    init_fms(user=User)
 """
 
 from __future__ import annotations
@@ -29,45 +29,39 @@ if TYPE_CHECKING:
     from .token import Token
     from .user import User
 
-    DefaultUser = User
-    DefaultDomain = Domain
-    DefaultUserSetting = UserSetting
-    DefaultToken = Token
-    DefaultUserRole = UserRole
-
 __all__ = [
     "BaseRoleEnum",
-    "DefaultDomain",
-    "DefaultToken",
-    "DefaultUser",
-    "DefaultUserRole",
-    "DefaultUserSetting",
+    "Domain",
+    "Token",
+    "User",
+    "UserRole",
+    "UserSetting",
 ]
 
 
 def __getattr__(name: str) -> object:
-    if name == "DefaultUser":
-        from .user import User as DefaultUser
+    if name == "User":
+        from .user import User
 
-        return DefaultUser
-    if name == "DefaultDomain":
-        from .role import Domain as DefaultDomain
+        return User
+    if name == "Domain":
+        from .role import Domain
 
-        return DefaultDomain
-    if name == "DefaultUserSetting":
-        from .setting import UserSetting as DefaultUserSetting
+        return Domain
+    if name == "UserSetting":
+        from .setting import UserSetting
 
-        return DefaultUserSetting
-    if name == "DefaultToken":
-        from .token import Token as DefaultToken
+        return UserSetting
+    if name == "Token":
+        from .token import Token
 
-        return DefaultToken
-    if name == "DefaultUserRole":
-        from .role import UserRole as DefaultUserRole
+        return Token
+    if name == "UserRole":
+        from .role import UserRole
 
-        return DefaultUserRole
+        return UserRole
     if name == "BaseRoleEnum":
-        from .base_roles import BaseRoleEnum as BaseRoleEnum
+        from .base_roles import BaseRoleEnum
 
         return BaseRoleEnum
 

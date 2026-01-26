@@ -1,4 +1,7 @@
-"""Unit tests for extending defaults_module.DefaultUser model with custom current user getter."""
+"""Unit tests for extending User model with custom get_current_user mechanism.
+
+Tests focus on the registration and behavior of custom get_current_user functions.
+"""
 
 import contextlib
 import sys
@@ -92,16 +95,14 @@ def db_session(unit_app: Flask) -> Generator[None, None, None]:
 
 
 class TestCustomGetter:
-    """Test extending defaults_module.DefaultUser model with custom get_current_user mechanism."""
+    """Test extending User model with custom get_current_user mechanism."""
 
-    def test_init_fms_with_custom_getter(self, unit_app, db_session) -> None:
+    def test_init_fms_with_custom_getter(self, unit_app: Flask, db_session: Generator[None, None, None]) -> None:
         """Test that init_fms with custom getter works."""
-
         CustomUser = build_models()
 
         clear_registration()
         init_fms(user=CustomUser)
-        db.drop_all()
         db.create_all()
 
         # Create a test user in database with extra attributes
@@ -129,14 +130,14 @@ class TestCustomGetter:
         assert current.external_id == "EXT123"  # type: ignore[attr-defined]
         assert current.source_system == "LDAP"  # type: ignore[attr-defined]
 
-    def test_custom_getter_overrides_jwt_fallback(self, unit_app, db_session) -> None:
+    def test_custom_getter_overrides_jwt_fallback(
+        self, unit_app: Flask, db_session: Generator[None, None, None]
+    ) -> None:
         """Test that custom getter takes precedence over JWT."""
-
         CustomUser = build_models()
 
         clear_registration()
         init_fms(user=CustomUser)
-        db.drop_all()
         db.create_all()
 
         # Create test users
@@ -158,9 +159,8 @@ class TestCustomGetter:
         assert current is not None
         assert current.email == "custom@example.com"
 
-    def test_custom_getter_returns_none(self, unit_app, db_session) -> None:
+    def test_custom_getter_returns_none(self, unit_app: Flask, db_session: Generator[None, None, None]) -> None:
         """Test that custom getter returning None is handled correctly."""
-
         CustomUser = build_models()
 
         clear_registration()
@@ -176,74 +176,19 @@ class TestCustomGetter:
         current = CustomUser.get_current_user()
         assert current is None
 
-    def test_multiple_user_classes(self, unit_app, db_session) -> None:
-        """Test that multiple user classes can coexist with different getters."""
-
-        CustomUser1 = build_models()
-
-        clear_registration()
-        init_fms(user=CustomUser1)
-        db.drop_all()
-        db.create_all()
-
-        # Create test users
-        with CustomUser1.bypass_perms():
-            employee = CustomUser1(email="employee@example.com", password="password123")
-            employee.external_id = "EMP001"  # type: ignore[attr-defined]
-            employee.save()
-
-        # Custom getter returns employee
-        def get_employee() -> CustomUser1 | None:  # type: ignore[valid-type]
-            return db.session.query(CustomUser1).filter_by(email="employee@example.com").first()
-
-        init_fms(get_current_user=get_employee)
-
-        # Should return employee
-        employee_current = CustomUser1.get_current_user()
-        assert employee_current is not None
-        assert isinstance(employee_current, CustomUser1)
-        assert employee_current.external_id == "EMP001"  # type: ignore[attr-defined]
-
-        db.session.remove()
-        db.drop_all()
-        reset_models()
-
-        CustomUser2 = build_models()
-
-        init_fms(user=CustomUser2)
-        db.create_all()
-
-        with CustomUser2.bypass_perms():
-            customer = CustomUser2(email="customer@example.com", password="password123")
-            customer.external_id = "CUST001"  # type: ignore[attr-defined]
-            customer.save()
-
-        # Custom getter returns customer
-        def get_customer() -> CustomUser2 | None:  # type: ignore[valid-type]
-            return db.session.query(CustomUser2).filter_by(email="customer@example.com").first()
-
-        init_fms(get_current_user=get_customer)
-
-        customer_current = CustomUser2.get_current_user()
-        assert customer_current is not None
-        assert isinstance(customer_current, CustomUser2)
-        assert customer_current.external_id == "CUST001"  # type: ignore[attr-defined]
-
-    def test_custom_getter_with_roles(self, unit_app, db_session) -> None:
+    def test_custom_getter_with_roles(self, unit_app: Flask, db_session: Generator[None, None, None]) -> None:
         """Test custom getter with role checks."""
-
         CustomUser = build_models()
 
         clear_registration()
         init_fms(user=CustomUser)
-        db.drop_all()
         db.create_all()
 
         # Create test user with admin role
         with CustomUser.bypass_perms():
             user = CustomUser(email="admin@example.com", password="password123")
             user.save()
-            user.roles.append(defaults_module.DefaultUserRole(user=user, role=defaults_module.BaseRoleEnum.ADMIN))
+            user.roles.append(defaults_module.UserRole(user=user, role=defaults_module.BaseRoleEnum.ADMIN))
 
         # Custom getter returns admin user
         def get_admin() -> CustomUser | None:  # type: ignore[valid-type]

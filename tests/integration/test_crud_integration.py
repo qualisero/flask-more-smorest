@@ -38,11 +38,11 @@ def app() -> Flask:
     app.config["SECRET_KEY"] = "test-secret-key-crud"
 
     init_fms(
-        user=defaults_module.DefaultUser,
-        role=defaults_module.DefaultUserRole,
-        token=defaults_module.DefaultToken,
-        domain=defaults_module.DefaultDomain,
-        setting=defaults_module.DefaultUserSetting,
+        user=defaults_module.User,
+        role=defaults_module.UserRole,
+        token=defaults_module.Token,
+        domain=defaults_module.Domain,
+        setting=defaults_module.UserSetting,
     )
     # Initialize database
     init_db(app)

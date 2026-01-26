@@ -29,10 +29,10 @@ Use direct inheritance when you want to add fields to the built-in User model wh
 
 .. code-block:: python
 
-   from flask_more_smorest.perms.models.defaults import DefaultUser
+   from flask_more_smorest.perms.models.defaults import User
    from sqlalchemy.orm import Mapped, mapped_column
 
-   class CustomUser(DefaultUser):
+   class CustomUser(User):
        # Uses "user" table (single-table inheritance)
        bio: Mapped[str | None] = mapped_column(db.String(500), nullable=True)
        phone: Mapped[str | None] = mapped_column(db.String(20), nullable=True)
@@ -53,7 +53,7 @@ All User instances automatically include:
 
 .. code-block:: python
 
-   class VerifiedUser(DefaultUser):
+   class VerifiedUser(User):
        is_verified: Mapped[bool] = mapped_column(db.Boolean, default=False)
 
        def _can_write(self) -> bool:
@@ -93,7 +93,7 @@ Use separate tables when you have distinct types of users that need their own sc
 
 .. code-block:: python
 
-   class ContractorUser(DefaultUser):
+   class ContractorUser(User):
        __tablename__ = "contractor_users"
        id: Mapped[uuid.UUID] = mapped_column(
            sa.Uuid(as_uuid=True),
@@ -319,7 +319,7 @@ Multi-Tenant SaaS Application
 
 .. code-block:: python
 
-   class TenantUser(DefaultUser):
+   class TenantUser(User):
        tenant_id: Mapped[uuid.UUID] = mapped_column(db.ForeignKey('tenant.id'))
        feature_flags: Mapped[dict] = mapped_column(db.JSON, default={})
 

@@ -138,8 +138,7 @@ def as_admin(
 
         from flask_more_smorest import User
         from flask_more_smorest.testing import as_admin
-        from flask_more_smorest.perms.models.defaults import DefaultUserRole, BaseRoleEnum
-        from flask_more_smorest.perms.models.role import UserRole
+        from flask_more_smorest.perms.models.defaults import UserRole, BaseRoleEnum
 
         def test_admin_endpoint(client, db_session):
             # Create admin user

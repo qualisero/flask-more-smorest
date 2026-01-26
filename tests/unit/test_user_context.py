@@ -19,21 +19,21 @@ from flask_more_smorest.perms.user_context import (
 @pytest.mark.usefixtures("reset_user_context")
 class TestUserContext:
     def test_init_fms_registers_getter(self, app, db_session) -> None:
-        user = defaults_module.DefaultUser(email="test@example.com")
+        user = defaults_module.User(email="test@example.com")
         user.set_password("secret")
         db.session.add(user)
         db.session.commit()
 
-        def my_get_user() -> defaults_module.DefaultUser | None:
+        def my_get_user() -> defaults_module.User | None:
             return user
 
         init_fms(get_current_user=my_get_user)
 
-        current = defaults_module.DefaultUser.get_current_user()
+        current = defaults_module.User.get_current_user()
         assert current is user
 
     def test_clear_registration_resets_getter(self, app, db_session) -> None:
-        user = defaults_module.DefaultUser(email="clear@example.com")
+        user = defaults_module.User(email="clear@example.com")
         user.set_password("secret")
         db.session.add(user)
         db.session.commit()
@@ -41,13 +41,13 @@ class TestUserContext:
         init_fms(get_current_user=lambda: user)
         clear_registration()
 
-        assert defaults_module.DefaultUser.get_current_user() is None
+        assert defaults_module.User.get_current_user() is None
 
     def test_user_type_filter_returns_none(self, app, db_session) -> None:
-        class OtherUser(defaults_module.DefaultUser):
+        class OtherUser(defaults_module.User):
             __abstract__ = True
 
-        user = defaults_module.DefaultUser(email="other@example.com")
+        user = defaults_module.User(email="other@example.com")
         user.set_password("secret")
         db.session.add(user)
         db.session.commit()
@@ -57,7 +57,7 @@ class TestUserContext:
         assert OtherUser.get_current_user() is None
 
     def test_get_current_user_id(self, app, db_session) -> None:
-        user = defaults_module.DefaultUser(email="id@example.com")
+        user = defaults_module.User(email="id@example.com")
         user.set_password("secret")
         db.session.add(user)
         db.session.commit()
@@ -67,12 +67,12 @@ class TestUserContext:
         assert get_current_user_id() == user.id
 
     def test_is_current_user_admin(self, app, db_session) -> None:
-        user = defaults_module.DefaultUser(email="admin@example.com")
+        user = defaults_module.User(email="admin@example.com")
         user.set_password("secret")
         db.session.add(user)
         db.session.commit()
 
-        role = defaults_module.DefaultUserRole(user_id=user.id, role=defaults_module.BaseRoleEnum.ADMIN, domain_id=None)
+        role = defaults_module.UserRole(user_id=user.id, role=defaults_module.BaseRoleEnum.ADMIN, domain_id=None)
         user.roles.append(role)
         db.session.commit()
 
@@ -83,14 +83,12 @@ class TestUserContext:
         assert user.has_role(ROLE_SUPERADMIN) is False
 
     def test_is_current_user_superadmin(self, app, db_session) -> None:
-        user = defaults_module.DefaultUser(email="super@example.com")
+        user = defaults_module.User(email="super@example.com")
         user.set_password("secret")
         db.session.add(user)
         db.session.commit()
 
-        role = defaults_module.DefaultUserRole(
-            user_id=user.id, role=defaults_module.BaseRoleEnum.SUPERADMIN, domain_id=None
-        )
+        role = defaults_module.UserRole(user_id=user.id, role=defaults_module.BaseRoleEnum.SUPERADMIN, domain_id=None)
         user.roles.append(role)
         db.session.commit()
 

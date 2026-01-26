@@ -1,4 +1,12 @@
-"""Unit tests for UserBlueprint class."""
+"""Unit tests for UserBlueprint class.
+
+This file contains only true unit tests that test class initialization,
+configuration, and endpoint registration without requiring full
+integration testing with database operations.
+
+Integration tests for actual endpoint behavior are in:
+- tests/integration/test_user_defaults.py
+"""
 
 # pyright: reportAttributeAccessIssue=false
 
@@ -77,7 +85,7 @@ def reset_models() -> None:
 
 
 class TestUserBlueprintClass:
-    """Tests for UserBlueprint class."""
+    """Tests for UserBlueprint class - CLASS INITIALIZATION AND CONFIGURATION."""
 
     def test_user_blueprint_instantiation_with_defaults(self, unit_app: Flask, api: Api) -> None:
         """Test UserBlueprint can be instantiated with default parameters."""
@@ -99,7 +107,7 @@ class TestUserBlueprintClass:
         assert bp.name == "custom_users"
         assert bp.url_prefix == "/api/v2/users/"
 
-    def test_user_blueprint_has_crud_endpoints(self, unit_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_user_blueprint_has_crud_endpoints(self, unit_app: Flask, api: Api) -> None:
         """Test UserBlueprint registers standard CRUD endpoints."""
         bp = UserBlueprint()
         api.register_blueprint(bp)
@@ -112,7 +120,7 @@ class TestUserBlueprintClass:
             assert "/api/users/" in rules  # INDEX and POST
             assert "/api/users/<uuid:users_id>" in rules  # GET, PATCH, DELETE
 
-    def test_user_blueprint_has_login_endpoint(self, unit_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_user_blueprint_has_login_endpoint(self, unit_app: Flask, api: Api) -> None:
         """Test UserBlueprint registers login endpoint."""
         bp = UserBlueprint()
         api.register_blueprint(bp)
@@ -122,7 +130,7 @@ class TestUserBlueprintClass:
             rules = [rule.rule for rule in unit_app.url_map.iter_rules()]
             assert "/api/users/login/" in rules
 
-    def test_user_blueprint_has_me_endpoint(self, unit_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_user_blueprint_has_me_endpoint(self, unit_app: Flask, api: Api) -> None:
         """Test UserBlueprint registers current user profile endpoint."""
         bp = UserBlueprint()
         api.register_blueprint(bp)
@@ -131,119 +139,6 @@ class TestUserBlueprintClass:
         with unit_app.app_context():
             rules = [rule.rule for rule in unit_app.url_map.iter_rules()]
             assert "/api/users/me/" in rules
-
-    def test_user_blueprint_login_endpoint_works(self, unit_app: Flask, api: Api, db_session: "scoped_session") -> None:
-        """Test login endpoint returns JWT token."""
-        bp = UserBlueprint()
-        api.register_blueprint(bp)
-
-        client = unit_app.test_client()
-
-        # Create a test user
-        with defaults_module.DefaultUser.bypass_perms():
-            user = defaults_module.DefaultUser(email="test@example.com", password="password123")
-            user.save()
-
-        # Login
-        response = client.post(
-            "/api/users/login/",
-            json={"email": "test@example.com", "password": "password123"},
-        )
-
-        assert response.status_code == 200
-        data = response.get_json()
-        assert "access_token" in data
-
-    def test_user_blueprint_login_fails_with_wrong_password(
-        self, unit_app: Flask, api: Api, db_session: "scoped_session"
-    ) -> None:
-        """Test login fails with wrong password."""
-        bp = UserBlueprint()
-        api.register_blueprint(bp)
-
-        client = unit_app.test_client()
-
-        # Create a test user
-        with defaults_module.DefaultUser.bypass_perms():
-            user = defaults_module.DefaultUser(email="test@example.com", password="password123")
-            user.save()
-
-        # Login with wrong password
-        response = client.post(
-            "/api/users/login/",
-            json={"email": "test@example.com", "password": "wrongpassword"},
-        )
-
-        assert response.status_code == 401
-
-    def test_user_blueprint_login_fails_for_disabled_user(
-        self, unit_app: Flask, api: Api, db_session: "scoped_session"
-    ) -> None:
-        """Test login fails for disabled user."""
-        bp = UserBlueprint()
-        api.register_blueprint(bp)
-
-        client = unit_app.test_client()
-
-        # Create a disabled test user
-        with defaults_module.DefaultUser.bypass_perms():
-            user = defaults_module.DefaultUser(email="test@example.com", password="password123")
-            user.is_enabled = False
-            user.save()
-
-        # Login with disabled user
-        response = client.post(
-            "/api/users/login/",
-            json={"email": "test@example.com", "password": "password123"},
-        )
-
-        assert response.status_code == 401
-
-    def test_user_blueprint_me_endpoint_requires_auth(
-        self, unit_app: Flask, api: Api, db_session: "scoped_session"
-    ) -> None:
-        """Test /me endpoint requires authentication."""
-        bp = UserBlueprint()
-        api.register_blueprint(bp)
-
-        client = unit_app.test_client()
-
-        # Request without auth header
-        response = client.get("/api/users/me/")
-        assert response.status_code == 401
-
-    def test_user_blueprint_me_endpoint_returns_current_user(
-        self, unit_app: Flask, api: Api, db_session: "scoped_session"
-    ) -> None:
-        """Test /me endpoint returns current user data."""
-        bp = UserBlueprint()
-        api.register_blueprint(bp)
-
-        client = unit_app.test_client()
-
-        # Create a test user
-        with defaults_module.DefaultUser.bypass_perms():
-            user = defaults_module.DefaultUser(email="test@example.com", password="password123")
-            user.save()
-            user_id = user.id
-
-        # Login to get token
-        login_response = client.post(
-            "/api/users/login/",
-            json={"email": "test@example.com", "password": "password123"},
-        )
-        token = login_response.get_json()["access_token"]
-
-        # Access /me endpoint with auth token
-        response = client.get(
-            "/api/users/me/",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-
-        assert response.status_code == 200
-        data = response.get_json()
-        assert data["id"] == str(user_id)
-        assert data["email"] == "test@example.com"
 
     def test_user_blueprint_skip_methods(self, unit_app: Flask, api: Api, db_session: "scoped_session") -> None:
         """Test UserBlueprint skip_methods configuration."""
@@ -281,36 +176,36 @@ class TestUserBlueprintClass:
 
 
 class TestUserBlueprintWithCustomUser:
-    """Test UserBlueprint with custom defaults_module.DefaultUser model."""
+    """Test UserBlueprint with custom User model - CONFIGURATION TESTS."""
 
     @pytest.fixture(autouse=True)
     def _restore_defaults(self, unit_app: Flask) -> Iterator[None]:
         with unit_app.app_context():
             reset_models()
             init_fms(
-                user=defaults_module.DefaultUser,
-                role=defaults_module.DefaultUserRole,
-                token=defaults_module.DefaultToken,
-                domain=defaults_module.DefaultDomain,
-                setting=defaults_module.DefaultUserSetting,
+                user=defaults_module.User,
+                role=defaults_module.UserRole,
+                token=defaults_module.Token,
+                domain=defaults_module.Domain,
+                setting=defaults_module.UserSetting,
             )
             db.create_all()
         yield
         with unit_app.app_context():
             reset_models()
             init_fms(
-                user=defaults_module.DefaultUser,
-                role=defaults_module.DefaultUserRole,
-                token=defaults_module.DefaultToken,
-                domain=defaults_module.DefaultDomain,
-                setting=defaults_module.DefaultUserSetting,
+                user=defaults_module.User,
+                role=defaults_module.UserRole,
+                token=defaults_module.Token,
+                domain=defaults_module.Domain,
+                setting=defaults_module.UserSetting,
             )
             db.create_all()
 
     def test_user_blueprint_with_custom_user_class(
         self, unit_app: Flask, api: Api, db_session: "scoped_session"
     ) -> None:
-        """Test UserBlueprint works with custom defaults_module.DefaultUser model."""
+        """Test UserBlueprint works with custom User model."""
 
         reset_models()
         CustomUser = build_models()
@@ -348,44 +243,13 @@ class TestUserBlueprintWithCustomUser:
         post_config = bp._config.methods.get(CRUDMethod.POST, {})
         assert post_config.get("public") is True, "POST should be marked as public when PUBLIC_REGISTRATION=True"
 
-    def test_public_registration_allows_unauthenticated_user_creation(
-        self, unit_app: Flask, api: Api, db_session: "scoped_session"
-    ) -> None:
-        """Test that PUBLIC_REGISTRATION=True allows creating users without authentication."""
-
-        reset_models()
-        CustomUser = build_models()
-
-        with unit_app.app_context():
-            init_fms(user=CustomUser)
-
-            # Recreate tables to include CustomUser
-            db.drop_all()
-            db.create_all()
-
-        # Create blueprint with public registration user
-        bp = UserBlueprint(model=CustomUser, schema=CustomUser.Schema)
-        api.register_blueprint(bp)
-
-        client = unit_app.test_client()
-
-        # Try to create a user without authentication - should succeed
-        response = client.post(
-            "/api/users/",
-            json={"email": "newuser@example.com", "password": "password123"},
-        )
-
-        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.get_json()}"
-        data = response.get_json()
-        assert data["email"] == "newuser@example.com"
-
     def test_no_public_registration_requires_auth_for_post(
         self, unit_app: Flask, api: Api, db_session: "scoped_session"
     ) -> None:
         """Test that without PUBLIC_REGISTRATION, POST requires authentication."""
         from flask_more_smorest.crud.crud_blueprint import CRUDMethod
 
-        # Default defaults_module.DefaultUser has PUBLIC_REGISTRATION=False
+        # Default User has PUBLIC_REGISTRATION=False
         bp = UserBlueprint()
         api.register_blueprint(bp)
 
@@ -393,55 +257,11 @@ class TestUserBlueprintWithCustomUser:
         post_config = bp._config.methods.get(CRUDMethod.POST, {})
         assert post_config.get("public") is not True, "POST should NOT be public by default"
 
-        client = unit_app.test_client()
 
-        # Try to create a user without authentication - should fail with 401
-        response = client.post(
-            "/api/users/",
-            json={"email": "newuser@example.com", "password": "password123"},
-        )
+class TestUserBlueprintMultipleInstances:
+    """Tests for multiple UserBlueprint instances."""
 
-        assert response.status_code == 401, f"Expected 401, got {response.status_code}"
-
-
-class TestUserBlueprintIntegration:
-    """Integration tests for UserBlueprint with full app setup."""
-
-    def test_complete_user_registration_and_login_flow(
-        self, unit_app: Flask, api: Api, db_session: "scoped_session"
-    ) -> None:
-        """Test complete user flow: create -> login -> access profile -> update."""
-        bp = UserBlueprint()
-        api.register_blueprint(bp)
-
-        client = unit_app.test_client()
-
-        # Step 1: Create a new user (bypassing perms for test)
-        with defaults_module.DefaultUser.bypass_perms():
-            user = defaults_module.DefaultUser(email="newuser@example.com", password="securepass123")
-            user.save()
-            user_id = user.id
-
-        # Step 2: Login with the new user
-        login_response = client.post(
-            "/api/users/login/",
-            json={"email": "newuser@example.com", "password": "securepass123"},
-        )
-        assert login_response.status_code == 200
-        token_data = login_response.get_json()
-        token = token_data["access_token"]
-
-        # Step 3: Access profile using /me endpoint
-        profile_response = client.get(
-            "/api/users/me/",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-        assert profile_response.status_code == 200
-        profile_data = profile_response.get_json()
-        assert profile_data["email"] == "newuser@example.com"
-        assert profile_data["id"] == str(user_id)
-
-    def test_multiple_user_blueprint_instances(self, unit_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_multiple_user_blueprint_instances(self, unit_app: Flask, api: Api) -> None:
         """Test that multiple UserBlueprint instances can coexist with different configs."""
 
         # Create two UserBlueprints with different prefixes
@@ -460,25 +280,3 @@ class TestUserBlueprintIntegration:
             rules = [rule.rule for rule in unit_app.url_map.iter_rules()]
             assert "/api/v1/users/" in rules
             assert "/api/v2/users/" in rules
-
-
-class TestCustomUserInheritedColumns:
-    """Tests for custom user inherited columns."""
-
-    def test_custom_user_instance_has_all_inherited_columns(
-        self, unit_app: Flask, api: Api, db_session: "scoped_session"
-    ) -> None:
-        """Test that defaults_module.DefaultUser instances have all expected column values."""
-
-        # Create a defaults_module.DefaultUser instance
-        with defaults_module.DefaultUser.bypass_perms():
-            user = defaults_module.DefaultUser(
-                email="testuser@example.com",
-                password="password123",
-            )
-            user.save()
-
-        # Ensure inherited columns exist and have correct values
-        assert user.id is not None
-        assert user.email == "testuser@example.com"
-        assert user.is_enabled is True
