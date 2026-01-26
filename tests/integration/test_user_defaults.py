@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import uuid
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any, cast
@@ -67,7 +68,20 @@ def _load_defaults() -> Iterator[None]:
 
     yield
 
+    # Clear registry
     clear_registration()
+    # Clear metadata
+    db.metadata.clear()
+    # Clear SQLAlchemy mappers
+    with contextlib.suppress(Exception):
+        import sqlalchemy as sa
+
+        sa.orm.clear_mappers()
+    # Unload user_schemas module - critical for preventing schema caching pollution
+    import sys
+
+    if "flask_more_smorest.perms.user_schemas" in sys.modules:
+        del sys.modules["flask_more_smorest.perms.user_schemas"]
 
 
 @pytest.fixture
