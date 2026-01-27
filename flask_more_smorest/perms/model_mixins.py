@@ -176,10 +176,12 @@ class UserOwnershipMixin(HasUserMixin):
             return True
 
         if self.user_id:
-            from .models.user import User
+            from .user_registry import get_user_model
+
+            UserModel = get_user_model()
 
             try:
-                user = User.get_or_404(self.user_id)
+                user = UserModel.get_or_404(self.user_id)
             except ForbiddenError:
                 return False
 
