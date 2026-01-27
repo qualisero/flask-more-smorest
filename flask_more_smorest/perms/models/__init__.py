@@ -3,6 +3,8 @@
 This module exports abstract user-related models. Concrete default
 implementations live in ``flask_more_smorest.perms.models.defaults`` and
 are only loaded when explicitly imported.
+
+Version: 0.10.1
 """
 
 from __future__ import annotations
