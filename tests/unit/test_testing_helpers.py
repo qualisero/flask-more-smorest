@@ -228,7 +228,7 @@ class TestAsUserIntegration:
         # Test that as_user sets the header
         client = unit_app.test_client()
         with as_user(client, str(user.id)):
-            response = client.get("/api/users/me/")
+            response = client.get("/api/users/me")
             assert response.status_code == 200
             assert response.json is not None
             assert response.json["email"] == "test@example.com"
@@ -244,7 +244,7 @@ class TestAsUserIntegration:
 
         client = unit_app.test_client()
         with as_user(client, str(user.id), additional_claims={"tenant_id": "12345"}):
-            response = client.get("/api/users/me/")
+            response = client.get("/api/users/me")
             assert response.status_code == 200
 
 
