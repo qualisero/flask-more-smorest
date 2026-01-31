@@ -45,12 +45,12 @@ def custom_models() -> SimpleNamespace:
         phone_number: Mapped[str | None] = mapped_column(sa.String(20), nullable=True)
         is_verified: Mapped[bool] = mapped_column(sa.Boolean(), default=False)
 
-        def _can_write(self, current_user: AbstractUser | None) -> bool:
+        def _can_write(self, user: AbstractUser | None) -> bool:
             from flask_more_smorest.perms.user_context import is_current_user_admin
 
             if is_current_user_admin():
                 return True
-            if not current_user or current_user.id != self.id:
+            if not user or user.id != self.id:
                 return False
             return self.is_verified  # type: ignore[attr-defined]
 
@@ -67,18 +67,18 @@ def custom_models() -> SimpleNamespace:
         owner_id: Mapped[uuid.UUID] = mapped_column(sa.Uuid(as_uuid=True), sa.ForeignKey("user.id"), nullable=False)
         owner: Mapped[CustomUserModel] = relationship(CustomUserModel)  # type: ignore[valid-type]
 
-        def _can_read(self, current_user: AbstractUser | None) -> bool:
+        def _can_read(self, user: AbstractUser | None) -> bool:
             if self.is_public:
                 return True
-            return current_user is not None and current_user.id == self.owner_id
+            return user is not None and user.id == self.owner_id
 
-        def _can_write(self, current_user: AbstractUser | None) -> bool:
-            return current_user is not None and current_user.id == self.owner_id
+        def _can_write(self, user: AbstractUser | None) -> bool:
+            return user is not None and user.id == self.owner_id
 
-        def _can_create(self, current_user: AbstractUser | None) -> bool:
-            if not current_user:
+        def _can_create(self, user: AbstractUser | None) -> bool:
+            if not user:
                 return False
-            owner = db.session.get(CustomUserModel, current_user.id)
+            owner = db.session.get(CustomUserModel, user.id)
             return owner.is_verified if owner else False  # type: ignore[attr-defined]
 
     return SimpleNamespace(CustomUserModel=CustomUserModel, Note=Note, Document=Document)

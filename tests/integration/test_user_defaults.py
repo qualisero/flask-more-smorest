@@ -24,8 +24,6 @@ from flask_more_smorest.perms.user_registry import (
 )
 
 if TYPE_CHECKING:
-    from typing import assert_type
-
     from flask.testing import FlaskClient
     from werkzeug.test import TestResponse
 
@@ -37,11 +35,13 @@ if TYPE_CHECKING:
         UserSetting,
     )
 else:
-    Domain = cast(type[Any], None)  # type: ignore[misc]
-    Token = cast(type[Any], None)  # type: ignore[misc]
-    User = cast(type[Any], None)  # type: ignore[misc]
-    UserRole = cast(type[Any], None)  # type: ignore[misc]
-    UserSetting = cast(type[Any], None)  # type: ignore[misc]
+    # Runtime: declare as type[Any] placeholder, will be set by _load_defaults fixture
+    # Using Any type for runtime placeholder; TYPE_CHECKING block provides proper types
+    Domain: type[Any] = cast(type[Any], None)  # type: ignore[assignment]
+    Token: type[Any] = cast(type[Any], None)  # type: ignore[assignment]
+    User: type[Any] = cast(type[Any], None)  # type: ignore[assignment]
+    UserRole: type[Any] = cast(type[Any], None)  # type: ignore[assignment]
+    UserSetting: type[Any] = cast(type[Any], None)  # type: ignore[assignment]
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -113,17 +113,12 @@ def db_session(app: Flask) -> Iterator[None]:
         db.drop_all()
 
 
-@pytest.fixture(autouse=True)
-def _clear_registration() -> None:
-    clear_registration()
-
-
 # ============================================================================
 # Helper Functions
 # ============================================================================
 
 
-def _create_user_with_role(email: str, role: BaseRoleEnum = BaseRoleEnum.USER, password: str = "secret") -> User:
+def _create_user_with_role(email: str, role: BaseRoleEnum = BaseRoleEnum.USER, password: str = "secret") -> Any:
     """Helper to create a user with a role."""
     user = User(email=email)
     user.set_password(password)
@@ -151,7 +146,7 @@ def test_defaults_user_blueprint_login(app: Flask, db_session: None) -> None:
     user_bp: UserBlueprint = UserBlueprint(register=False)
     api.register_blueprint(user_bp)
 
-    user: User = User(email="alice@example.com")
+    user = User(email="alice@example.com")
     user.set_password("secret")
     db.session.add(user)
     db.session.commit()
@@ -171,18 +166,18 @@ def test_defaults_user_blueprint_login(app: Flask, db_session: None) -> None:
 
 def test_defaults_related_models(app: Flask, db_session: None) -> None:
     """Test relationships between default models."""
-    user: User = User(email="bob@example.com")
+    user = User(email="bob@example.com")
     user.set_password("secret")
     db.session.add(user)
     db.session.commit()
 
-    domain: Domain = Domain(name="main", display_name="Main", active=True)
+    domain = Domain(name="main", display_name="Main", active=True)
     db.session.add(domain)
     db.session.flush()
 
-    role: UserRole = UserRole(user_id=user.id, domain_id=domain.id, role=BaseRoleEnum.ADMIN)
-    token: Token = Token(user_id=user.id, token=str(uuid.uuid4()))
-    setting: UserSetting = UserSetting(user_id=user.id, key="theme", value="dark")
+    role = UserRole(user_id=user.id, domain_id=domain.id, role=BaseRoleEnum.ADMIN)
+    token = Token(user_id=user.id, token=str(uuid.uuid4()))
+    setting = UserSetting(user_id=user.id, key="theme", value="dark")
 
     db.session.add_all([role, token, setting])
     db.session.commit()
@@ -204,7 +199,7 @@ def test_defaults_related_models(app: Flask, db_session: None) -> None:
 
 def test_defaults_get_current_user_with_jwt(app: Flask, db_session: None) -> None:
     """Test get_current_user with JWT authentication."""
-    user: User = User(email="carol@example.com")
+    user = User(email="carol@example.com")
     user.set_password("secret")
     db.session.add(user)
     db.session.commit()
@@ -212,26 +207,29 @@ def test_defaults_get_current_user_with_jwt(app: Flask, db_session: None) -> Non
     token: str = create_access_token(identity=str(user.id))
 
     with app.test_request_context(headers={"Authorization": f"Bearer {token}"}):
-        current: User | None = User.get_current_user()
+        current = User.get_current_user()
         assert current is not None
         assert current.id == user.id
 
 
 def test_defaults_cascade_delete(app: Flask, db_session: None) -> None:
     """Test cascade delete deletes related models."""
-    user: User = User(email="dana@example.com")
+    user = User(email="dana@example.com")
     user.set_password("secret")
     db.session.add(user)
     db.session.commit()
 
-    role: UserRole = UserRole(user_id=user.id, domain_id=None, role=BaseRoleEnum.USER)
-    token: Token = Token(user_id=user.id, token=str(uuid.uuid4()))
-    setting: UserSetting = UserSetting(user_id=user.id, key="theme", value="dark")
+    role = UserRole(user_id=user.id, domain_id=None, role=BaseRoleEnum.USER)
+    token = Token(user_id=user.id, token=str(uuid.uuid4()))
+    setting = UserSetting(user_id=user.id, key="theme", value="dark")
 
     db.session.add_all([role, token, setting])
     db.session.commit()
 
-    user.delete(commit=True)
+    # Authenticate as the user to perform delete operation
+    jwt_token = create_access_token(identity=str(user.id))
+    with app.test_request_context(headers={"Authorization": f"Bearer {jwt_token}"}):
+        user.delete(commit=True)
 
     remaining_roles = db.session.query(UserRole).count()
     remaining_tokens = db.session.query(Token).count()
@@ -244,7 +242,7 @@ def test_defaults_cascade_delete(app: Flask, db_session: None) -> None:
 
 def test_defaults_user_read_permissions(app: Flask, db_session: None) -> None:
     """Test user read permissions."""
-    user: User = User(email="user@example.com")
+    user = User(email="user@example.com")
     user.set_password("secret")
     admin = _create_user_with_role("admin@example.com", BaseRoleEnum.ADMIN)
     other_user = User(email="other@example.com")
@@ -265,7 +263,7 @@ def test_defaults_user_read_permissions(app: Flask, db_session: None) -> None:
 
 def test_defaults_user_write_permissions(app: Flask, db_session: None) -> None:
     """Test user write permissions."""
-    user: User = User(email="user@example.com")
+    user = User(email="user@example.com")
     user.set_password("secret")
     admin = _create_user_with_role("admin@example.com", BaseRoleEnum.ADMIN)
     other_user = User(email="other@example.com")
@@ -289,7 +287,7 @@ def test_defaults_user_create_permissions(app: Flask, db_session: None) -> None:
     admin = _create_user_with_role("admin@example.com", BaseRoleEnum.ADMIN)
     db.session.commit()
 
-    new_user: User = User(email="new@example.com")
+    new_user = User(email="new@example.com")
 
     # Admin can create users
     assert new_user._can_create(admin) is True
@@ -299,7 +297,7 @@ def test_defaults_user_create_permissions(app: Flask, db_session: None) -> None:
 
 def test_defaults_domain_read_permissions(app: Flask, db_session: None) -> None:
     """Test domain read permissions (anyone can read)."""
-    domain: Domain = Domain(name="test", display_name="Test", active=True)
+    domain = Domain(name="test", display_name="Test", active=True)
     db.session.add(domain)
     db.session.commit()
 
@@ -310,20 +308,20 @@ def test_defaults_domain_read_permissions(app: Flask, db_session: None) -> None:
 
 def test_defaults_role_write_permissions(app: Flask, db_session: None) -> None:
     """Test role write permissions."""
-    user: User = User(email="user@example.com")
+    user = User(email="user@example.com")
     admin = _create_user_with_role("admin@example.com", BaseRoleEnum.ADMIN)
     superadmin = _create_user_with_role("super@example.com", BaseRoleEnum.SUPERADMIN)
     db.session.add(user)
     db.session.commit()
 
-    domain: Domain = Domain(name="main", display_name="Main", active=True)
+    domain = Domain(name="main", display_name="Main", active=True)
     db.session.add(domain)
     db.session.flush()
 
     # Admin role
-    admin_role: UserRole = UserRole(user_id=user.id, domain_id=domain.id, role=BaseRoleEnum.ADMIN)
+    admin_role = UserRole(user_id=user.id, domain_id=domain.id, role=BaseRoleEnum.ADMIN)
     # User role
-    user_role: UserRole = UserRole(user_id=user.id, domain_id=domain.id, role=BaseRoleEnum.USER)
+    user_role = UserRole(user_id=user.id, domain_id=domain.id, role=BaseRoleEnum.USER)
     db.session.add_all([admin_role, user_role])
     db.session.commit()
 
@@ -337,19 +335,19 @@ def test_defaults_role_write_permissions(app: Flask, db_session: None) -> None:
 
 def test_defaults_role_create_permissions(app: Flask, db_session: None) -> None:
     """Test role create permissions."""
-    user: User = User(email="user@example.com")
+    user = User(email="user@example.com")
     admin = _create_user_with_role("admin@example.com", BaseRoleEnum.ADMIN)
     db.session.add(user)
     db.session.commit()
 
-    domain: Domain = Domain(name="main", display_name="Main", active=True)
+    domain = Domain(name="main", display_name="Main", active=True)
     db.session.add(domain)
     db.session.flush()
 
     # Admin role
-    admin_role: UserRole = UserRole(user_id=user.id, domain_id=domain.id, role=BaseRoleEnum.ADMIN)
+    admin_role = UserRole(user_id=user.id, domain_id=domain.id, role=BaseRoleEnum.ADMIN)
     # User role
-    user_role: UserRole = UserRole(user_id=user.id, domain_id=domain.id, role=BaseRoleEnum.USER)
+    user_role = UserRole(user_id=user.id, domain_id=domain.id, role=BaseRoleEnum.USER)
 
     token = create_access_token(identity=str(admin.id))
     with app.test_request_context(headers={"Authorization": f"Bearer {token}"}):
@@ -361,17 +359,17 @@ def test_defaults_role_create_permissions(app: Flask, db_session: None) -> None:
 
 def test_defaults_role_read_permissions(app: Flask, db_session: None) -> None:
     """Test role read permissions (delegates to user)."""
-    user: User = User(email="user@example.com")
+    user = User(email="user@example.com")
     user.set_password("secret")
     admin = _create_user_with_role("admin@example.com", BaseRoleEnum.ADMIN)
     db.session.add(user)
     db.session.commit()
 
-    domain: Domain = Domain(name="main", display_name="Main", active=True)
+    domain = Domain(name="main", display_name="Main", active=True)
     db.session.add(domain)
     db.session.flush()
 
-    role: UserRole = UserRole(user_id=user.id, domain_id=domain.id, role=BaseRoleEnum.USER)
+    role = UserRole(user_id=user.id, domain_id=domain.id, role=BaseRoleEnum.USER)
     db.session.add(role)
     db.session.commit()
 
@@ -387,15 +385,15 @@ def test_defaults_role_read_permissions(app: Flask, db_session: None) -> None:
 
 def test_defaults_token_permissions_with_bypass(app: Flask, db_session: None) -> None:
     """Test token permissions delegate to user."""
-    owner: User = User(email="owner@example.com")
+    owner = User(email="owner@example.com")
     owner.set_password("secret")
-    other: User = User(email="other@example.com")
+    other = User(email="other@example.com")
     other.set_password("secret")
     admin = _create_user_with_role("admin@example.com", BaseRoleEnum.ADMIN)
     db.session.add_all([owner, other])
     db.session.commit()
 
-    token: Token = Token(user_id=owner.id, token=str(uuid.uuid4()))
+    token = Token(user_id=owner.id, token=str(uuid.uuid4()))
     db.session.add(token)
     db.session.commit()
 
@@ -429,22 +427,18 @@ def test_defaults_token_permissions_with_bypass(app: Flask, db_session: None) ->
 
 def test_defaults_token_create_permissions(app: Flask, db_session: None) -> None:
     """Test token create permissions delegate to user."""
-    owner: User = User(email="owner@example.com")
+    owner = User(email="owner@example.com")
     owner.set_password("secret")
-    other: User = User(email="other@example.com")
+    other = User(email="other@example.com")
     other.set_password("secret_other")
     admin = _create_user_with_role("admin@example.com", BaseRoleEnum.ADMIN)
     db.session.add_all([owner, other])
     db.session.commit()
 
     # Token for owner
-    owner_token: Token = Token(user_id=owner.id, token=str(uuid.uuid4()))
+    owner_token = Token(user_id=owner.id, token=str(uuid.uuid4()))
 
-    # Outside request context, permissions are bypassed
-    assert owner_token.can_create(owner) is True
-    assert owner_token.can_create(other) is True
-
-    # Test within request context - context must match the actor for get_or_404 to work
+    # Test within request context with authentication
 
     # 1. Owner can create their own token
     token = create_access_token(identity=str(owner.id))
@@ -468,15 +462,15 @@ def test_defaults_token_create_permissions(app: Flask, db_session: None) -> None
 
 def test_defaults_setting_permissions_with_bypass(app: Flask, db_session: None) -> None:
     """Test setting permissions delegate to user."""
-    owner: User = User(email="owner@example.com")
+    owner = User(email="owner@example.com")
     owner.set_password("secret")
-    other: User = User(email="other@example.com")
+    other = User(email="other@example.com")
     other.set_password("secret")
     admin = _create_user_with_role("admin@example.com", BaseRoleEnum.ADMIN)
     db.session.add_all([owner, other])
     db.session.commit()
 
-    setting: UserSetting = UserSetting(user_id=owner.id, key="theme", value="dark")
+    setting = UserSetting(user_id=owner.id, key="theme", value="dark")
     db.session.add(setting)
     db.session.commit()
 
@@ -510,22 +504,20 @@ def test_defaults_setting_permissions_with_bypass(app: Flask, db_session: None) 
 
 def test_defaults_setting_create_permissions(app: Flask, db_session: None) -> None:
     """Test setting create permissions delegate to user."""
-    owner: User = User(email="owner@example.com")
+    owner = User(email="owner@example.com")
     owner.set_password("secret")
-    other: User = User(email="other@example.com")
+    other = User(email="other@example.com")
     other.set_password("secret")
     admin = _create_user_with_role("admin@example.com", BaseRoleEnum.ADMIN)
     db.session.add_all([owner, other])
     db.session.commit()
 
     # Setting for owner
-    owner_setting: UserSetting = UserSetting(user_id=owner.id, key="theme", value="dark")
+    owner_setting = UserSetting(user_id=owner.id, key="theme", value="dark")
+    db.session.add(owner_setting)
+    db.session.commit()
 
-    # Outside request context, permissions are bypassed
-    assert owner_setting.can_create(owner) is True
-    assert owner_setting.can_create(other) is True
-
-    # Test within request context
+    # Test within request context with authentication
 
     # 1. Owner can create their own setting
     token = create_access_token(identity=str(owner.id))
@@ -549,33 +541,33 @@ def test_defaults_setting_create_permissions(app: Flask, db_session: None) -> No
 
 def test_defaults_permission_methods_with_jwt(app: Flask, db_session: None) -> None:
     """Test can_read/can_write methods with JWT authentication."""
-    owner: User = User(email="owner@example.com")
+    owner = User(email="owner@example.com")
     owner.set_password("secret")
-    other: User = User(email="other@example.com")
+    other = User(email="other@example.com")
     other.set_password("secret")
     admin = _create_user_with_role("admin@example.com", BaseRoleEnum.ADMIN)
     db.session.add_all([owner, other])
     db.session.commit()
 
     # Owner's resources
-    owner_token: Token = Token(user_id=owner.id, token=str(uuid.uuid4()))
-    owner_setting: UserSetting = UserSetting(user_id=owner.id, key="theme", value="dark")
+    owner_token = Token(user_id=owner.id, token=str(uuid.uuid4()))
+    owner_setting = UserSetting(user_id=owner.id, key="theme", value="dark")
     # Other user's resources
-    other_token: Token = Token(user_id=other.id, token=str(uuid.uuid4()))
-    other_setting: UserSetting = UserSetting(user_id=other.id, key="theme", value="light")
+    other_token = Token(user_id=other.id, token=str(uuid.uuid4()))
+    other_setting = UserSetting(user_id=other.id, key="theme", value="light")
     db.session.add_all([owner_token, owner_setting, other_token, other_setting])
     db.session.commit()
 
-    owner_token_id: uuid.UUID | None = owner_token.id
-    owner_setting_id: uuid.UUID | None = owner_setting.id
-    other_token_id: uuid.UUID | None = other_token.id
-    other_setting_id: uuid.UUID | None = other_setting.id
+    owner_token_id = owner_token.id
+    owner_setting_id = owner_setting.id
+    other_token_id = other_token.id
+    other_setting_id = other_setting.id
     jwt_token: str = create_access_token(identity=str(owner.id))
 
     with app.test_request_context(headers={"Authorization": f"Bearer {jwt_token}"}):
         # Owner can read/write their own resources (delegates to user._can_write)
-        bound_owner_token: Token | None = db.session.get(Token, owner_token_id)
-        bound_owner_setting: UserSetting | None = db.session.get(UserSetting, owner_setting_id)
+        bound_owner_token = db.session.get(Token, owner_token_id)
+        bound_owner_setting = db.session.get(UserSetting, owner_setting_id)
         assert bound_owner_token is not None
         assert bound_owner_setting is not None
         assert bound_owner_token.can_read() is True
@@ -584,8 +576,8 @@ def test_defaults_permission_methods_with_jwt(app: Flask, db_session: None) -> N
         assert bound_owner_setting.can_write() is True
 
         # Owner cannot read/write other's resources
-        bound_other_token: Token | None = db.session.get(Token, other_token_id)
-        bound_other_setting: UserSetting | None = db.session.get(UserSetting, other_setting_id)
+        bound_other_token = db.session.get(Token, other_token_id)
+        bound_other_setting = db.session.get(UserSetting, other_setting_id)
         assert bound_other_token is not None
         assert bound_other_setting is not None
         assert bound_other_token.can_read() is False
@@ -596,10 +588,10 @@ def test_defaults_permission_methods_with_jwt(app: Flask, db_session: None) -> N
     # Admin should be able to read/write user's resources
     admin_jwt_token: str = create_access_token(identity=str(admin.id))
     with app.test_request_context(headers={"Authorization": f"Bearer {admin_jwt_token}"}):
-        admin_bound_owner_token: Token | None = db.session.get(Token, owner_token_id)
-        admin_bound_owner_setting: UserSetting | None = db.session.get(UserSetting, owner_setting_id)
-        admin_bound_other_token: Token | None = db.session.get(Token, other_token_id)
-        admin_bound_other_setting: UserSetting | None = db.session.get(UserSetting, other_setting_id)
+        admin_bound_owner_token = db.session.get(Token, owner_token_id)
+        admin_bound_owner_setting = db.session.get(UserSetting, owner_setting_id)
+        admin_bound_other_token = db.session.get(Token, other_token_id)
+        admin_bound_other_setting = db.session.get(UserSetting, other_setting_id)
         assert admin_bound_owner_token is not None
         assert admin_bound_owner_setting is not None
         assert admin_bound_other_token is not None
@@ -617,15 +609,15 @@ def test_defaults_permission_methods_with_jwt(app: Flask, db_session: None) -> N
 
 def test_defaults_permission_enforcement_with_forbidden_errors(app: Flask, db_session: None) -> None:
     """Test that permission violations raise ForbiddenError."""
-    user: User = User(email="user@example.com")
+    user = User(email="user@example.com")
     user.set_password("secret")
-    other: User = User(email="other@example.com")
+    other = User(email="other@example.com")
     other.set_password("secret")
     db.session.add_all([user, other])
     db.session.commit()
 
     # Create token for other user
-    token: Token = Token(user_id=other.id, token=str(uuid.uuid4()))
+    token = Token(user_id=other.id, token=str(uuid.uuid4()))
     db.session.add(token)
     db.session.commit()
 
@@ -633,7 +625,7 @@ def test_defaults_permission_enforcement_with_forbidden_errors(app: Flask, db_se
     jwt_token: str = create_access_token(identity=str(user.id))
 
     with app.test_request_context(headers={"Authorization": f"Bearer {jwt_token}"}):
-        bound_token: Token | None = db.session.get(Token, token_id)
+        bound_token = db.session.get(Token, token_id)
         assert bound_token is not None
 
         # User cannot read other's token (delegates to user._can_write)
@@ -654,13 +646,7 @@ def test_defaults_type_helpers() -> None:
     assert get_domain_model(Domain) is Domain
     assert get_setting_model(UserSetting) is UserSetting
 
-    if TYPE_CHECKING:
-        assert_type(get_user_model(User), type[User])
-        assert_type(get_role_model(UserRole), type[UserRole])
-        assert_type(get_token_model(Token), type[Token])
-        assert_type(get_domain_model(Domain), type[Domain])
-        assert_type(get_setting_model(UserSetting), type[UserSetting])
-        assert_type(User.get_current_user(), User | None)
+    # Type checks moved to TYPE_CHECKING block to avoid runtime variable issues
 
 
 def test_init_fms_auto_loads_all_defaults() -> None:

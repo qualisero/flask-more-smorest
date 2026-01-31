@@ -56,8 +56,8 @@ class AbstractUser(BasePermsModel):
             # Optional: custom fields only
             bio: Mapped[str | None] = mapped_column(sa.String(500))
 
-            def _can_write(self, current_user) -> bool:
-                return super()._can_write(current_user)
+            def _can_write(self, user) -> bool:
+                return super()._can_write(user)
 
         # Register with the system
         init_fms(user=CustomUser)
@@ -233,14 +233,13 @@ class AbstractUser(BasePermsModel):
         roles = self.roles
         return [r.role for r in roles]
 
-    def _can_read(self, current_user: Self | None) -> bool:
+    def _can_read(self, user: Self | None) -> bool:
         """Default read permission: users can read their own profile.
 
         Args:
-            current_user: The current authenticated user, or None
+            user: The current authenticated user, or None
         """
 
-        user = current_user
         if not user:
             return False
         try:

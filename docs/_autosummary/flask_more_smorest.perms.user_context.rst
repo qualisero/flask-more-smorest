@@ -19,5 +19,4 @@ flask\_more\_smorest.perms.user\_context
 
    .. autosummary::
    
-      UserProtocol
    

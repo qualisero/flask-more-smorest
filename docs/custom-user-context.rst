@@ -259,33 +259,28 @@ Different user models per tenant:
    def set_tenant():
        g.tenant_id = request.headers.get('X-Tenant-ID', 'default')
 
-Type Safety with UserProtocol
+Type Safety with AbstractUser
 ------------------------------
 
-Use ``UserProtocol`` for runtime type checking:
+Inherit from ``AbstractUser`` to ensure compatibility with all features:
 
 .. code-block:: python
 
-   from flask_more_smorest.perms import UserProtocol, get_current_user, ROLE_ADMIN, ROLE_SUPERADMIN
-   from typing import runtime_checkable
+   from flask_more_smorest.perms import AbstractUser, init_fms
 
-   @runtime_checkable
-   class MyUser(UserProtocol):
-       id: uuid.UUID
-       email: str
+   class MyUser(AbstractUser):
+       # Your custom fields
+       pass
 
-       def has_role(self, role: str) -> bool:
-           return self.role == role
+   # Registering your user class allows the system to use it for type checking and validation
+   init_fms(user=MyUser)
 
-       def list_roles(self) -> list[str]:
-           return [self.role] if self.role else []
-
-   # Now runtime checking works
+   # Runtime checking
    user = get_current_user()
-   if isinstance(user, UserProtocol):
-       print(f"User {user.email} is compliant with UserProtocol")
+   if isinstance(user, AbstractUser):
+       print(f"User {user.email} is a valid AbstractUser subclass")
    else:
-       print("Warning: User model doesn't implement UserProtocol")
+       print("Warning: User model should inherit from AbstractUser")
 
 
 Custom Role Checking

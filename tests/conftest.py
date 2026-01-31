@@ -14,10 +14,40 @@ from flask_more_smorest.perms import clear_registration
 
 @pytest.fixture(autouse=True)
 def _reset_perms_registry() -> Generator[None, None, None]:
-    """Reset perms registry between tests to avoid cross-test leakage."""
-    clear_registration()
+    """Reset perms registry between tests to avoid cross-test leakage.
+
+    Preserves global state set by init_fms() when called without app context,
+    ensuring models registered before app context are available during tests.
+    """
+    # Import registry internals to save global state
+    from flask_more_smorest.perms import user_registry
+
+    # Save current global state at start of test
+    saved_user_model = user_registry._user_model
+    saved_role_model = user_registry._role_model
+    saved_token_model = user_registry._token_model
+    saved_domain_model = user_registry._domain_model
+    saved_setting_model = user_registry._setting_model
+    saved_get_current_user_func = user_registry._get_current_user_func
+    saved_models_initialized = user_registry._models_initialized
+    saved_helpers_initialized = user_registry._helpers_initialized
+
     yield
+
+    # After test: clear everything
     clear_registration()
+
+    # Restore global state if it was previously initialized
+    # This ensures models registered by init_fms() persist across tests
+    if saved_models_initialized:
+        user_registry._user_model = saved_user_model
+        user_registry._role_model = saved_role_model
+        user_registry._token_model = saved_token_model
+        user_registry._domain_model = saved_domain_model
+        user_registry._setting_model = saved_setting_model
+        user_registry._get_current_user_func = saved_get_current_user_func
+        user_registry._models_initialized = saved_models_initialized
+        user_registry._helpers_initialized = saved_helpers_initialized
 
 
 @pytest.fixture(scope="module", autouse=True)

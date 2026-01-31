@@ -40,11 +40,11 @@ class Domain(AbstractDomain):
             return domain.id
         return None
 
-    def _can_read(self, current_user: Any) -> bool:
+    def _can_read(self, user: Any) -> bool:
         """Any user can read domains.
 
         Args:
-            current_user: The current authenticated user, or None (ignored for Domain)
+            user: The current authenticated user, or None (ignored for Domain)
         """
         return True
 
@@ -124,23 +124,23 @@ class UserRole(AbstractUserRole):
 
         super().__init__(domain_id=domain_id, role=role, **kwargs)
 
-    def _can_write(self, current_user: Any) -> bool:
+    def _can_write(self, user: Any) -> bool:
         """Permission check for modifying roles.
 
         Supports custom role enums by checking for elevated role names
         ('superadmin' or 'admin' in the role string).
 
         Args:
-            current_user: The current authenticated user, or None
+            user: The current authenticated user, or None
         """
         from ..user_context import ROLE_ADMIN, ROLE_SUPERADMIN
 
         try:
-            if not current_user:
+            if not user:
                 return False
 
             # Superadmins can modify any role
-            if current_user.has_role(ROLE_SUPERADMIN):
+            if user.has_role(ROLE_SUPERADMIN):
                 return True
 
             # Admins can only modify non-admin roles
@@ -148,28 +148,31 @@ class UserRole(AbstractUserRole):
             role_value = self._role.upper()
             is_elevated_role = "SUPERADMIN" in role_value or "ADMIN" in role_value
 
-            return not is_elevated_role and current_user.has_role(ROLE_ADMIN)
+            return not is_elevated_role and user.has_role(ROLE_ADMIN)
         except Exception:
             return False
 
-    def _can_create(self, current_user: Any) -> bool:
+    def _can_create(self, user: Any) -> bool:
         """Permission check for creating roles.
 
         Uses same logic as _can_write(): only superadmins can create
         admin/superadmin roles, admins can create other roles.
 
         Args:
-            current_user: The current authenticated user, or None
+            user: The current authenticated user, or None
         """
-        return self._can_write(current_user)
+        return self._can_write(user)
 
-    def _can_read(self, current_user: Any) -> bool:
+    def _can_read(self, user: Any) -> bool:
         """Permission check for reading roles.
 
+        Delegates to user.can_read() to properly apply admin bypass logic.
+
         Args:
-            current_user: The current authenticated user, or None
+            user: The current authenticated user, or None
         """
         try:
-            return self.user._can_read(current_user)
+            # Use can_read() instead of _can_read() to apply admin bypass logic
+            return self.user.can_read(user)
         except Exception:
             return True

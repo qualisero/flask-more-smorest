@@ -113,7 +113,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-__version__ = "0.10.2"
+__version__ = "0.10.3"
 __author__ = "Dave <david@qualisero.com>"
 __email__ = "david@qualisero.com"
 __description__ = "Enhanced Flask-Smorest blueprints with automatic CRUD operations and extensible user management"

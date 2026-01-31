@@ -28,8 +28,8 @@ class BasePermsModel(SQLABaseModel):
     Example:
         >>> class Article(BasePermsModel):
         ...     title: Mapped[str] = mapped_column(sa.String(200))
-        ...     def _can_write(self, current_user) -> bool:
-        ...         return current_user is not None and self.user_id == current_user.id
+        ...     def _can_write(self, user) -> bool:
+        ...         return user is not None and self.user_id == user.id
     """
 
     __abstract__ = True
@@ -62,7 +62,7 @@ class BasePermsModel(SQLABaseModel):
     def _should_bypass_perms(self) -> bool:
         return self.perms_disabled or not has_request_context()
 
-    def _check_admin_bypass(self, current_user: Any) -> bool:
+    def _check_admin_bypass(self, user: Any) -> bool:
         """Check if current operation should bypass due to admin privileges.
 
         Returns True if:
@@ -84,9 +84,7 @@ class BasePermsModel(SQLABaseModel):
         if getattr(self, "is_admin", False):
             return False
 
-        return current_user is not None and (
-            current_user.has_role(ROLE_ADMIN) or current_user.has_role(ROLE_SUPERADMIN)
-        )
+        return user is not None and (user.has_role(ROLE_ADMIN) or user.has_role(ROLE_SUPERADMIN))
 
     def _execute_permission_check(self, check_func: Callable[[], bool], operation: str) -> bool:
         """Execute permission check with consistent error handling.
@@ -110,59 +108,59 @@ class BasePermsModel(SQLABaseModel):
                 raise UnauthorizedError("User must be authenticated")
             raise e
 
-    def can_write(self, current_user: Any = None) -> bool:
+    def can_write(self, user: Any = None) -> bool:
         """Check if current user has write permission."""
 
-        if current_user is None:
+        if user is None:
             from .user_context import get_current_user
 
-            current_user = get_current_user()
+            user = get_current_user()
 
-        if self._check_admin_bypass(current_user):
+        if self._check_admin_bypass(user):
             return True
 
         if getattr(sa.inspect(self), "transient", False):
-            return self._execute_permission_check(lambda: self._can_create(current_user), "create")
+            return self._execute_permission_check(lambda: self._can_create(user), "create")
 
-        return self._execute_permission_check(lambda: self._can_write(current_user), "write")
+        return self._execute_permission_check(lambda: self._can_write(user), "write")
 
-    def can_read(self, current_user: Any = None) -> bool:
+    def can_read(self, user: Any = None) -> bool:
         """Check if current user has read permission."""
 
-        if current_user is None:
+        if user is None:
             from .user_context import get_current_user
 
-            current_user = get_current_user()
+            user = get_current_user()
 
-        if self._check_admin_bypass(current_user):
+        if self._check_admin_bypass(user):
             return True
 
         if self.id is None:
             return True  # type: ignore[unreachable]  # mypy false positive
 
-        return self._execute_permission_check(lambda: self._can_read(current_user), "read")
+        return self._execute_permission_check(lambda: self._can_read(user), "read")
 
-    def can_create(self, current_user: Any = None) -> bool:
+    def can_create(self, user: Any = None) -> bool:
         """Check if current user can create objects."""
 
-        if current_user is None:
+        if user is None:
             from .user_context import get_current_user
 
-            current_user = get_current_user()
+            user = get_current_user()
 
-        if self._check_admin_bypass(current_user):
+        if self._check_admin_bypass(user):
             return True
 
-        return self._execute_permission_check(lambda: self._can_create(current_user), "create")
+        return self._execute_permission_check(lambda: self._can_create(user), "create")
 
-    def _can_write(self, current_user: Any) -> bool:
+    def _can_write(self, user: Any) -> bool:
         """Internal permission check for write/update/delete operations.
 
         This method MUST be overridden by subclasses to define write permissions.
         It is called by the public `can_write()` and `delete()` methods.
 
         Args:
-            current_user: The currently authenticated user object (or None)
+            user: The currently authenticated user object (or None)
 
         Returns:
             bool: True if operation is allowed, False otherwise.
@@ -170,14 +168,14 @@ class BasePermsModel(SQLABaseModel):
         """
         return False
 
-    def _can_create(self, current_user: Any) -> bool:
+    def _can_create(self, user: Any) -> bool:
         """Internal permission check for creation operations.
 
         This method SHOULD be overridden by subclasses if create logic differs
         from default (allow all). It is called by `can_create()` and `save()`.
 
         Args:
-            current_user: The currently authenticated user object (or None)
+            user: The currently authenticated user object (or None)
 
         Returns:
             bool: True if creation is allowed, False otherwise.
@@ -185,20 +183,20 @@ class BasePermsModel(SQLABaseModel):
         """
         return True
 
-    def _can_read(self, current_user: Any) -> bool:
+    def _can_read(self, user: Any) -> bool:
         """Internal permission check for read operations.
 
         This method SHOULD be overridden by subclasses.
         It is called by `can_read()` and `get_by()`.
 
         Args:
-            current_user: The currently authenticated user object (or None)
+            user: The currently authenticated user object (or None)
 
         Returns:
             bool: True if read is allowed, False otherwise.
                   Defaults to calling `_can_write()` (if you can write, you can read).
         """
-        return self._can_write(current_user)
+        return self._can_write(user)
 
     def _check_permission(self, operation: str) -> None:
         """Ensure permissions exist before mutating resource.
@@ -256,8 +254,8 @@ class BasePermsModel(SQLABaseModel):
         Example:
             >>> def _get_permission_failure_reason(self, operation: str) -> str | None:
             ...     from .user_context import get_current_user
-            ...     current_user = get_current_user()
-            ...     if current_user is None:
+            ...     user = get_current_user()
+            ...     if user is None:
             ...         return "not authenticated"
             ...     if operation == "write" and self.published:
             ...         return "cannot modify published articles"
@@ -265,8 +263,8 @@ class BasePermsModel(SQLABaseModel):
         """
         from .user_context import get_current_user
 
-        current_user = get_current_user()
-        if current_user is None:
+        user = get_current_user()
+        if user is None:
             return "not authenticated"
         return None  # Generic "permission denied"
 
