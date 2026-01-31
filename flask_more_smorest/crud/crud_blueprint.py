@@ -567,6 +567,10 @@ class CRUDBlueprint(CRUDPaginationMixin, BlueprintOperationIdMixin, Blueprint):
         schema_cls: type[Schema] = config.schema_cls
 
         if CRUDMethod.INDEX in config.methods or CRUDMethod.POST in config.methods:
+            # Initialize variables to avoid "possibly unbound" errors
+            index_schema_class: type[Schema] | None = None
+            query_filter_schema: type[Schema] | None = None
+
             if CRUDMethod.INDEX in config.methods:
                 index_schema_candidate = config.methods[CRUDMethod.INDEX].get("schema", schema_cls)
                 index_schema_class = self._resolve_schema_class(
@@ -579,8 +583,8 @@ class CRUDBlueprint(CRUDPaginationMixin, BlueprintOperationIdMixin, Blueprint):
 
                 if CRUDMethod.INDEX in config.methods:
 
-                    @self.arguments(query_filter_schema, location="query", unknown=RAISE)
-                    @self.response(HTTPStatus.OK, index_schema_class(many=True))
+                    @self.arguments(query_filter_schema, location="query", unknown=RAISE)  # pyright: ignore[reportArgumentType]
+                    @self.response(HTTPStatus.OK, index_schema_class(many=True))  # type: ignore[misc]  # pyright: ignore[reportArgumentType, reportOptionalCall]
                     @self.paginate()
                     @self.doc(operationId=f"list{config.model_name}")
                     def get(

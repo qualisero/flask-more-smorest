@@ -60,7 +60,7 @@ class Api(ApiOrig):
 
         super().__init__(app, spec_kwargs=spec_kwargs)
 
-    def init_app(self, app: "Flask", *pargs: str, **kwargs: dict) -> None:
+    def init_app(self, app: "Flask", *pargs: Any, **kwargs: Any) -> None:
         """Initialize the API with a Flask application.
 
         Sets up OpenAPI security schemes and before_request handler
@@ -119,10 +119,11 @@ class Api(ApiOrig):
                     public_endpoint = getattr(fn, "_is_public", False)
                     admin_endpoint = getattr(fn, "_is_admin", False)
                     if hasattr(fn, "view_class"):
-                        public_endpoint |= getattr(fn.view_class, "_is_public", False)
-                        admin_endpoint |= getattr(fn.view_class, "_is_admin", False)
+                        view_class = getattr(fn, "view_class", None)  # pyright: ignore[reportFunctionMemberAccess]
+                        public_endpoint |= getattr(view_class, "_is_public", False)
+                        admin_endpoint |= getattr(view_class, "_is_admin", False)
                         # Handle MethodView classes:
-                        if actual_method := getattr(fn.view_class, request.method.lower(), None):
+                        if actual_method := getattr(view_class, request.method.lower(), None):  # pyright: ignore[reportFunctionMemberAccess]
                             public_endpoint |= getattr(actual_method, "_is_public", False)
                             admin_endpoint |= getattr(actual_method, "_is_admin", False)
                     if public_endpoint and not admin_endpoint:

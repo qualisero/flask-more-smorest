@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "flask-more-smorest"
-version = "0.10.3"
+version = "0.10.4"
 description = "Enhanced Flask-Smorest blueprints with automatic CRUD operations"
 authors = ["Dave <david@qualisero.com>"]
 maintainers = ["Dave <david@qualisero.com>"]
@@ -198,6 +198,7 @@ stubPath = "./stubs;./stubs/test_stubs"
 
 [[tool.pyright.executionEnvironments]]
 root = "tests"
+extraPaths = ["."]
 reportUnknownMemberType = "none"
 reportUnknownVariableType = "none"
 reportUnknownArgumentType = "none"

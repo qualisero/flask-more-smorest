@@ -6,6 +6,7 @@ authenticated endpoints and permission-based views.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
@@ -44,7 +45,7 @@ def clear_registration() -> None:
 
 @contextmanager
 def as_user(
-    client: FlaskClient, user_id: str, additional_claims: dict[str, Any] | None = None
+    client: FlaskClient, user_id: str | uuid.UUID, additional_claims: dict[str, Any] | None = None
 ) -> Generator[None, None, None]:
     """Context manager to set JWT authentication for a user in test requests.
 
@@ -53,7 +54,7 @@ def as_user(
 
     Args:
         client: Flask test client
-        user_id: User ID to authenticate as (string representation of UUID)
+        user_id: User ID to authenticate as (string or UUID)
         additional_claims: Optional additional JWT claims to include in the token
 
     Yields:
@@ -72,7 +73,7 @@ def as_user(
             user.save()
 
             # Test authenticated endpoint
-            with as_user(client, str(user.id)):
+            with as_user(client, user.id):
                 response = client.get("/api/users/me/")
                 assert response.status_code == 200
                 assert response.json["email"] == "test@example.com"
@@ -81,7 +82,7 @@ def as_user(
 
     .. code-block:: python
 
-        with as_user(client, str(user.id), additional_claims={"custom_claim": "value"}):
+        with as_user(client, user.id, additional_claims={"custom_claim": "value"}):
             response = client.get("/api/users/me/")
             # Token will include custom_claim
 
@@ -93,7 +94,7 @@ def as_user(
     from flask_jwt_extended import create_access_token
 
     # Create token with user identity
-    token = create_access_token(identity=user_id, additional_claims=additional_claims or {})
+    token = create_access_token(identity=str(user_id), additional_claims=additional_claims or {})
 
     # Set authorization header for all requests within context
     # Note: Flask test client environ_base uses HTTP_ prefix for headers
@@ -113,7 +114,7 @@ def as_user(
 @contextmanager
 def as_admin(
     client: FlaskClient,
-    user_id: str,
+    user_id: str | uuid.UUID,
     additional_claims: dict[str, Any] | None = None,
     roles: list[str] | None = None,
 ) -> Generator[None, None, None]:
@@ -124,7 +125,7 @@ def as_admin(
 
     Args:
         client: Flask test client
-        user_id: Admin user ID to authenticate as (string representation of UUID)
+        user_id: Admin user ID to authenticate as (string or UUID)
         additional_claims: Optional additional JWT claims to include in the token
         roles: List of roles to assign (default: ["admin"]). Use ["superadmin"]
             for superadmin privileges.
@@ -147,7 +148,7 @@ def as_admin(
             admin.roles.append(UserRole(user=admin, role=BaseRoleEnum.ADMIN))
 
             # Test admin-only endpoint
-            with as_admin(client, str(admin.id)):
+            with as_admin(client, admin.id):
                 response = client.get("/api/users/")
                 assert response.status_code == 200
 
@@ -157,7 +158,7 @@ def as_admin(
 
         admin.roles.append(UserRole(user=admin, role=BaseRoleEnum.SUPERADMIN))
 
-        with as_admin(client, str(admin.id), roles=["superadmin"]):
+        with as_admin(client, admin.id, roles=["superadmin"]):
             response = client.delete("/api/users/123/")
             assert response.status_code == 204
 
@@ -172,7 +173,7 @@ def as_admin(
     merged_claims = {**(additional_claims or {}), "roles": roles or ["admin"]}
 
     # Create token with admin claims
-    token = create_access_token(identity=user_id, additional_claims=merged_claims)
+    token = create_access_token(identity=str(user_id), additional_claims=merged_claims)
 
     # Set authorization header for all requests within context
     # Note: Flask test client environ_base uses HTTP_ prefix for headers

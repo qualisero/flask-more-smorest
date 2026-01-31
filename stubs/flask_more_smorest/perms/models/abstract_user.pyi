@@ -14,7 +14,7 @@ class AbstractUser(BasePermsModel):
     __tablename__: str
     __table_args__: dict[str, Any]
 
-    id: UUID
+    id: Mapped[UUID]
     email: Mapped[str]
     password: Mapped[bytes | None]
     is_enabled: Mapped[bool]
