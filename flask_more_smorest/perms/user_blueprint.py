@@ -213,8 +213,9 @@ class UserBlueprint(PermsBlueprint):
         """Register the current user profile endpoint."""
         user_schema_cls: type[Schema] = self._config.schema_cls
 
-        @self.route("/me/", methods=["GET"])
+        @self.route("/me", methods=["GET"])
         @self.response(HTTPStatus.OK, user_schema_cls)
+        @self.doc(operationId="getUserMe")
         def get_current_user_profile() -> AbstractUser:
             """Get current authenticated user's profile."""
             from .user_context import get_current_user

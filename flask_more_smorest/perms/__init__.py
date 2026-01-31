@@ -92,7 +92,7 @@ __all__ = [
     "TimestampMixin",
     "UserBlueprint",
     "UserOwnershipMixin",
-    "UserSchema",
+    "UserSchema",  # pyright: ignore[reportUnsupportedDunderAll]
     "clear_registration",
     "get_current_user",
     "get_current_user_func",

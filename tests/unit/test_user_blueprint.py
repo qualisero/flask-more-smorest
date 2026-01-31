@@ -138,7 +138,7 @@ class TestUserBlueprintClass:
         # Check /me route is registered
         with unit_app.app_context():
             rules = [rule.rule for rule in unit_app.url_map.iter_rules()]
-            assert "/api/users/me/" in rules
+            assert "/api/users/me" in rules
 
     def test_user_blueprint_skip_methods(self, unit_app: Flask, api: Api, db_session: "scoped_session") -> None:
         """Test UserBlueprint skip_methods configuration."""

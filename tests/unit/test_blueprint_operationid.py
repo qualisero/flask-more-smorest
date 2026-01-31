@@ -57,7 +57,7 @@ class TestBlueprintOperationIdMixin:
                     return {"products": []}
 
             # Check that operationId was set
-            get_method = Products.get
+            get_method = Products.get  # type: ignore[reportFunctionMemberAccess]
             apidoc = getattr(get_method, "_apidoc", {})
             assert "manual_doc" in apidoc
             assert "operationId" in apidoc["manual_doc"]
@@ -79,7 +79,7 @@ class TestBlueprintOperationIdMixin:
                 def get(self) -> dict[str, list[Any]]:
                     return {"items": []}
 
-            get_method = Items.get
+            get_method = Items.get  # type: ignore[reportFunctionMemberAccess]
             apidoc = getattr(get_method, "_apidoc", {})
             assert "manual_doc" in apidoc
             assert apidoc["manual_doc"]["operationId"] == "listItems"
@@ -100,7 +100,7 @@ class TestBlueprintOperationIdMixin:
                 def get(self, product_id: int) -> dict[str, dict[str, Any]]:
                     return {"product": {}}
 
-            get_method = Product.get
+            get_method = Product.get  # type: ignore[reportFunctionMemberAccess]
             apidoc = getattr(get_method, "_apidoc", {})
             assert "manual_doc" in apidoc
             assert "operationId" in apidoc["manual_doc"]
@@ -122,7 +122,7 @@ class TestBlueprintOperationIdMixin:
                 def post(self) -> dict[str, dict[str, Any]]:
                     return {"product": {}}
 
-            post_method = Products.post
+            post_method = Products.post  # type: ignore[reportFunctionMemberAccess]
             apidoc = getattr(post_method, "_apidoc", {})
             assert "manual_doc" in apidoc
             assert "operationId" in apidoc["manual_doc"]
@@ -144,7 +144,7 @@ class TestBlueprintOperationIdMixin:
                 def patch(self, product_id: int) -> dict[str, dict[str, Any]]:
                     return {"product": {}}
 
-            patch_method = Product.patch
+            patch_method = Product.patch  # type: ignore[reportFunctionMemberAccess]
             apidoc = getattr(patch_method, "_apidoc", {})
             assert "manual_doc" in apidoc
             assert "operationId" in apidoc["manual_doc"]
@@ -166,7 +166,7 @@ class TestBlueprintOperationIdMixin:
                 def delete(self, product_id: int) -> tuple[str, int]:
                     return "", 204
 
-            delete_method = Product.delete
+            delete_method = Product.delete  # type: ignore[reportFunctionMemberAccess]
             apidoc = getattr(delete_method, "_apidoc", {})
             assert "manual_doc" in apidoc
             assert "operationId" in apidoc["manual_doc"]
@@ -188,7 +188,7 @@ class TestBlueprintOperationIdMixin:
                 def get(self, review_id: int) -> dict[str, dict[str, Any]]:
                     return {"review": {}}
 
-            get_method = ProductReview.get
+            get_method = ProductReview.get  # type: ignore[reportFunctionMemberAccess]
             apidoc = getattr(get_method, "_apidoc", {})
             assert "manual_doc" in apidoc
             assert "operationId" in apidoc["manual_doc"]
@@ -211,7 +211,7 @@ class TestBlueprintOperationIdMixin:
                 def get(self, product_id: int) -> dict[str, dict[str, Any]]:
                     return {"product": {}}
 
-            get_method = Product.get
+            get_method = Product.get  # type: ignore[reportFunctionMemberAccess]
             apidoc = getattr(get_method, "_apidoc", {})
             # Manual operationId should be preserved
             assert apidoc["manual_doc"]["operationId"] == "customGetProduct"
@@ -355,7 +355,7 @@ class TestCollectionDetectionLogic:
                 def get(self) -> dict[str, list[Any]]:
                     return {"users": []}
 
-            get_method = User.get
+            get_method = User.get  # type: ignore[reportFunctionMemberAccess]
             apidoc = getattr(get_method, "_apidoc", {})
             assert "manual_doc" in apidoc
             assert "operationId" in apidoc["manual_doc"]
@@ -378,7 +378,7 @@ class TestCollectionDetectionLogic:
                 def get(self, user_id: int) -> dict[str, dict[str, Any]]:
                     return {"user": {}}
 
-            get_method = Users.get
+            get_method = Users.get  # type: ignore[reportFunctionMemberAccess]
             apidoc = getattr(get_method, "_apidoc", {})
             assert "manual_doc" in apidoc
             assert "operationId" in apidoc["manual_doc"]
@@ -405,7 +405,7 @@ class TestCollectionDetectionLogic:
                 def get(self) -> dict[str, list[Any]]:
                     return {"items": []}
 
-            get_method = Item.get
+            get_method = Item.get  # type: ignore[reportFunctionMemberAccess]
             apidoc = getattr(get_method, "_apidoc", {})
             assert "manual_doc" in apidoc
             assert "operationId" in apidoc["manual_doc"]
@@ -428,7 +428,7 @@ class TestCollectionDetectionLogic:
                 def get(self) -> dict[str, list[Any]]:
                     return {"news": []}
 
-            get_method = News.get
+            get_method = News.get  # type: ignore[reportFunctionMemberAccess]
             apidoc = getattr(get_method, "_apidoc", {})
             assert "manual_doc" in apidoc
             assert "operationId" in apidoc["manual_doc"]
@@ -455,7 +455,7 @@ class TestCollectionDetectionLogic:
                 def get(self, product_id: str) -> dict[str, dict[str, Any]]:
                     return {"product": {}}
 
-            get_method = Product.get
+            get_method = Product.get  # type: ignore[reportFunctionMemberAccess]
             apidoc = getattr(get_method, "_apidoc", {})
             assert "manual_doc" in apidoc
             assert "operationId" in apidoc["manual_doc"]
@@ -478,7 +478,7 @@ class TestCollectionDetectionLogic:
                 def get(self) -> dict[str, list[Any]]:
                     return {"items": []}
 
-            get_method = Item.get
+            get_method = Item.get  # type: ignore[reportFunctionMemberAccess]
             apidoc = getattr(get_method, "_apidoc", {})
             assert "manual_doc" in apidoc
             assert "operationId" in apidoc["manual_doc"]
@@ -500,7 +500,7 @@ class TestCollectionDetectionLogic:
                 def post(self) -> dict[str, dict[str, Any]]:
                     return {"item": {}}
 
-            post_method = Item.post
+            post_method = Item.post  # type: ignore[reportFunctionMemberAccess]
             apidoc = getattr(post_method, "_apidoc", {})
             assert "manual_doc" in apidoc
             assert "operationId" in apidoc["manual_doc"]

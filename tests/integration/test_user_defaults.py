@@ -158,7 +158,7 @@ def test_defaults_user_blueprint_login(app: Flask, db_session: None) -> None:
     assert payload["token_type"] == "bearer"
 
     token: str = payload["access_token"]
-    me_resp: TestResponse = client.get("/api/users/me/", headers={"Authorization": f"Bearer {token}"})
+    me_resp: TestResponse = client.get("/api/users/me", headers={"Authorization": f"Bearer {token}"})
     assert me_resp.status_code == 200
     me = me_resp.get_json()
     assert me["email"] == "alice@example.com"
