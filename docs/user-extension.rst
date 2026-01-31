@@ -161,31 +161,22 @@ The system automatically provides:
 - ``is_current_user_superadmin()`` - Checks ``has_role('superadmin')``
 - ``list_roles()`` - Returns user's roles as strings (if implemented)
 
-**UserProtocol for Type Safety:**
+**Type Safety:**
 
-Your custom User model should implement ``UserProtocol`` for compatibility:
+Your custom User model should inherit from ``AbstractUser`` for type compatibility:
 
 .. code-block:: python
 
-   from flask_more_smorest.perms import UserProtocol, ROLE_ADMIN, ROLE_SUPERADMIN
-   from typing import runtime_checkable
+   from flask_more_smorest.perms import AbstractUser, ROLE_ADMIN, ROLE_SUPERADMIN
    import uuid
 
-   @runtime_checkable
-   class MyUser(UserProtocol):
-       id: uuid.UUID
-       email: str
-       roles: list[str] = []
-
-       def has_role(self, role: str) -> bool:
-           return role in self.roles
-
-       def list_roles(self) -> list[str]:
-           return list(self.roles)
+   class MyUser(AbstractUser):
+       # Your specific implementation
+       pass
 
    # Type checking works
    user: MyUser = get_current_user()
-   if isinstance(user, UserProtocol):
+   if isinstance(user, AbstractUser):
        print(f"User {user.email} is compliant")
 
 **Integration Examples:**

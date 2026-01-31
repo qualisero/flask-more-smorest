@@ -69,10 +69,10 @@ class User(AbstractUser):
             bio: Mapped[str | None] = mapped_column(db.String(500))
             age: Mapped[int | None] = mapped_column(db.Integer)
 
-            def _can_write(self, current_user) -> bool:
+            def _can_write(self, user) -> bool:
                 if self.age and self.age < 18:
                     return False  # Minors can't edit
-                return super()._can_write(current_user)
+                return super()._can_write(user)
 
             @property
             def is_adult(self) -> bool:
@@ -208,49 +208,49 @@ class User(AbstractUser):
         roles = self.roles
         return [r.role for r in roles]
 
-    def _can_read(self, current_user: Self | None) -> bool:
+    def _can_read(self, user: Self | None) -> bool:
         """Default read permission: users can read their own profile.
 
         Args:
-            current_user: The current authenticated user, or None
+            user: The current authenticated user, or None
         """
 
-        if not current_user:
+        if not user:
             return False
         try:
-            return self.id == current_user.id
+            return self.id == user.id
         except Exception:
             return False
 
-    def _can_write(self, current_user: Self | None) -> bool:
+    def _can_write(self, user: Self | None) -> bool:
         """Default write permission: users can edit their own profile.
 
         Args:
-            current_user: The current authenticated user, or None
+            user: The current authenticated user, or None
         """
-        if not current_user:
+        if not user:
             return False
 
         try:
-            if self.id == current_user.id:
+            if self.id == user.id:
                 return True
             if self.is_admin:
-                return current_user.is_superadmin
-            return current_user.is_admin
+                return user.is_superadmin
+            return user.is_admin
         except Exception:
             return False
 
-    def _can_create(self, current_user: Self | None) -> bool:
+    def _can_create(self, user: Self | None) -> bool:
         """Default create permission: admins can create users, or public registration if enabled.
 
         Args:
-            current_user: The current authenticated user, or None
+            user: The current authenticated user, or None
         """
         # Check if public registration is enabled on the class
         if getattr(self.__class__, "PUBLIC_REGISTRATION", False):
             return True
 
-        return current_user is not None and current_user.is_admin
+        return user is not None and user.is_admin
 
     # Concrete methods that use relationships - available to all User models
     @property

@@ -188,6 +188,20 @@ class UserBlueprint(PermsBlueprint):
             if not user.is_enabled:
                 raise UnauthorizedError("Account is disabled")
 
+            # Check domain access if domain is specified in login data
+            if domain_name := data.get("domain"):
+                from ..error.exceptions import NoDomainAccessError
+                from .user_registry import get_domain_model
+
+                # Get the registered Domain model
+                Domain = get_domain_model()
+                # Find domain by name (raises NotFoundError if not found)
+                domain = Domain.get_by_or_404(name=domain_name)
+
+                # Check if user has access to the domain
+                if not user.has_domain_access(domain.id):
+                    raise NoDomainAccessError()
+
             # Run custom validation hook
             self._validate_login(user, data)
 

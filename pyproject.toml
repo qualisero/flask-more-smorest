@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "flask-more-smorest"
-version = "0.10.2"
+version = "0.10.3"
 description = "Enhanced Flask-Smorest blueprints with automatic CRUD operations"
 authors = ["Dave <david@qualisero.com>"]
 maintainers = ["Dave <david@qualisero.com>"]
@@ -188,11 +188,12 @@ include = ["flask_more_smorest", "tests"]
 exclude = ["**/__pycache__", "**/.mypy_cache", "**/node_modules", "**/*.egg-info"]
 typeCheckingMode = "standard"
 reportIncompatibleMethodOverride = "warning"
-reportUnknownMemberType = "warning"
-reportUnknownVariableType = "warning"
-reportUnknownArgumentType = "warning"
-reportUnknownParameterType = "warning"
+reportUnknownMemberType = "none"
+reportUnknownVariableType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownParameterType = "none"
 reportAttributeAccessIssue = "warning"
+reportMissingTypeStubs = "none"
 stubPath = "./stubs;./stubs/test_stubs"
 
 [[tool.pyright.executionEnvironments]]

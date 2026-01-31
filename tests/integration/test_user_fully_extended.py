@@ -150,36 +150,36 @@ def custom_models() -> Iterator[SimpleNamespace]:
         visibility: Mapped[str] = mapped_column(sa.String(20), default="private", nullable=False)  # private/team/public
         owner_id: Mapped[uuid.UUID | None] = mapped_column(sa.Uuid(as_uuid=True), nullable=True)
 
-        def _can_read(self, current_user: CustomUser | None) -> bool:
+        def _can_read(self, user: CustomUser | None) -> bool:
             # Public domains are readable by anyone
             if self.visibility == "public" or self.is_public:
                 return True
             # Private/team domains require authentication
-            if current_user is None:
+            if user is None:
                 return False
             # Owner can always read
-            if self.owner_id and self.owner_id == current_user.id:
+            if self.owner_id and self.owner_id == user.id:
                 return True
             # Team visibility: any authenticated user in same domain can read
             if self.visibility == "team":
-                return current_user.has_domain_access(self.id)
+                return user.has_domain_access(self.id)
             # Otherwise requires ADMIN role
-            return current_user.has_role(CustomUserRoleEnum.ADMIN)
+            return user.has_role(CustomUserRoleEnum.ADMIN)
 
-        def _can_write(self, current_user: CustomUser | None) -> bool:
-            if current_user is None:
+        def _can_write(self, user: CustomUser | None) -> bool:
+            if user is None:
                 return False
             # Owner can write
-            if self.owner_id and self.owner_id == current_user.id:
+            if self.owner_id and self.owner_id == user.id:
                 return True
             # Otherwise requires ADMIN role
-            return current_user.has_role(CustomUserRoleEnum.ADMIN)
+            return user.has_role(CustomUserRoleEnum.ADMIN)
 
-        def _can_create(self, current_user: CustomUser | None) -> bool:
-            if current_user is None:
+        def _can_create(self, user: CustomUser | None) -> bool:
+            if user is None:
                 return False
             # Only admins or premium users can create domains
-            return current_user.has_role(CustomUserRoleEnum.ADMIN) or getattr(current_user, "is_premium", False)
+            return user.has_role(CustomUserRoleEnum.ADMIN) or getattr(user, "is_premium", False)
 
     class CustomUser(AbstractUser, ProfileMixin, TimestampMixin, SoftDeleteMixin):  # type: ignore[misc]
         """User with multiple mixins and custom fields for permission testing."""
@@ -220,35 +220,35 @@ def custom_models() -> Iterator[SimpleNamespace]:
         is_temporary: Mapped[bool] = mapped_column(sa.Boolean(), default=False, nullable=False)
         granted_by_id: Mapped[uuid.UUID | None] = mapped_column(sa.Uuid(as_uuid=True), nullable=True)
 
-        def _can_write(self, current_user: CustomUser | None) -> bool:
-            if current_user is None:
+        def _can_write(self, user: CustomUser | None) -> bool:
+            if user is None:
                 return False
             # Temporary roles can be removed by the user themselves
-            if self.is_temporary and self.user_id == current_user.id:
+            if self.is_temporary and self.user_id == user.id:
                 return True
             # Role granter can modify the role
-            if self.granted_by_id and self.granted_by_id == current_user.id:
+            if self.granted_by_id and self.granted_by_id == user.id:
                 return True
             # Otherwise requires ADMIN
-            return current_user.has_role(CustomUserRoleEnum.ADMIN)
+            return user.has_role(CustomUserRoleEnum.ADMIN)
 
-        def _can_read(self, current_user: CustomUser | None) -> bool:
-            if current_user is None:
+        def _can_read(self, user: CustomUser | None) -> bool:
+            if user is None:
                 return False
             # User can read their own roles
-            if self.user_id == current_user.id:
+            if self.user_id == user.id:
                 return True
             # Admins can read all roles
-            return current_user.has_role(CustomUserRoleEnum.ADMIN)
+            return user.has_role(CustomUserRoleEnum.ADMIN)
 
-        def _can_create(self, current_user: CustomUser | None) -> bool:
-            if current_user is None:
+        def _can_create(self, user: CustomUser | None) -> bool:
+            if user is None:
                 return False
             # Temporary roles can be self-assigned if trust level is high enough
-            if self.is_temporary and self.user_id == current_user.id:
-                return current_user.trust_level >= 3
+            if self.is_temporary and self.user_id == user.id:
+                return user.trust_level >= 3
             # Otherwise requires ADMIN
-            return current_user.has_role(CustomUserRoleEnum.ADMIN)
+            return user.has_role(CustomUserRoleEnum.ADMIN)
 
     class CustomToken(AbstractToken):
         """Token with custom fields affecting permissions."""
@@ -260,29 +260,29 @@ def custom_models() -> Iterator[SimpleNamespace]:
         is_revoked: Mapped[bool] = mapped_column(sa.Boolean(), default=False, nullable=False)
         scope: Mapped[str] = mapped_column(sa.String(50), default="full", nullable=False)  # full/readonly
 
-        def _can_read(self, current_user: CustomUser | None) -> bool:
-            if current_user is None:
+        def _can_read(self, user: CustomUser | None) -> bool:
+            if user is None:
                 return False
             # Owner can read their tokens
-            if self.user_id == current_user.id:
+            if self.user_id == user.id:
                 return True
             # Admins can read non-revoked tokens only
-            return current_user.has_role(CustomUserRoleEnum.ADMIN) and not self.is_revoked
+            return user.has_role(CustomUserRoleEnum.ADMIN) and not self.is_revoked
 
-        def _can_write(self, current_user: CustomUser | None) -> bool:
-            if current_user is None:
+        def _can_write(self, user: CustomUser | None) -> bool:
+            if user is None:
                 return False
             # Owner can write their own tokens
-            return self.user_id == current_user.id
+            return self.user_id == user.id
 
-        def _can_create(self, current_user: CustomUser | None) -> bool:
-            if current_user is None:
+        def _can_create(self, user: CustomUser | None) -> bool:
+            if user is None:
                 return False
             # Users can create their own tokens unless they're soft-deleted
-            if self.user_id == current_user.id:
-                return not current_user.is_deleted
+            if self.user_id == user.id:
+                return not user.is_deleted
             # Admins can create tokens for others
-            return current_user.has_role(CustomUserRoleEnum.ADMIN)
+            return user.has_role(CustomUserRoleEnum.ADMIN)
 
     class CustomUserSetting(AbstractUserSetting):
         """Setting with custom fields for permission control."""
@@ -293,69 +293,46 @@ def custom_models() -> Iterator[SimpleNamespace]:
         is_sensitive: Mapped[bool] = mapped_column(sa.Boolean(), default=False, nullable=False)
         is_system: Mapped[bool] = mapped_column(sa.Boolean(), default=False, nullable=False)
 
-        def _can_read(self, current_user: CustomUser | None) -> bool:
-            if current_user is None:
+        def _can_read(self, user: CustomUser | None) -> bool:
+            if user is None:
                 return False
             # Owner can read non-sensitive settings
-            if self.user_id == current_user.id:
+            if self.user_id == user.id:
                 if self.is_sensitive:
                     # Sensitive settings require premium or admin
-                    return current_user.is_premium or current_user.has_role(CustomUserRoleEnum.ADMIN)
+                    return user.is_premium or user.has_role(CustomUserRoleEnum.ADMIN)
                 return True
             # Admins can read non-system settings
-            return current_user.has_role(CustomUserRoleEnum.ADMIN) and not self.is_system
+            return user.has_role(CustomUserRoleEnum.ADMIN) and not self.is_system
 
-        def _can_write(self, current_user: CustomUser | None) -> bool:
-            if current_user is None:
+        def _can_write(self, user: CustomUser | None) -> bool:
+            if user is None:
                 return False
             # System settings can only be modified by superadmins
             if self.is_system:
-                return current_user.has_role(CustomUserRoleEnum.SUPERADMIN)
+                return user.has_role(CustomUserRoleEnum.SUPERADMIN)
             # Owner can write their own settings
-            if self.user_id == current_user.id:
+            if self.user_id == user.id:
                 return True
             # Admins can write non-system settings
-            return current_user.has_role(CustomUserRoleEnum.ADMIN)
+            return user.has_role(CustomUserRoleEnum.ADMIN)
 
-        def _can_create(self, current_user: CustomUser | None) -> bool:
-            if current_user is None:
+        def _can_create(self, user: CustomUser | None) -> bool:
+            if user is None:
                 return False
             # System settings can only be created by superadmins
             if self.is_system:
-                return current_user.has_role(CustomUserRoleEnum.SUPERADMIN)
+                return user.has_role(CustomUserRoleEnum.SUPERADMIN)
             # Users can create their own settings
-            if self.user_id == current_user.id:
+            if self.user_id == user.id:
                 return True
             # Admins can create settings for others
-            return current_user.has_role(CustomUserRoleEnum.ADMIN)
+            return user.has_role(CustomUserRoleEnum.ADMIN)
 
     class CustomUserBlueprint(UserBlueprint):
         """Custom blueprint with additional endpoints."""
 
         __module__ = module_name
-
-        def _register_current_user_endpoint(self) -> None:
-            super()._register_current_user_endpoint()
-
-            @self.route("/me/bio/", methods=["GET"])
-            def get_bio() -> dict[str, str | None]:
-                user = CustomUser.get_current_user()
-                if user is None:
-                    raise UnauthorizedError("Not authenticated")
-                return {"bio": user.bio}
-
-            @self.route("/me/profile/", methods=["GET"])
-            def get_profile() -> dict:
-                user = CustomUser.get_current_user()
-                if user is None:
-                    raise UnauthorizedError("Not authenticated")
-                return {
-                    "first_name": user.first_name,
-                    "last_name": user.last_name,
-                    "full_name": user.full_name,
-                    "display_name": user.display_name,
-                    "avatar_url": user.avatar_url,
-                }
 
     models = SimpleNamespace(
         CustomDomain=CustomDomain,
@@ -429,6 +406,15 @@ def test_fully_extended_models_and_blueprint(app: Flask, db_session: None, custo
 
     api: Api = Api(app)
     user_bp: CustomUserBlueprint = CustomUserBlueprint(register=False)  # type: ignore[valid-type]
+
+    # Add custom bio endpoint
+    @user_bp.route("/me/bio/", methods=["GET"])  # type: ignore[attr-defined]
+    def get_bio() -> dict[str, str | None]:
+        user = CustomUser.get_current_user()
+        if user is None:
+            raise UnauthorizedError("Not authenticated")
+        return {"bio": user.bio}
+
     api.register_blueprint(user_bp)
 
     user: CustomUser = CustomUser(email="anne@example.com", bio="Hello World")  # type: ignore[valid-type]
@@ -451,6 +437,21 @@ def test_custom_blueprint_profile_endpoint(app: Flask, db_session: None) -> None
     """Test custom profile endpoint with ProfileMixin fields."""
     api: Api = Api(app)
     user_bp: CustomUserBlueprint = CustomUserBlueprint(register=False)
+
+    # Add custom profile endpoint
+    @user_bp.route("/me/profile/", methods=["GET"])  # type: ignore[attr-defined]
+    def get_profile() -> dict:
+        user = CustomUser.get_current_user()
+        if user is None:
+            raise UnauthorizedError("Not authenticated")
+        return {
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "full_name": user.full_name,
+            "display_name": user.display_name,
+            "avatar_url": user.avatar_url,
+        }
+
     api.register_blueprint(user_bp)
 
     user: CustomUser = CustomUser(
@@ -941,8 +942,9 @@ def test_fully_extended_hard_delete_cascades(app: Flask, db_session: None) -> No
     db.session.add_all([role, token, setting])
     db.session.commit()
 
-    # Hard delete the user
-    user.delete(commit=True)
+    # Hard delete the user (bypass permission checks for testing cascade behavior)
+    with CustomUser.bypass_perms():
+        user.delete(commit=True)
 
     # All related records should be cascade deleted
     assert db.session.query(CustomUserRole).count() == 0
@@ -1001,7 +1003,8 @@ def test_fully_extended_hard_delete_after_soft_delete(app: Flask, db_session: No
     assert user.is_deleted is True
 
     # Then hard delete (should cascade)
-    user.delete(commit=True)
+    with CustomUser.bypass_perms():
+        user.delete(commit=True)
 
     # All related records should be cascade deleted
     assert db.session.query(CustomUserRole).count() == 0
@@ -1061,11 +1064,12 @@ def test_fully_extended_hard_delete_after_restore(app: Flask, db_session: None) 
     assert user.is_deleted is False
 
     # Hard delete should still cascade
-    user.delete(commit=True)  # type: ignore[unreachable]
+    with CustomUser.bypass_perms():  # type: ignore[unreachable]
+        user.delete(commit=True)
     assert db.session.query(CustomToken).count() == 0
 
 
-def test_fully_extended_current_user_typed(app: Flask, db_session: None) -> None:
+def test_fully_extended_user_typed(app: Flask, db_session: None) -> None:
     """Test current user retrieval with proper typing."""
     user: CustomUser = CustomUser(email="cara@example.com", bio="Bio")
     user.set_password("secret")
@@ -1142,9 +1146,9 @@ def test_fully_extended_type_helpers() -> None:
     assert expect_domain_model(CustomDomain) is CustomDomain
     assert expect_setting_model(CustomUserSetting) is CustomUserSetting
 
-    current_user: CustomUser | None = CustomUser.get_current_user()
-    if current_user is not None:
-        assert isinstance(current_user.bio, str | None)
+    user: CustomUser | None = CustomUser.get_current_user()
+    if user is not None:
+        assert isinstance(user.bio, str | None)
 
     if TYPE_CHECKING:
         assert_type(cast(type[CustomUser], expect_user_model(CustomUser)), type[CustomUser])

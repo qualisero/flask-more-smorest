@@ -37,7 +37,7 @@ def test_check_permission_raises_for_create(
 
     with app.app_context():
         instance = dummy_perms_model(name="value")
-        instance._can_create = lambda current_user: False  # type: ignore[method-assign]
+        instance._can_create = lambda user: False  # type: ignore[method-assign]
 
     with app.test_request_context("/"):
         with pytest.raises(ForbiddenError):
@@ -52,8 +52,8 @@ def test_can_write_uses_can_create_when_transient(
         instance = dummy_perms_model(name="value")
 
     called: list[str] = []
-    instance._can_create = lambda current_user: called.append("create") or True  # type: ignore[method-assign,func-returns-value]
-    instance._can_write = lambda current_user: False  # type: ignore[method-assign]
+    instance._can_create = lambda user: called.append("create") or True  # type: ignore[method-assign,func-returns-value]
+    instance._can_write = lambda user: False  # type: ignore[method-assign]
 
     def fake_inspect(obj: object) -> object:
         @dataclass
@@ -79,8 +79,8 @@ def test_can_write_uses_write_when_persisted(
         instance = dummy_perms_model(name="value")
 
     called: list[str] = []
-    instance._can_create = lambda current_user: False  # type: ignore[method-assign]
-    instance._can_write = lambda current_user: called.append("write") or True  # type: ignore[method-assign,func-returns-value]
+    instance._can_create = lambda user: False  # type: ignore[method-assign]
+    instance._can_write = lambda user: called.append("write") or True  # type: ignore[method-assign,func-returns-value]
 
     def fake_inspect(obj: object) -> object:
         @dataclass

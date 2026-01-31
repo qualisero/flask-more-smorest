@@ -65,26 +65,44 @@ _USER_REGISTRY_STATE_KEY = "user_registry"
 
 
 def _get_app_state() -> dict:
-    """Get app state from Flask extensions."""
+    """Get app state from Flask extensions.
+
+    Syncs with global state to ensure consistency when init_fms() is called
+    outside an app context but models are accessed inside one (e.g., in tests).
+    """
     from flask import current_app
 
     extensions_state = current_app.extensions.setdefault("flask-more-smorest", {})
-    return cast(
-        dict,
-        extensions_state.setdefault(
-            _USER_REGISTRY_STATE_KEY,
-            {
-                "user_model": _user_model,
-                "role_model": _role_model,
-                "token_model": _token_model,
-                "domain_model": _domain_model,
-                "setting_model": _setting_model,
-                "get_current_user_func": _get_current_user_func,
-                "models_initialized": _models_initialized,
-                "helpers_initialized": _helpers_initialized,
-            },
-        ),
+
+    # Get or create app state with initial values from global state
+    app_state = extensions_state.setdefault(
+        _USER_REGISTRY_STATE_KEY,
+        {
+            "user_model": _user_model,
+            "role_model": _role_model,
+            "token_model": _token_model,
+            "domain_model": _domain_model,
+            "setting_model": _setting_model,
+            "get_current_user_func": _get_current_user_func,
+            "models_initialized": _models_initialized,
+            "helpers_initialized": _helpers_initialized,
+        },
     )
+
+    # Sync from global if app state is uninitialized but global is initialized
+    # This handles case where init_fms() was called without app context,
+    # then app state was cleared (in tests), and now accessed with app context
+    if not app_state.get("models_initialized") and _models_initialized:
+        app_state["user_model"] = _user_model
+        app_state["role_model"] = _role_model
+        app_state["token_model"] = _token_model
+        app_state["domain_model"] = _domain_model
+        app_state["setting_model"] = _setting_model
+        app_state["get_current_user_func"] = _get_current_user_func
+        app_state["models_initialized"] = _models_initialized
+        app_state["helpers_initialized"] = _helpers_initialized
+
+    return cast(dict, app_state)
 
 
 def _get_state() -> tuple[dict, bool]:

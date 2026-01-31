@@ -8,8 +8,6 @@ import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import Mapped, backref, mapped_column, relationship, synonym
 
-from flask_more_smorest.error.exceptions import ForbiddenError
-
 if TYPE_CHECKING:
     from .models.user import User
 
@@ -161,33 +159,36 @@ class UserOwnershipMixin(HasUserMixin):
     __user_id_nullable__ = False
     __delegate_to_user__ = False
 
-    def _can_write(self, current_user: Any) -> bool:
+    def _can_write(self, user: Any) -> bool:
         if self.__delegate_to_user__:
-            return self.user._can_write(current_user)
-        return bool(current_user) and self.user_id == current_user.id
+            return self.user._can_write(user)
+        return bool(user) and self.user_id == user.id
 
-    def _can_read(self, current_user: Any) -> bool:
+    def _can_read(self, user: Any) -> bool:
         if self.__delegate_to_user__:
-            return self._can_write(current_user)
-        return bool(current_user) and self.user_id == current_user.id
+            return self._can_write(user)
+        return bool(user) and self.user_id == user.id
 
-    def _can_create(self, current_user: Any) -> bool:
+    def _can_create(self, user: Any) -> bool:
         if not self.__delegate_to_user__:
             return True
 
         if self.user_id:
+            from ..sqla import db
             from .user_registry import get_user_model
 
             UserModel = get_user_model()
 
-            try:
-                user = UserModel.get_or_404(self.user_id)
-            except ForbiddenError:
+            # Use db.session.get() instead of get_or_404() to avoid permission check
+            # during delegation. We don't need to verify read permission on the owner
+            # user - we only need to delegate the write permission check.
+            owner = db.session.get(UserModel, self.user_id)
+            if not owner:
                 return False
 
-            return user._can_write(current_user)
+            return owner._can_write(user)
 
-        return self._can_write(current_user)
+        return self._can_write(user)
 
 
 # Commonly used mixins for extending User models
