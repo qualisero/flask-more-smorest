@@ -42,6 +42,7 @@ flask-jwt-extended = "^4.6.0"
 bcrypt = "^4.1.0"
 werkzeug = "^3.0.0"
 alembic = "^1.13.0"
+inflect = ">=7.5.0,<9"
 
 [tool.poetry.group.dev.dependencies]
 # Testing
@@ -211,6 +212,7 @@ reportIncompatibleMethodOverride = "none"
 module = [
     "flask_smorest.*",
     "marshmallow_sqlalchemy.*",
+    "inflect.*",
 ]
 ignore_missing_imports = true
 
