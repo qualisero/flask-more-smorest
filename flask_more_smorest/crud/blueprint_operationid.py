@@ -317,8 +317,9 @@ class BlueprintOperationIdMixin(Blueprint):
             return f"{self._pluralise(parts[0])}By{parts[1]}"
 
         # If inflect considers it singular, pluralize it
-        if inflector.singular_noun(name) is False:
-            plural_form = inflector.plural_noun(name)
+        # pyright: ignore[reportArgumentType]
+        if inflector.singular_noun(name) is False:  # pyright: ignore[reportArgumentType]
+            plural_form = inflector.plural_noun(name)  # pyright: ignore[reportArgumentType]
             name = str(plural_form) if plural_form else name
         return name
 

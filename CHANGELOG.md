@@ -8,11 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **`strip_suffixes()` for class name normalisation** (`blueprint_operationid`):
-  Common boilerplate suffixes (`View`, `MethodView`, `Index`, `List`, `Collection`,
-  `V1`/`V2` and their `_v1`/`_v2` variants) are now stripped from MethodView class
-  names before the operationId is built.  A class named `UserListView` on `GET /users/`
-  now generates `listUsers` instead of `listUserListView`.
 
 - **Inflect-based pluralisation** (`blueprint_operationid`):
   Collection endpoints (trailing-slash or `many=True`) now produce properly pluralised
