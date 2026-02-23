@@ -8,7 +8,7 @@ from __future__ import annotations
 import enum
 import logging
 import uuid
-from typing import Self, TypeVar, cast
+from typing import TypeVar, cast
 
 from flask_jwt_extended import current_user as jwt_current_user
 from flask_jwt_extended import exceptions, verify_jwt_in_request
@@ -208,7 +208,7 @@ class User(AbstractUser):
         roles = self.roles
         return [r.role for r in roles]
 
-    def _can_read(self, user: Self | None) -> bool:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def _can_read(self, user: AbstractUser | None) -> bool:
         """Default read permission: users can read their own profile.
 
         Args:
@@ -222,7 +222,7 @@ class User(AbstractUser):
         except Exception:
             return False
 
-    def _can_write(self, user: Self | None) -> bool:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def _can_write(self, user: AbstractUser | None) -> bool:
         """Default write permission: users can edit their own profile.
 
         Args:
@@ -240,7 +240,7 @@ class User(AbstractUser):
         except Exception:
             return False
 
-    def _can_create(self, user: Self | None) -> bool:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def _can_create(self, user: AbstractUser | None) -> bool:
         """Default create permission: admins can create users, or public registration if enabled.
 
         Args:
