@@ -146,7 +146,7 @@ class UserRole(AbstractUserRole):
             # Admins can only modify non-admin roles
             # Check for elevated role names (uppercase) in stored role
             role_value = self._role.upper()
-            is_elevated_role = "SUPERADMIN" in role_value or "ADMIN" in role_value
+            is_elevated_role = ROLE_SUPERADMIN in role_value or ROLE_ADMIN in role_value
 
             return not is_elevated_role and user.has_role(ROLE_ADMIN)
         except Exception:

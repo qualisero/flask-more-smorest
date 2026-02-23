@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Inflect-based pluralisation** (`blueprint_operationid`):
+  Collection endpoints (trailing-slash or `many=True`) now produce properly pluralised
+  operationIds (`listUsers`, `listProjects`, `listNews`).  Handles irregular plurals,
+  already-plural words, and compound `FooByBar` names
+  (`AppointmentByRef` → `listAppointmentsByRef`).  Adds `inflect ≥ 7.5` as a runtime
+  dependency.
+
+- **`many=True` collection detection** (`blueprint_operationid`):
+  A GET endpoint whose `@bp.response()` decorator carries a schema with `many=True` is
+  now treated as a collection endpoint (`listXxx`) even when the path has no trailing
+  slash.
+
+- **`operation_id`, `operation_id_prefix`, `operation_id_suffix` on `route()`**:
+  Three new keyword arguments allow per-route customisation:
+  - `operation_id="myId"` — explicit full operationId for a function-based route.
+  - `operation_id_prefix="_deprecated_"` — prefix prepended to every auto-generated
+    operationId on a MethodView (useful for deprecation markers).
+  - `operation_id_suffix="_v2"` — suffix appended to every auto-generated operationId
+    on a MethodView (useful for API versioning).
+
+### Changed
+- **`BlueprintOperationIdMixin` architecture** (`blueprint_operationid`):
+  operationId injection is now performed inside the `_store_endpoint_docs` hook (after
+  all decorators have accumulated their metadata) rather than via `self.doc()` at
+  decoration time.  This makes the injection order-independent with respect to other
+  Flask-Smorest decorators and enables per-rule customisation for the same MethodView
+  registered at multiple routes.
+
+### Breaking Changes
+- **`PUT` now maps to `"set"` prefix** in `HTTP_METHOD_OPERATION_MAP` (was `"replace"`).
+  A `PUT /item/<id>` endpoint on `class Item(MethodView)` now generates `setItem`
+  instead of `replaceItem`.  Update any code that relied on the old `replace` prefix.
+
 ## [0.10.0] - 2026-01-26
 
 ### Added

@@ -1,508 +1,769 @@
-"""Unit tests for BlueprintOperationIdMixin."""
+"""Unit tests for BlueprintOperationIdMixin.
 
-# pyright: reportAttributeAccessIssue=false
+All tests that verify the generated operationId value use the full OpenAPI
+spec (via ``Api + api.spec.to_dict()``) rather than inspecting ``_apidoc``
+directly.  This matches the architecture of the new ``_store_endpoint_docs``
+implementation where operationIds land in ``blueprint._docs``, not on the
+decorated function itself.
+"""
 
+from http import HTTPStatus
 from typing import Any
 
+from flask import Flask
 from flask.views import MethodView
+from flask_smorest import Api
+from marshmallow import Schema, fields
 
 from flask_more_smorest.crud.blueprint_operationid import (
     HTTP_METHOD_OPERATION_MAP,
     BlueprintOperationIdMixin,
+    strip_suffixes,
 )
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
-class TestBlueprintOperationIdMixin:
-    """Tests for BlueprintOperationIdMixin class."""
 
-    def test_mixin_inheritance(self) -> None:
-        """Test that BlueprintOperationIdMixin inherits from Blueprint."""
+def make_app() -> Flask:
+    """Return a minimal Flask app configured for flask-smorest."""
+    app = Flask(__name__)
+    app.config.update(
+        {
+            "API_TITLE": "Test",
+            "API_VERSION": "v1",
+            "OPENAPI_VERSION": "3.0.2",
+        }
+    )
+    return app
+
+
+def get_op_id(bp: BlueprintOperationIdMixin, path: str, method: str = "get") -> str:
+    """Register *bp* and extract the operationId from the compiled spec.
+
+    Args:
+        bp: Blueprint to register.
+        path: Full path including ``url_prefix`` (e.g. ``"/api/users/"``).
+        method: Lowercase HTTP method.
+    """
+    app = make_app()
+    api = Api(app)
+    api.register_blueprint(bp)
+    spec = api.spec.to_dict()
+    return spec["paths"][path][method]["operationId"]
+
+
+def make_bp(name: str = "test", url_prefix: str = "/api") -> BlueprintOperationIdMixin:
+    """Create a fresh blueprint bound to a new Flask app context."""
+    return BlueprintOperationIdMixin(name, __name__, url_prefix=url_prefix)
+
+
+# ---------------------------------------------------------------------------
+# Structural / meta tests
+# ---------------------------------------------------------------------------
+
+
+class TestBlueprintMetadata:
+    """Basic structural checks."""
+
+    def test_inherits_from_flask_smorest_blueprint(self) -> None:
         from flask_smorest import Blueprint
 
         assert issubclass(BlueprintOperationIdMixin, Blueprint)
 
-    def test_route_method_exists(self) -> None:
-        """Test that route method exists and can be called."""
-        # Create a minimal mock app
-        from flask import Flask
-
+    def test_route_method_is_callable(self) -> None:
         app = Flask(__name__)
-
         with app.app_context():
             bp = BlueprintOperationIdMixin("test", __name__)
-            assert hasattr(bp, "route")
             assert callable(bp.route)
 
-    def test_default_operation_name_map_contains_common_methods(self) -> None:
-        """HTTP_METHOD_OPERATION_MAP includes verbs we rely on."""
+    def test_http_method_map_contains_expected_verbs(self) -> None:
         assert HTTP_METHOD_OPERATION_MAP["get"] == "get"
         assert HTTP_METHOD_OPERATION_MAP["post"] == "create"
         assert HTTP_METHOD_OPERATION_MAP["patch"] == "update"
+        assert HTTP_METHOD_OPERATION_MAP["delete"] == "delete"
+        assert HTTP_METHOD_OPERATION_MAP["put"] == "set"
 
-    def test_operation_id_generation_for_list_endpoint(self) -> None:
-        """Test operationId generation for list endpoints."""
-        from flask import Flask
 
-        app = Flask(__name__)
+# ---------------------------------------------------------------------------
+# strip_suffixes() unit tests
+# ---------------------------------------------------------------------------
 
-        with app.app_context():
-            bp = BlueprintOperationIdMixin("products", __name__)
 
-            # Define a MethodView class
-            @bp.route("/")
-            class Products(MethodView):
-                methods = ["GET"]
+class TestStripSuffixes:
+    """Tests for the strip_suffixes() utility function."""
 
+    def test_strip_view(self) -> None:
+        assert strip_suffixes("FeeEstimationView") == "FeeEstimation"
+
+    def test_strip_methodview(self) -> None:
+        assert strip_suffixes("ValuationMethodView") == "Valuation"
+
+    def test_strip_index(self) -> None:
+        assert strip_suffixes("AccreditationIndex") == "Accreditation"
+
+    def test_strip_list(self) -> None:
+        assert strip_suffixes("UserList") == "User"
+
+    def test_strip_collection(self) -> None:
+        assert strip_suffixes("UserAccreditationCollection") == "UserAccreditation"
+
+    def test_strip_v2(self) -> None:
+        assert strip_suffixes("UserAccreditationV2") == "UserAccreditation"
+
+    def test_strip_v1(self) -> None:
+        assert strip_suffixes("ExpertListV1") == "Expert"
+
+    def test_strip_compound_view_then_list(self) -> None:
+        """UserListView → first 'View' stripped → 'UserList' → then 'List' stripped → 'User'."""
+        assert strip_suffixes("UserListView") == "User"
+
+    def test_strip_compound_index_v2(self) -> None:
+        """AccreditationIndexV2 → 'V2' stripped → 'AccreditationIndex' → 'Index' stripped → 'Accreditation'."""
+        assert strip_suffixes("AccreditationIndexV2") == "Accreditation"
+
+    def test_no_matching_suffix_preserved(self) -> None:
+        assert strip_suffixes("UserFull") == "UserFull"
+        assert strip_suffixes("UserBasic") == "UserBasic"
+        assert strip_suffixes("UserDetails") == "UserDetails"
+
+    def test_name_equal_to_suffix_not_stripped(self) -> None:
+        """A name that IS the suffix (e.g. 'View') must not be reduced to ''."""
+        assert strip_suffixes("View") == "View"
+        assert strip_suffixes("List") == "List"
+
+
+# ---------------------------------------------------------------------------
+# MethodView operationId generation — spec-level assertions
+# ---------------------------------------------------------------------------
+
+
+class TestMethodViewOperationIds:
+    """Tests for MethodView-based routes using full spec assertions."""
+
+    def test_list_endpoint_with_trailing_slash(self) -> None:
+        """GET / with trailing slash → listProducts (pluralised)."""
+        with make_app().app_context():
+            bp = make_bp("products")
+
+            @bp.route("/products/")
+            class Product(MethodView):
                 def get(self) -> dict[str, list[Any]]:
                     return {"products": []}
 
-            # Check that operationId was set
-            get_method = Products.get  # type: ignore[reportFunctionMemberAccess]
-            apidoc = getattr(get_method, "_apidoc", {})
-            assert "manual_doc" in apidoc
-            assert "operationId" in apidoc["manual_doc"]
-            assert apidoc["manual_doc"]["operationId"] == "listProducts"
+            assert get_op_id(bp, "/api/products/") == "listProducts"
 
-    def test_operation_id_generation_handles_plural_class_names(self) -> None:
-        """Plural MethodView class names should drop the trailing 's'."""
-        from flask import Flask
+    def test_list_endpoint_already_plural_class(self) -> None:
+        """Already-plural class name → stays plural in list operationId."""
+        with make_app().app_context():
+            bp = make_bp()
 
-        app = Flask(__name__)
-
-        with app.app_context():
-            bp = BlueprintOperationIdMixin("items", __name__)
-
-            @bp.route("/")
+            @bp.route("/items/")
             class Items(MethodView):
-                methods = ["GET"]
-
                 def get(self) -> dict[str, list[Any]]:
                     return {"items": []}
 
-            get_method = Items.get  # type: ignore[reportFunctionMemberAccess]
-            apidoc = getattr(get_method, "_apidoc", {})
-            assert "manual_doc" in apidoc
-            assert apidoc["manual_doc"]["operationId"] == "listItems"
+            assert get_op_id(bp, "/api/items/") == "listItems"
 
-    def test_operation_id_generation_for_get_endpoint(self) -> None:
-        """Test operationId generation for GET single item endpoint."""
-        from flask import Flask
+    def test_get_single_item(self) -> None:
+        with make_app().app_context():
+            bp = make_bp()
 
-        app = Flask(__name__)
-
-        with app.app_context():
-            bp = BlueprintOperationIdMixin("products", __name__)
-
-            @bp.route("/<int:product_id>")
+            @bp.route("/product/<int:product_id>")
             class Product(MethodView):
-                methods = ["GET"]
+                def get(self, product_id: int) -> dict[str, Any]:
+                    return {}
 
-                def get(self, product_id: int) -> dict[str, dict[str, Any]]:
-                    return {"product": {}}
+            assert get_op_id(bp, "/api/product/{product_id}") == "getProduct"
 
-            get_method = Product.get  # type: ignore[reportFunctionMemberAccess]
-            apidoc = getattr(get_method, "_apidoc", {})
-            assert "manual_doc" in apidoc
-            assert "operationId" in apidoc["manual_doc"]
-            assert apidoc["manual_doc"]["operationId"] == "getProduct"
+    def test_post_endpoint(self) -> None:
+        with make_app().app_context():
+            bp = make_bp()
 
-    def test_operation_id_generation_for_post_endpoint(self) -> None:
-        """Test operationId generation for POST endpoint."""
-        from flask import Flask
-
-        app = Flask(__name__)
-
-        with app.app_context():
-            bp = BlueprintOperationIdMixin("products", __name__)
-
-            @bp.route("/")
-            class Products(MethodView):
-                methods = ["POST"]
-
-                def post(self) -> dict[str, dict[str, Any]]:
-                    return {"product": {}}
-
-            post_method = Products.post  # type: ignore[reportFunctionMemberAccess]
-            apidoc = getattr(post_method, "_apidoc", {})
-            assert "manual_doc" in apidoc
-            assert "operationId" in apidoc["manual_doc"]
-            assert apidoc["manual_doc"]["operationId"] == "createProducts"
-
-    def test_operation_id_generation_for_patch_endpoint(self) -> None:
-        """Test operationId generation for PATCH endpoint."""
-        from flask import Flask
-
-        app = Flask(__name__)
-
-        with app.app_context():
-            bp = BlueprintOperationIdMixin("products", __name__)
-
-            @bp.route("/<int:product_id>")
+            @bp.route("/products/")
             class Product(MethodView):
-                methods = ["PATCH"]
+                def post(self) -> dict[str, Any]:
+                    return {}
 
-                def patch(self, product_id: int) -> dict[str, dict[str, Any]]:
-                    return {"product": {}}
+            assert get_op_id(bp, "/api/products/", method="post") == "createProduct"
 
-            patch_method = Product.patch  # type: ignore[reportFunctionMemberAccess]
-            apidoc = getattr(patch_method, "_apidoc", {})
-            assert "manual_doc" in apidoc
-            assert "operationId" in apidoc["manual_doc"]
-            assert apidoc["manual_doc"]["operationId"] == "updateProduct"
+    def test_patch_endpoint(self) -> None:
+        with make_app().app_context():
+            bp = make_bp()
 
-    def test_operation_id_generation_for_delete_endpoint(self) -> None:
-        """Test operationId generation for DELETE endpoint."""
-        from flask import Flask
-
-        app = Flask(__name__)
-
-        with app.app_context():
-            bp = BlueprintOperationIdMixin("products", __name__)
-
-            @bp.route("/<int:product_id>")
+            @bp.route("/product/<int:product_id>", methods=["PATCH"])
             class Product(MethodView):
-                methods = ["DELETE"]
+                def patch(self, product_id: int) -> dict[str, Any]:
+                    return {}
 
+            assert get_op_id(bp, "/api/product/{product_id}", method="patch") == "updateProduct"
+
+    def test_delete_endpoint(self) -> None:
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/product/<int:product_id>", methods=["DELETE"])
+            class Product(MethodView):
                 def delete(self, product_id: int) -> tuple[str, int]:
                     return "", 204
 
-            delete_method = Product.delete  # type: ignore[reportFunctionMemberAccess]
-            apidoc = getattr(delete_method, "_apidoc", {})
-            assert "manual_doc" in apidoc
-            assert "operationId" in apidoc["manual_doc"]
-            assert apidoc["manual_doc"]["operationId"] == "deleteProduct"
+            assert get_op_id(bp, "/api/product/{product_id}", method="delete") == "deleteProduct"
 
-    def test_operation_id_with_snake_case_class_name(self) -> None:
-        """Test operationId generation with snake_case class name."""
-        from flask import Flask
+    def test_put_maps_to_set(self) -> None:
+        """PUT uses 'set' prefix (was 'replace' in previous versions)."""
+        with make_app().app_context():
+            bp = make_bp()
 
-        app = Flask(__name__)
+            @bp.route("/request/<int:id>/expert", methods=["PUT"])
+            class RequestExpert(MethodView):
+                def put(self, id: int) -> dict[str, Any]:
+                    return {}
 
-        with app.app_context():
-            bp = BlueprintOperationIdMixin("product_reviews", __name__)
+            assert get_op_id(bp, "/api/request/{id}/expert", method="put") == "setRequestExpert"
 
-            @bp.route("/<int:review_id>")
+    def test_camel_case_class_name(self) -> None:
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/product-review/<int:review_id>")
             class ProductReview(MethodView):
-                methods = ["GET"]
+                def get(self, review_id: int) -> dict[str, Any]:
+                    return {}
 
-                def get(self, review_id: int) -> dict[str, dict[str, Any]]:
-                    return {"review": {}}
+            assert get_op_id(bp, "/api/product-review/{review_id}") == "getProductReview"
 
-            get_method = ProductReview.get  # type: ignore[reportFunctionMemberAccess]
-            apidoc = getattr(get_method, "_apidoc", {})
-            assert "manual_doc" in apidoc
-            assert "operationId" in apidoc["manual_doc"]
-            assert apidoc["manual_doc"]["operationId"] == "getProductReview"
+    def test_manual_doc_operationid_not_overridden(self) -> None:
+        """@bp.doc(operationId=...) takes priority over auto-generation."""
+        with make_app().app_context():
+            bp = make_bp()
 
-    def test_manual_operation_id_not_overridden(self) -> None:
-        """Test that manually set operationId is not overridden."""
-        from flask import Flask
-
-        app = Flask(__name__)
-
-        with app.app_context():
-            bp = BlueprintOperationIdMixin("products", __name__)
-
-            @bp.route("/<int:product_id>")
+            @bp.route("/product/<int:product_id>")
             class Product(MethodView):
-                methods = ["GET"]
-
                 @bp.doc(operationId="customGetProduct")
-                def get(self, product_id: int) -> dict[str, dict[str, Any]]:
-                    return {"product": {}}
+                def get(self, product_id: int) -> dict[str, Any]:
+                    return {}
 
-            get_method = Product.get  # type: ignore[reportFunctionMemberAccess]
-            apidoc = getattr(get_method, "_apidoc", {})
-            # Manual operationId should be preserved
-            assert apidoc["manual_doc"]["operationId"] == "customGetProduct"
+            assert get_op_id(bp, "/api/product/{product_id}") == "customGetProduct"
 
-    def test_operation_id_for_function_route(self) -> None:
-        """Test operationId generation for function-based routes."""
-        from flask import Flask
 
-        app = Flask(__name__)
+# ---------------------------------------------------------------------------
+# strip_suffixes applied to MethodView class names
+# ---------------------------------------------------------------------------
 
-        with app.app_context():
-            bp = BlueprintOperationIdMixin("test", __name__)
+
+class TestSuffixStrippingInOperationIds:
+    """Verify strip_suffixes affects the generated operationId."""
+
+    def test_view_suffix_stripped(self) -> None:
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/estimate")
+            class FeeEstimationView(MethodView):
+                def get(self) -> dict[str, Any]:
+                    return {}
+
+            assert get_op_id(bp, "/api/estimate") == "getFeeEstimation"
+
+    def test_v2_suffix_stripped(self) -> None:
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/accred/<int:id>")
+            class UserAccreditationV2(MethodView):
+                def get(self, id: int) -> dict[str, Any]:
+                    return {}
+
+            assert get_op_id(bp, "/api/accred/{id}") == "getUserAccreditation"
+
+    def test_list_suffix_stripped_on_collection(self) -> None:
+        """UserList on /users/ → strip 'List' → User → listUsers."""
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/users/")
+            class UserList(MethodView):
+                def get(self) -> list[Any]:
+                    return []
+
+            assert get_op_id(bp, "/api/users/") == "listUsers"
+
+    def test_compound_suffix_stripped(self) -> None:
+        """AccreditationIndexV2 → 'V2' then 'Index' stripped → Accreditation."""
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/accred/<int:user_id>/<int:accred_id>")
+            class AccreditationIndexV2(MethodView):
+                def get(self, user_id: int, accred_id: int) -> dict[str, Any]:
+                    return {}
+
+            assert get_op_id(bp, "/api/accred/{user_id}/{accred_id}") == "getAccreditation"
+
+    def test_list_view_compound_suffix(self) -> None:
+        """UserListView → 'View' then 'List' stripped → User."""
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/user/<int:id>")
+            class UserListView(MethodView):
+                def get(self, id: int) -> dict[str, Any]:
+                    return {}
+
+            assert get_op_id(bp, "/api/user/{id}") == "getUser"
+
+    def test_post_with_stripped_suffix(self) -> None:
+        """POST on a class with Index suffix → createXxx (not createXxxIndex)."""
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/users/")
+            class UserIndex(MethodView):
+                def post(self) -> dict[str, Any]:
+                    return {}
+
+            assert get_op_id(bp, "/api/users/", method="post") == "createUser"
+
+
+# ---------------------------------------------------------------------------
+# Pluralisation tests
+# ---------------------------------------------------------------------------
+
+
+class TestPluralisation:
+    """Tests for the _pluralise() method via generated operationIds."""
+
+    def test_singular_class_pluralised(self) -> None:
+        """User → Users → listUsers."""
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/users/")
+            class User(MethodView):
+                def get(self) -> list[Any]:
+                    return []
+
+            assert get_op_id(bp, "/api/users/") == "listUsers"
+
+    def test_already_plural_unchanged(self) -> None:
+        """Items is already plural → listItems (not listItemss)."""
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/items/")
+            class Items(MethodView):
+                def get(self) -> list[Any]:
+                    return []
+
+            assert get_op_id(bp, "/api/items/") == "listItems"
+
+    def test_invariant_plural_unchanged(self) -> None:
+        """News is invariant plural → listNews."""
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/news/")
+            class News(MethodView):
+                def get(self) -> list[Any]:
+                    return []
+
+            assert get_op_id(bp, "/api/news/") == "listNews"
+
+    def test_foobybar_compound_pluralisation(self) -> None:
+        """AppointmentByRef → AppointmentsByRef (only prefix part pluralised)."""
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/appt/")
+            class AppointmentByRef(MethodView):
+                def get(self) -> list[Any]:
+                    return []
+
+            assert get_op_id(bp, "/api/appt/") == "listAppointmentsByRef"
+
+    def test_compound_name_pluralised(self) -> None:
+        """ProjectList (after stripping 'List' → 'Project') → listProjects."""
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/projects/")
+            class ProjectList(MethodView):
+                def get(self) -> list[Any]:
+                    return []
+
+            assert get_op_id(bp, "/api/projects/") == "listProjects"
+
+    def test_non_get_method_not_pluralised(self) -> None:
+        """POST on a collection does NOT pluralise the name."""
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/items/")
+            class Item(MethodView):
+                def post(self) -> dict[str, Any]:
+                    return {}
+
+            assert get_op_id(bp, "/api/items/", method="post") == "createItem"
+
+
+# ---------------------------------------------------------------------------
+# Collection detection: many=True from response schema
+# ---------------------------------------------------------------------------
+
+
+class TestManyTrueDetection:
+    """Verify that many=True on response schema triggers list operationId."""
+
+    def test_many_true_without_trailing_slash(self) -> None:
+        """No trailing slash but many=True on response → listXxx."""
+
+        class ItemSchema(Schema):
+            name = fields.Str()
+
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/items")
+            class Item(MethodView):
+                @bp.response(HTTPStatus.OK, ItemSchema(many=True))
+                def get(self) -> list[Any]:
+                    return []
+
+            assert get_op_id(bp, "/api/items") == "listItems"
+
+    def test_many_true_with_trailing_slash(self) -> None:
+        """Trailing slash takes precedence; many=True is additive confirmation."""
+
+        class UserSchema(Schema):
+            name = fields.Str()
+
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/users/")
+            class User(MethodView):
+                @bp.response(HTTPStatus.OK, UserSchema(many=True))
+                def get(self) -> list[Any]:
+                    return []
+
+            assert get_op_id(bp, "/api/users/") == "listUsers"
+
+    def test_many_false_without_trailing_slash_gives_get(self) -> None:
+        """many=False (scalar schema) + no trailing slash → getXxx."""
+
+        class UserSchema(Schema):
+            name = fields.Str()
+
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/user/<int:id>")
+            class User(MethodView):
+                @bp.response(HTTPStatus.OK, UserSchema())
+                def get(self, id: int) -> dict[str, Any]:
+                    return {}
+
+            assert get_op_id(bp, "/api/user/{id}") == "getUser"
+
+    def test_many_true_does_not_affect_non_get(self) -> None:
+        """many=True on a POST response does not make it a 'list' operation."""
+
+        class ItemSchema(Schema):
+            name = fields.Str()
+
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/items/", methods=["POST"])
+            class Item(MethodView):
+                @bp.response(HTTPStatus.CREATED, ItemSchema(many=True))
+                def post(self) -> list[Any]:
+                    return []
+
+            assert get_op_id(bp, "/api/items/", method="post") == "createItem"
+
+
+# ---------------------------------------------------------------------------
+# Collection detection: trailing slash heuristic
+# ---------------------------------------------------------------------------
+
+
+class TestCollectionDetectionHeuristic:
+    """Tests focused on the trailing-slash heuristic for collection endpoints."""
+
+    def test_trailing_slash_at_root(self) -> None:
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/")
+            class Item(MethodView):
+                def get(self) -> list[Any]:
+                    return []
+
+            assert get_op_id(bp, "/api/") == "listItems"
+
+    def test_no_trailing_slash_gives_get(self) -> None:
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/items")
+            class Item(MethodView):
+                def get(self) -> list[Any]:
+                    return []
+
+            assert get_op_id(bp, "/api/items") == "getItem"
+
+    def test_path_param_no_trailing_slash(self) -> None:
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/users/<int:user_id>")
+            class Users(MethodView):
+                def get(self, user_id: int) -> dict[str, Any]:
+                    return {}
+
+            assert get_op_id(bp, "/api/users/{user_id}") == "getUsers"
+
+    def test_non_get_on_trailing_slash_path(self) -> None:
+        """Trailing slash does not affect non-GET method (should still be createXxx)."""
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/items/")
+            class Item(MethodView):
+                def post(self) -> dict[str, Any]:
+                    return {}
+
+            assert get_op_id(bp, "/api/items/", method="post") == "createItem"
+
+
+# ---------------------------------------------------------------------------
+# Function-based routes
+# ---------------------------------------------------------------------------
+
+
+class TestFunctionRoutes:
+    """Tests for function-based (non-MethodView) routes."""
+
+    def test_auto_generated_from_function_name(self) -> None:
+        with make_app().app_context():
+            bp = make_bp()
 
             @bp.route("/custom")
             def custom_endpoint() -> dict[str, str]:
-                return {"message": "success"}
+                return {"message": "ok"}
 
-            # For function-based routes, use function name
-            apidoc = getattr(custom_endpoint, "_apidoc", {})
-            assert "manual_doc" in apidoc
-            assert "operationId" in apidoc["manual_doc"]
-            assert apidoc["manual_doc"]["operationId"] == "customEndpoint"
+            assert get_op_id(bp, "/api/custom") == "customEndpoint"
 
-    def test_operation_id_with_response_decorator(self) -> None:
-        """Test operationId generation for function routes with @response decorator.
+    def test_explicit_operation_id(self) -> None:
+        with make_app().app_context():
+            bp = make_bp()
 
-        This test verifies the fix for the bug where operationId was not being
-        generated for function-based routes that used @bp.response() or other
-        Flask-Smorest decorators.
-        """
-        from http import HTTPStatus
+            @bp.route("/special", operation_id="getSpecialThing")
+            def my_func() -> dict[str, Any]:
+                return {}
 
-        from flask import Flask
-        from marshmallow import Schema, fields
+            assert get_op_id(bp, "/api/special") == "getSpecialThing"
 
-        app = Flask(__name__)
+    def test_explicit_operation_id_with_methods(self) -> None:
+        with make_app().app_context():
+            bp = make_bp()
 
+            @bp.route("/action", methods=["PUT"], operation_id="_deprecated_doAction")
+            def action() -> dict[str, Any]:
+                return {}
+
+            assert get_op_id(bp, "/api/action", method="put") == "_deprecated_doAction"
+
+    def test_with_response_decorator(self) -> None:
         class ResponseSchema(Schema):
             message = fields.Str()
 
-        with app.app_context():
-            bp = BlueprintOperationIdMixin("test", __name__)
+        with make_app().app_context():
+            bp = make_bp()
 
             @bp.route("/with_response", methods=["GET"])
             @bp.response(HTTPStatus.OK, ResponseSchema)
             def endpoint_with_response() -> dict[str, str]:
-                return {"message": "success"}
+                return {"message": "ok"}
 
-            # operationId should still be generated even with @response decorator
-            apidoc = getattr(endpoint_with_response, "_apidoc", {})
-            assert "manual_doc" in apidoc, f"Expected 'manual_doc' in _apidoc, got: {apidoc}"
-            assert "operationId" in apidoc["manual_doc"], f"Expected 'operationId' in manual_doc, got: {apidoc}"
-            assert apidoc["manual_doc"]["operationId"] == "endpointWithResponse"
-            # Should also have response info
-            assert "response" in apidoc
+            assert get_op_id(bp, "/api/with_response") == "endpointWithResponse"
 
-    def test_operation_id_with_arguments_decorator(self) -> None:
-        """Test operationId generation for function routes with @arguments decorator."""
-        from flask import Flask
-        from marshmallow import Schema, fields
-
-        app = Flask(__name__)
-
+    def test_with_arguments_decorator(self) -> None:
         class ArgsSchema(Schema):
             name = fields.Str(required=True)
 
-        with app.app_context():
-            bp = BlueprintOperationIdMixin("test", __name__)
+        with make_app().app_context():
+            bp = make_bp()
 
             @bp.route("/with_args", methods=["POST"])
             @bp.arguments(ArgsSchema)
             def endpoint_with_args(args: dict[str, Any]) -> dict[str, str]:
-                return {"message": "success"}
+                return {"message": "ok"}
 
-            # operationId should still be generated even with @arguments decorator
-            apidoc = getattr(endpoint_with_args, "_apidoc", {})
-            assert "manual_doc" in apidoc, f"Expected 'manual_doc' in _apidoc, got: {apidoc}"
-            assert "operationId" in apidoc["manual_doc"], f"Expected 'operationId' in manual_doc, got: {apidoc}"
-            assert apidoc["manual_doc"]["operationId"] == "endpointWithArgs"
-            # Should also have arguments info
-            assert "arguments" in apidoc
+            assert get_op_id(bp, "/api/with_args", method="post") == "endpointWithArgs"
 
-    def test_operation_id_with_multiple_decorators(self) -> None:
-        """Test operationId generation with multiple Flask-Smorest decorators.
-
-        This simulates the real-world scenario in UserBlueprint where endpoints
-        like /login/ have both @arguments and @response decorators.
-        """
-        from http import HTTPStatus
-
-        from flask import Flask
-        from marshmallow import Schema, fields
-
-        app = Flask(__name__)
-
+    def test_with_multiple_decorators(self) -> None:
         class InputSchema(Schema):
             username = fields.Str(required=True)
 
         class OutputSchema(Schema):
             token = fields.Str()
 
-        with app.app_context():
-            bp = BlueprintOperationIdMixin("test", __name__)
+        with make_app().app_context():
+            bp = make_bp()
 
             @bp.route("/complex", methods=["POST"])
             @bp.arguments(InputSchema)
             @bp.response(HTTPStatus.OK, OutputSchema)
             def complex_endpoint(args: dict[str, Any]) -> dict[str, str]:
-                return {"token": "abc123"}
+                return {"token": "abc"}
 
-            # operationId should be generated with multiple decorators
-            apidoc = getattr(complex_endpoint, "_apidoc", {})
-            assert "manual_doc" in apidoc, f"Expected 'manual_doc' in _apidoc, got: {apidoc}"
-            assert "operationId" in apidoc["manual_doc"], f"Expected 'operationId' in manual_doc, got: {apidoc}"
-            assert apidoc["manual_doc"]["operationId"] == "complexEndpoint"
-            # Should have both arguments and response info
-            assert "arguments" in apidoc
-            assert "response" in apidoc
+            assert get_op_id(bp, "/api/complex", method="post") == "complexEndpoint"
+
+    def test_multiple_routes_different_operation_ids(self) -> None:
+        """Two routes on same function: one auto-generated, one explicit."""
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/action", methods=["PUT"])
+            @bp.route(
+                "/status",
+                methods=["PUT"],
+                operation_id="_deprecated_requestValuationAction",
+            )
+            def test_func() -> dict[str, Any]:
+                return {}
+
+            app = make_app()
+            api = Api(app)
+            api.register_blueprint(bp)
+            spec = api.spec.to_dict()
+
+            assert spec["paths"]["/api/action"]["put"]["operationId"] == "testFunc"
+            assert spec["paths"]["/api/status"]["put"]["operationId"] == "_deprecated_requestValuationAction"
 
 
-class TestCollectionDetectionLogic:
-    """Test improved collection detection logic based on trailing slash."""
+# ---------------------------------------------------------------------------
+# operation_id_prefix and operation_id_suffix
+# ---------------------------------------------------------------------------
 
-    def test_collection_with_singular_class_name(self) -> None:
-        """Test that singular class names on collection paths generate list operations.
 
-        This verifies the fix for the TODO comment issue where the old logic
-        required both class name ending in 's' AND trailing slash.
-        """
-        from flask import Flask
-        from flask.views import MethodView
+class TestOperationIdPrefixSuffix:
+    """Tests for operation_id_prefix and operation_id_suffix on route()."""
 
-        app = Flask(__name__)
+    def test_prefix_applied_to_all_methods(self) -> None:
+        with make_app().app_context():
+            bp = make_bp()
 
-        with app.app_context():
-            bp = BlueprintOperationIdMixin("test", __name__)
+            @bp.route("/current", methods=["GET", "PATCH"])
+            @bp.route("/legacy", methods=["GET", "PATCH"], operation_id_prefix="_deprecated_")
+            class ErsView(MethodView):
+                def get(self) -> dict[str, Any]:
+                    return {}
 
-            # Singular class name on collection path (with trailing slash)
-            @bp.route("/users/")
+                def patch(self) -> dict[str, Any]:
+                    return {}
+
+            app = make_app()
+            api = Api(app)
+            api.register_blueprint(bp)
+            spec = api.spec.to_dict()
+
+            assert spec["paths"]["/api/current"]["get"]["operationId"] == "getErs"
+            assert spec["paths"]["/api/current"]["patch"]["operationId"] == "updateErs"
+            assert spec["paths"]["/api/legacy"]["get"]["operationId"] == "_deprecated_getErs"
+            assert spec["paths"]["/api/legacy"]["patch"]["operationId"] == "_deprecated_updateErs"
+
+    def test_suffix_applied_to_all_methods(self) -> None:
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/v1", methods=["GET", "PATCH"])
+            @bp.route("/v2", methods=["GET", "PATCH"], operation_id_suffix="_v2")
+            class ErsView(MethodView):
+                def get(self) -> dict[str, Any]:
+                    return {}
+
+                def patch(self) -> dict[str, Any]:
+                    return {}
+
+            app = make_app()
+            api = Api(app)
+            api.register_blueprint(bp)
+            spec = api.spec.to_dict()
+
+            assert spec["paths"]["/api/v1"]["get"]["operationId"] == "getErs"
+            assert spec["paths"]["/api/v1"]["patch"]["operationId"] == "updateErs"
+            assert spec["paths"]["/api/v2"]["get"]["operationId"] == "getErs_v2"
+            assert spec["paths"]["/api/v2"]["patch"]["operationId"] == "updateErs_v2"
+
+    def test_prefix_and_suffix_combined(self) -> None:
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route(
+                "/old",
+                methods=["GET", "POST"],
+                operation_id_prefix="_deprecated_",
+                operation_id_suffix="_v1",
+            )
+            class UserView(MethodView):
+                def get(self) -> dict[str, Any]:
+                    return {}
+
+                def post(self) -> dict[str, Any]:
+                    return {}
+
+            app = make_app()
+            api = Api(app)
+            api.register_blueprint(bp)
+            spec = api.spec.to_dict()
+
+            assert spec["paths"]["/api/old"]["get"]["operationId"] == "_deprecated_getUser_v1"
+            assert spec["paths"]["/api/old"]["post"]["operationId"] == "_deprecated_createUser_v1"
+
+    def test_prefix_on_collection_endpoint(self) -> None:
+        """Prefix is applied after the full base_id is generated (list + plural)."""
+        with make_app().app_context():
+            bp = make_bp()
+
+            @bp.route("/users/", methods=["GET"], operation_id_prefix="v2_")
             class User(MethodView):
-                def get(self) -> dict[str, list[Any]]:
-                    return {"users": []}
+                def get(self) -> list[Any]:
+                    return []
 
-            get_method = User.get  # type: ignore[reportFunctionMemberAccess]
-            apidoc = getattr(get_method, "_apidoc", {})
-            assert "manual_doc" in apidoc
-            assert "operationId" in apidoc["manual_doc"]
-            # Should be "listUser" because of trailing slash
-            assert apidoc["manual_doc"]["operationId"] == "listUser"
+            assert get_op_id(bp, "/api/users/") == "v2_listUsers"
 
-    def test_single_item_with_path_param_no_trailing_slash(self) -> None:
-        """Test that paths with params but no trailing slash generate get operations."""
-        from flask import Flask
-        from flask.views import MethodView
+    def test_manual_doc_wins_over_prefix(self) -> None:
+        """Manual @bp.doc(operationId=...) is not overridden by operation_id_prefix."""
+        with make_app().app_context():
+            bp = make_bp()
 
-        app = Flask(__name__)
+            @bp.route("/user/<int:id>", operation_id_prefix="_dep_")
+            class UserView(MethodView):
+                @bp.doc(operationId="myManualId")
+                def get(self, id: int) -> dict[str, Any]:
+                    return {}
 
-        with app.app_context():
-            bp = BlueprintOperationIdMixin("test", __name__)
+            assert get_op_id(bp, "/api/user/{id}") == "myManualId"
 
-            # Single-item path without trailing slash
-            @bp.route("/users/<int:user_id>")
-            class Users(MethodView):
-                def get(self, user_id: int) -> dict[str, dict[str, Any]]:
-                    return {"user": {}}
+    def test_prefix_does_not_affect_routes_without_it(self) -> None:
+        """A prefix on one route of a MethodView does not leak to other routes."""
+        with make_app().app_context():
+            bp = make_bp()
 
-            get_method = Users.get  # type: ignore[reportFunctionMemberAccess]
-            apidoc = getattr(get_method, "_apidoc", {})
-            assert "manual_doc" in apidoc
-            assert "operationId" in apidoc["manual_doc"]
-            # Should be "getUsers" because no trailing slash
-            assert apidoc["manual_doc"]["operationId"] == "getUsers"
+            @bp.route("/new")
+            @bp.route("/old", operation_id_prefix="legacy_")
+            class ItemView(MethodView):
+                def get(self) -> dict[str, Any]:
+                    return {}
 
-    def test_collection_without_trailing_slash(self) -> None:
-        """Test that collection paths without trailing slash generate get operations.
+            app = make_app()
+            api = Api(app)
+            api.register_blueprint(bp)
+            spec = api.spec.to_dict()
 
-        Note: Without trailing slash, we cannot distinguish collection from single item,
-        so we default to 'get' operation.
-        """
-        from flask import Flask
-        from flask.views import MethodView
-
-        app = Flask(__name__)
-
-        with app.app_context():
-            bp = BlueprintOperationIdMixin("test", __name__)
-
-            # Collection path without trailing slash
-            @bp.route("/items")
-            class Item(MethodView):
-                def get(self) -> dict[str, list[Any]]:
-                    return {"items": []}
-
-            get_method = Item.get  # type: ignore[reportFunctionMemberAccess]
-            apidoc = getattr(get_method, "_apidoc", {})
-            assert "manual_doc" in apidoc
-            assert "operationId" in apidoc["manual_doc"]
-            # Should be "getItem" because no trailing slash
-            assert apidoc["manual_doc"]["operationId"] == "getItem"
-
-    def test_collection_with_already_plural_name(self) -> None:
-        """Test class names that are already plural (News, Series, etc.)."""
-        from flask import Flask
-        from flask.views import MethodView
-
-        app = Flask(__name__)
-
-        with app.app_context():
-            bp = BlueprintOperationIdMixin("test", __name__)
-
-            # Already plural name on collection path
-            @bp.route("/news/")
-            class News(MethodView):
-                def get(self) -> dict[str, list[Any]]:
-                    return {"news": []}
-
-            get_method = News.get  # type: ignore[reportFunctionMemberAccess]
-            apidoc = getattr(get_method, "_apidoc", {})
-            assert "manual_doc" in apidoc
-            assert "operationId" in apidoc["manual_doc"]
-            # Should be "listNews" because of trailing slash
-            assert apidoc["manual_doc"]["operationId"] == "listNews"
-
-    def test_single_item_with_trailing_slash(self) -> None:
-        """Test that paths with params and trailing slash generate list operations.
-
-        Note: Trailing slash takes precedence, so even with path params,
-        we generate 'list' operation. This is a trade-off of the simpler heuristic.
-        """
-        from flask import Flask
-        from flask.views import MethodView
-
-        app = Flask(__name__)
-
-        with app.app_context():
-            bp = BlueprintOperationIdMixin("test", __name__)
-
-            # Single-item path with trailing slash
-            @bp.route("/products/<string:product_id>/")
-            class Product(MethodView):
-                def get(self, product_id: str) -> dict[str, dict[str, Any]]:
-                    return {"product": {}}
-
-            get_method = Product.get  # type: ignore[reportFunctionMemberAccess]
-            apidoc = getattr(get_method, "_apidoc", {})
-            assert "manual_doc" in apidoc
-            assert "operationId" in apidoc["manual_doc"]
-            # Should be "listProduct" because of trailing slash (even with path param)
-            assert apidoc["manual_doc"]["operationId"] == "listProduct"
-
-    def test_collection_at_root_path(self) -> None:
-        """Test collection operations at root path."""
-        from flask import Flask
-        from flask.views import MethodView
-
-        app = Flask(__name__)
-
-        with app.app_context():
-            bp = BlueprintOperationIdMixin("test", __name__)
-
-            # Root path (ends with /)
-            @bp.route("/")
-            class Item(MethodView):
-                def get(self) -> dict[str, list[Any]]:
-                    return {"items": []}
-
-            get_method = Item.get  # type: ignore[reportFunctionMemberAccess]
-            apidoc = getattr(get_method, "_apidoc", {})
-            assert "manual_doc" in apidoc
-            assert "operationId" in apidoc["manual_doc"]
-            # Should be "listItem" because ends with /
-            assert apidoc["manual_doc"]["operationId"] == "listItem"
-
-    def test_non_get_methods_not_affected(self) -> None:
-        """Test that non-GET methods don't use collection logic."""
-        from flask import Flask
-        from flask.views import MethodView
-
-        app = Flask(__name__)
-
-        with app.app_context():
-            bp = BlueprintOperationIdMixin("test", __name__)
-
-            @bp.route("/items/")
-            class Item(MethodView):
-                def post(self) -> dict[str, dict[str, Any]]:
-                    return {"item": {}}
-
-            post_method = Item.post  # type: ignore[reportFunctionMemberAccess]
-            apidoc = getattr(post_method, "_apidoc", {})
-            assert "manual_doc" in apidoc
-            assert "operationId" in apidoc["manual_doc"]
-            # Should be "createItem" not "listItem"
-            assert apidoc["manual_doc"]["operationId"] == "createItem"
+            assert spec["paths"]["/api/new"]["get"]["operationId"] == "getItem"
+            assert spec["paths"]["/api/old"]["get"]["operationId"] == "legacy_getItem"
