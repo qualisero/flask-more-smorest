@@ -151,7 +151,7 @@ class BlueprintOperationIdMixin(Blueprint):
         Returns:
             Decorator for the view class or function.
         """
-        methods: tuple[str, ...] = tuple(sorted(options.get("methods", ["GET"]))) if options.get("methods") else ()
+        methods: tuple[str, ...] = tuple(sorted(options.get("methods", ("GET",))))
         route_key = (rule, methods)
 
         if operation_id is not None:
@@ -181,11 +181,9 @@ class BlueprintOperationIdMixin(Blueprint):
         methods: tuple[str, ...] = tuple(sorted(options.get("methods", ("GET",))))
         route_key = (rule, methods)
 
-        # Fall back to the empty-methods key because route() stores () when no
-        # explicit methods kwarg is given (e.g. a plain function-based GET route).
-        custom_op_id = self._route_operation_ids.get(route_key) or self._route_operation_ids.get((rule, ()))
-        prefix = self._route_operation_id_prefixes.get(route_key) or self._route_operation_id_prefixes.get((rule, ()))
-        suffix = self._route_operation_id_suffixes.get(route_key) or self._route_operation_id_suffixes.get((rule, ()))
+        custom_op_id = self._route_operation_ids.get(route_key)
+        prefix = self._route_operation_id_prefixes.get(route_key)
+        suffix = self._route_operation_id_suffixes.get(route_key)
 
         if view_func is not None:
             pending_key = (rule, id(view_func))
@@ -268,10 +266,12 @@ class BlueprintOperationIdMixin(Blueprint):
         responses = doc.get("response", {}).get("responses", {})
         for status_code in (200, 201, "200", "201"):
             entry = responses.get(status_code)
-            if entry:
-                schema = entry[0].get("schema")
-                if schema is not None and hasattr(schema, "many"):
-                    return bool(schema.many)
+            if entry and isinstance(entry, (list, tuple)) and len(entry) > 0:
+                first_entry = entry[0]
+                if isinstance(first_entry, dict):
+                    schema = first_entry.get("schema")
+                    if schema is not None and hasattr(schema, "many"):
+                        return bool(schema.many)
         return False
 
     def _is_collection_endpoint(
@@ -316,7 +316,7 @@ class BlueprintOperationIdMixin(Blueprint):
         if len(parts) > 1 and parts[1] and parts[1][0].isupper():
             return f"{self._pluralise(parts[0])}By{parts[1]}"
 
-        # If inflect considers it already plural, keep it
+        # If inflect considers it singular, pluralize it
         if inflector.singular_noun(name) is False:
             plural_form = inflector.plural_noun(name)
             name = str(plural_form) if plural_form else name
