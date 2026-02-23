@@ -123,7 +123,7 @@ class BlueprintOperationIdMixin(Blueprint):
         ] = {}
         self._current_rule: str | None = None
 
-    def route(
+    def route(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         rule: str,
         *,
