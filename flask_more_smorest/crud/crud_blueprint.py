@@ -143,7 +143,11 @@ class CRUDConfig:
     methods: dict[CRUDMethod, MethodConfig]
 
 
-class CRUDBlueprint(CRUDPaginationMixin, BlueprintOperationIdMixin, Blueprint):
+class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
+    CRUDPaginationMixin,
+    BlueprintOperationIdMixin,
+    Blueprint,
+):
     """Blueprint subclass that automatically registers CRUD routes.
 
     This class extends Flask-Smorest Blueprint to provide automatic CRUD

@@ -208,7 +208,7 @@ class User(AbstractUser):
         roles = self.roles
         return [r.role for r in roles]
 
-    def _can_read(self, user: Self | None) -> bool:
+    def _can_read(self, user: Self | None) -> bool:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Default read permission: users can read their own profile.
 
         Args:
@@ -222,7 +222,7 @@ class User(AbstractUser):
         except Exception:
             return False
 
-    def _can_write(self, user: Self | None) -> bool:
+    def _can_write(self, user: Self | None) -> bool:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Default write permission: users can edit their own profile.
 
         Args:
@@ -240,7 +240,7 @@ class User(AbstractUser):
         except Exception:
             return False
 
-    def _can_create(self, user: Self | None) -> bool:
+    def _can_create(self, user: Self | None) -> bool:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Default create permission: admins can create users, or public registration if enabled.
 
         Args:
