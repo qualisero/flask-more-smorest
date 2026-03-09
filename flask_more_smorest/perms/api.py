@@ -18,6 +18,7 @@ from flask_jwt_extended import verify_jwt_in_request
 from flask_smorest import Api as ApiOrig
 from marshmallow import Schema
 
+from ..error.error_handlers import RequestHandlers
 from ..error.exceptions import ForbiddenError, UnauthorizedError
 from .jwt import init_jwt
 
@@ -102,6 +103,12 @@ class Api(ApiOrig):
         # },
 
         super().init_app(app, *pargs, **kwargs)
+
+        # Register FMS error handlers (ApiException → 4xx, DatabaseError, etc.)
+        extensions_state = app.extensions.setdefault("flask-more-smorest", {})
+        if not extensions_state.get("error_handlers_registered", False):
+            RequestHandlers(app)
+            extensions_state["error_handlers_registered"] = True
 
         # Register health check endpoint
         self._register_health_endpoint(app)
