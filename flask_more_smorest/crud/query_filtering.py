@@ -152,7 +152,7 @@ def generate_filter_schema(base_schema: type[ma.Schema] | ma.Schema) -> type[ma.
         load_default=None,
         load_only=True,
         required=False,
-        validate=validate.Range(min=1),
+        validate=validate.Range(min=0),
     )
 
     class_name = f"{base_cls.__name__}FilterSchema"

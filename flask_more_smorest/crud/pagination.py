@@ -44,29 +44,38 @@ class CRUDPaginationMixin:
                 if filters is None:
                     filters = {}
 
-                def _coerce_positive_int(name: str, value: Any, default: int) -> int:
+                def _coerce_int(name: str, value: Any, default: int, *, allow_zero: bool = False) -> int:
                     candidate = value if value is not None else default
                     if candidate is None:
                         raise BadRequest(f"Missing pagination parameter: {name}")
                     try:
                         int_value = int(candidate)
                     except (TypeError, ValueError) as exc:
-                        raise BadRequest(f"{name} must be a positive integer") from exc
-                    if int_value <= 0:
-                        raise BadRequest(f"{name} must be a positive integer")
+                        raise BadRequest(
+                            f"{name} must be a non-negative integer"
+                            if allow_zero
+                            else f"{name} must be a positive integer"
+                        ) from exc
+                    min_val = 0 if allow_zero else 1
+                    if int_value < min_val:
+                        raise BadRequest(
+                            f"{name} must be a non-negative integer"
+                            if allow_zero
+                            else f"{name} must be a positive integer"
+                        )
                     return int_value
 
                 # Extract values with fallbacks and validation
                 raw_page = filters.get("page")
                 if raw_page is None:
                     raw_page = page
-                p_val = _coerce_positive_int("page", raw_page, default=1)
+                p_val = _coerce_int("page", raw_page, default=1)
 
                 raw_page_size = filters.get("page_size")
                 if raw_page_size is None:
                     raw_page_size = page_size
-                p_size_default = page_size if page_size is not None else 10
-                p_size_val = _coerce_positive_int("page_size", raw_page_size, default=p_size_default)
+                p_size_default = page_size if page_size is not None else 20
+                p_size_val = _coerce_int("page_size", raw_page_size, default=p_size_default, allow_zero=True)
 
                 # Create parameters object
                 pagination_parameters = PaginationParameters(page=p_val, page_size=p_size_val)
@@ -95,8 +104,18 @@ class CRUDPaginationMixin:
 
                 # Set pagination metadata
                 if getattr(self, "PAGINATION_HEADER_NAME", None) is not None:
+                    metadata_parameters = pagination_parameters
+                    if pagination_parameters.page_size == 0:
+                        item_count = pagination_parameters.item_count or 0
+                        safe_page_size = max(item_count, 1)
+                        metadata_parameters = PaginationParameters(
+                            page=1,
+                            page_size=safe_page_size,
+                        )
+                        metadata_parameters.item_count = item_count
+
                     result, headers = self._set_pagination_metadata(  # type: ignore
-                        pagination_parameters, result, headers
+                        metadata_parameters, result, headers
                     )
 
                 return result, status, headers

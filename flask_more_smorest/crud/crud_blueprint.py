@@ -246,6 +246,7 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
         res_id_param: str | None = None,
         methods: list[CRUDMethod] | MethodConfigMapping = list(CRUDMethod),
         skip_methods: list[CRUDMethod] | None = None,
+        default_page_size: int | None = 20,
         db_session: Session | scoped_session[Session] | None = None,
         static_folder: str | None = None,
         static_url_path: str | None = None,
@@ -263,6 +264,8 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
             self._db_session = db.session
         else:
             self._db_session = db_session
+
+        self._default_page_size = default_page_size
 
         self._config = self._build_config(
             name=name,
@@ -334,8 +337,8 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
 
         resolved_url_prefix: str = url_prefix or f"/{name}/"
 
-        resolved_model_import_path: str = model_import_name or ".".join(import_name.split(".")[:-1] + ["models"])
-        resolved_schema_import_path: str = schema_import_name or ".".join(import_name.split(".")[:-1] + ["schemas"])
+        resolved_model_import_path: str = model_import_name or ".".join([*import_name.split(".")[:-1], "models"])
+        resolved_schema_import_path: str = schema_import_name or ".".join([*import_name.split(".")[:-1], "schemas"])
 
         # Resolve model class
         model_cls = self._resolve_model_class(
@@ -586,35 +589,51 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
                 """Index/Post endpoints."""
 
                 if CRUDMethod.INDEX in config.methods:
+                    if self._default_page_size is not None:
 
-                    @self.arguments(query_filter_schema, location="query", unknown=RAISE)  # pyright: ignore[reportArgumentType]
-                    @self.response(HTTPStatus.OK, index_schema_class(many=True))  # type: ignore[misc]  # pyright: ignore[reportArgumentType, reportOptionalCall]
-                    @self.paginate()
-                    @self.doc(operationId=f"list{config.model_name}")
-                    def get(
-                        _self,  # NOTE: using _self to avoid collision with outer self
-                        filters: dict,
-                        pagination_parameters: "PaginationParameters",
-                        **kwargs: Any,
-                    ) -> Sequence[BaseModel]:
-                        """Fetch all resources.
-                        kwargs might contains path parameters to filter by (eg /user/<uuid:user_id>/roles/)
-                        """
+                        @self.arguments(query_filter_schema, location="query", unknown=RAISE)  # pyright: ignore[reportArgumentType]
+                        @self.response(HTTPStatus.OK, index_schema_class(many=True))  # type: ignore[misc]  # pyright: ignore[reportArgumentType, reportOptionalCall]
+                        @self.paginate(page_size=self._default_page_size)
+                        @self.doc(operationId=f"list{config.model_name}")
+                        def get(
+                            _self,  # NOTE: using _self to avoid collision with outer self
+                            filters: dict,
+                            pagination_parameters: "PaginationParameters",
+                            **kwargs: Any,
+                        ) -> Sequence[BaseModel]:
+                            """Fetch all resources.
+                            kwargs might contains path parameters to filter by (eg /user/<uuid:user_id>/roles/)
+                            """
+                            stmts = get_statements_from_filters(filters, model=model_cls)
+                            base_query = sa.select(model_cls).filter_by(**kwargs).filter(*stmts)
 
-                        stmts = get_statements_from_filters(filters, model=model_cls)
-                        base_query = sa.select(model_cls).filter_by(**kwargs).filter(*stmts)
+                            count_query = sa.select(sa.func.count()).select_from(base_query.subquery())
+                            total_items = self._db_session.scalar(count_query)
+                            pagination_parameters.item_count = total_items  # pyright: ignore[reportAttributeAccessIssue]
 
-                        # Handle pagination
-                        count_query = sa.select(sa.func.count()).select_from(base_query.subquery())
-                        total_items = self._db_session.scalar(count_query)
-                        pagination_parameters.item_count = total_items  # pyright: ignore[reportAttributeAccessIssue]
+                            if pagination_parameters.page_size > 0:
+                                paginated_query = base_query.limit(pagination_parameters.page_size).offset(
+                                    pagination_parameters.page_size * (pagination_parameters.page - 1)
+                                )
+                            else:
+                                paginated_query = base_query
 
-                        paginated_query = base_query.limit(pagination_parameters.page_size).offset(
-                            pagination_parameters.page_size * (pagination_parameters.page - 1)
-                        )
+                            return self._db_session.execute(paginated_query).scalars().all()
 
-                        res = self._db_session.execute(paginated_query)
-                        return res.scalars().all()
+                    else:
+
+                        @self.arguments(query_filter_schema, location="query", unknown=RAISE)  # pyright: ignore[reportArgumentType]
+                        @self.response(HTTPStatus.OK, index_schema_class(many=True))  # type: ignore[misc]  # pyright: ignore[reportArgumentType, reportOptionalCall]
+                        @self.doc(operationId=f"list{config.model_name}")
+                        def get(
+                            _self,
+                            filters: dict,
+                            **kwargs: Any,
+                        ) -> Sequence[BaseModel]:
+                            """Fetch all resources (no pagination)."""
+                            stmts = get_statements_from_filters(filters, model=model_cls)
+                            base_query = sa.select(model_cls).filter_by(**kwargs).filter(*stmts)
+                            return self._db_session.execute(base_query).scalars().all()
 
                 if CRUDMethod.POST in config.methods:
 
