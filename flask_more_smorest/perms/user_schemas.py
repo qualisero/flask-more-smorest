@@ -19,6 +19,7 @@ class UserSchema(BaseUserSchema):
     """Public user schema - extends auto-generated schema."""
 
     password = fields.Str(required=True, load_only=True)
+    old_password = fields.Str(load_only=True, load_default=None)
 
 
 class UserLoginSchema(UserSchema):
