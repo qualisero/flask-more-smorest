@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-03-15
+
+### Added
+
+- **`default_page_size` parameter** on `CRUDBlueprint.__init__()`:
+  Controls the default page size for INDEX endpoints (default: 20).
+  Set to `None` to disable pagination entirely on a blueprint.
+
+- **`page_size=0` means "return all"**: Requesting `page_size=0` in query
+  parameters now returns all results without limit/offset. Previously
+  rejected as invalid.
+
+### Changed
+
+- Default page size changed from 10 to 20.
+- Marshmallow `page_size` validator now allows `min=0` (was `min=1`).
+
+### Fixed
+
+- Error handler registration in `Api.init_app()` now properly catches
+  `ApiException` subclasses (`ForbiddenError`, `UnauthorizedError`, etc.)
+  and returns structured HTTP error responses instead of falling through
+  to Flask's default 500 handler.
+
 ## [0.11.0] - 2026-02-23
 
 ### Added
