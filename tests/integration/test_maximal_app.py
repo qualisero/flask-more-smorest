@@ -26,7 +26,7 @@ from flask_more_smorest import (
     init_db,
     init_jwt,
 )
-from flask_more_smorest.error import ForbiddenError, NotFoundError, UnauthorizedError
+from flask_more_smorest.error import ForbiddenError, NotFoundError
 from flask_more_smorest.perms import init_fms, is_current_user_admin
 from flask_more_smorest.perms.models.base_roles import BaseRoleEnum
 
@@ -589,8 +589,8 @@ class TestMaximalFeatureIntegration:
         res = auth_client.get(f"/api/articles/{draft_article.id}")
         assert res.status_code == 200
 
-        with pytest.raises(ForbiddenError):
-            other_auth_client.get(f"/api/articles/{draft_article.id}")
+        res = other_auth_client.get(f"/api/articles/{draft_article.id}")
+        assert res.status_code == 403
 
         res = admin_client.get(f"/api/articles/{draft_article.id}")
         assert res.status_code == 200
@@ -688,8 +688,8 @@ class TestMaximalFeatureIntegration:
     def test_auth_required_for_private_routes(self, client: "FlaskClient") -> None:
         """Private endpoints should reject unauthenticated requests."""
 
-        with pytest.raises(UnauthorizedError):
-            client.get("/api/articles/")
+        response = client.get("/api/articles/")
+        assert response.status_code == 401
 
     def test_public_health_endpoint_is_public(self, client: "FlaskClient") -> None:
         """Public endpoints can be called without authentication."""
@@ -714,8 +714,8 @@ class TestMaximalFeatureIntegration:
         assert create_resp.status_code == 200
         article_id = create_resp.get_json()["id"]
 
-        with pytest.raises(ForbiddenError):
-            auth_client.delete(f"/api/articles/{article_id}")
+        resp = auth_client.delete(f"/api/articles/{article_id}")
+        assert resp.status_code == 403
 
         admin_resp = admin_client.delete(f"/api/articles/{article_id}")
         assert admin_resp.status_code in {200, 204}
@@ -844,8 +844,8 @@ class TestMaximalFeatureIntegration:
         # User B tries to update via API (PATCH)
         update_data = {"content": "Hacked content"}
 
-        with pytest.raises(ForbiddenError):
-            other_auth_client.patch(f"/api/articles/{article.id}", json=update_data)
+        resp = other_auth_client.patch(f"/api/articles/{article.id}", json=update_data)
+        assert resp.status_code == 403
 
     def test_delete_permission_enforcement(
         self,
@@ -866,8 +866,8 @@ class TestMaximalFeatureIntegration:
         # User B tries to delete via API
         # Note: DELETE endpoint is admin-only in blueprint config, so it returns 403 anyway,
         # but this confirms that permission checks are enforced.
-        with pytest.raises(ForbiddenError):
-            other_auth_client.delete(f"/api/articles/{article.id}")
+        resp = other_auth_client.delete(f"/api/articles/{article.id}")
+        assert resp.status_code == 403
 
     def test_admin_override_permissions(
         self,

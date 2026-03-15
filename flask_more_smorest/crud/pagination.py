@@ -105,16 +105,14 @@ class CRUDPaginationMixin:
                 # Set pagination metadata
                 if getattr(self, "PAGINATION_HEADER_NAME", None) is not None:
                     metadata_parameters = pagination_parameters
-                    if (
-                        pagination_parameters.page_size == 0
-                        and pagination_parameters.item_count is not None
-                        and pagination_parameters.item_count > 0
-                    ):
+                    if pagination_parameters.page_size == 0:
+                        item_count = pagination_parameters.item_count or 0
+                        safe_page_size = max(item_count, 1)
                         metadata_parameters = PaginationParameters(
-                            page=pagination_parameters.page,
-                            page_size=pagination_parameters.item_count,
+                            page=1,
+                            page_size=safe_page_size,
                         )
-                        metadata_parameters.item_count = pagination_parameters.item_count
+                        metadata_parameters.item_count = item_count
 
                     result, headers = self._set_pagination_metadata(  # type: ignore
                         metadata_parameters, result, headers

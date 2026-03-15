@@ -1,7 +1,7 @@
 import enum
 
 
-class BaseRoleEnum(enum.StrEnum):
+class BaseRoleEnum(str, enum.Enum):
     """Default user role enumeration.
 
     Values are uppercase for backward compatibility with applications
