@@ -18,6 +18,6 @@ def test_version_matches_pyproject() -> None:
     pyproject_version = pyproject["tool"]["poetry"]["version"]
     package_version = flask_more_smorest.__version__
 
-    assert package_version == pyproject_version, (
-        f"Version mismatch: __init__.py has '{package_version}' " f"but pyproject.toml has '{pyproject_version}'"
-    )
+    assert (
+        package_version == pyproject_version
+    ), f"Version mismatch: __init__.py has '{package_version}' but pyproject.toml has '{pyproject_version}'"

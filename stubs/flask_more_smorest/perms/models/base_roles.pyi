@@ -1,10 +1,10 @@
 """Type stub for BaseRoleEnum."""
 
-from enum import Enum
+from enum import StrEnum
 
-class BaseRoleEnum(str, Enum):  # type: ignore[misc]
+class BaseRoleEnum(StrEnum):
     """Base role enumeration."""
 
-    USER: str
-    ADMIN: str
-    SUPERADMIN: str
+    USER = "USER"
+    ADMIN = "ADMIN"
+    SUPERADMIN = "SUPERADMIN"

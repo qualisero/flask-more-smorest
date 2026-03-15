@@ -7,7 +7,7 @@ from datetime import date, datetime
 
 import pytest
 import sqlalchemy as sa
-from marshmallow import Schema, fields
+from marshmallow import Schema, fields, validate
 from sqlalchemy import Boolean, Column, Date, Integer, String
 
 from flask_more_smorest import db
@@ -206,6 +206,13 @@ class TestGenerateFilterSchema:
         assert "page_size" in filter_schema.fields
         assert filter_schema.fields["page"].required is False
         assert filter_schema.fields["page_size"].required is False
+
+        # Verify page_size allows 0 (for 'return all')
+        page_size_field = filter_schema.fields["page_size"]
+        assert any(
+            isinstance(v, validate.Range) and v.min == 0
+            for v in (page_size_field.validators if hasattr(page_size_field, "validators") else [])
+        )
 
 
 class TestGetStatementsFromFilters:

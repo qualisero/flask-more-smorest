@@ -389,8 +389,8 @@ class TestMaximalFeatureIntegration:
         """Test pagination functionality."""
         import json
 
-        # Create 15 articles
-        for i in range(15):
+        # Create 25 articles (more than default page_size of 20)
+        for i in range(25):
             article = Article(
                 title=f"Page Article {i}",
                 content="Content",
@@ -400,7 +400,13 @@ class TestMaximalFeatureIntegration:
             db.session.add(article)
         db.session.commit()
 
-        # Request page 1
+        # Default request (no page_size) should return 20 items (new default)
+        response = auth_client.get("/api/articles/", query_string={"page": 1})
+        assert response.status_code == 200
+        data = response.get_json()
+        assert len(data) == 20
+
+        # Request page 1 with explicit page_size
         response = auth_client.get("/api/articles/", query_string={"page": 1, "page_size": 10})
         assert response.status_code == 200
         data = response.get_json()
@@ -409,11 +415,11 @@ class TestMaximalFeatureIntegration:
         # Verify pagination metadata in X-Pagination header
         assert "X-Pagination" in response.headers
         pagination_meta = json.loads(response.headers["X-Pagination"])
-        assert pagination_meta["total"] == 15
-        assert pagination_meta["total_pages"] == 2
+        assert pagination_meta["total"] == 25
+        assert pagination_meta["total_pages"] == 3
 
-        # Request page 2
-        response = auth_client.get("/api/articles/", query_string={"page": 2, "page_size": 10})
+        # Request page 3
+        response = auth_client.get("/api/articles/", query_string={"page": 3, "page_size": 10})
         assert response.status_code == 200
         data = response.get_json()
         assert len(data) == 5
@@ -422,9 +428,14 @@ class TestMaximalFeatureIntegration:
         response = auth_client.get("/api/articles/", query_string={"page": 0, "page_size": 10})
         assert response.status_code == 422
 
-        # Invalid page_size should return a validation error
+        # page_size=0 should disable limit/offset and return all resources
         response = auth_client.get("/api/articles/", query_string={"page": 1, "page_size": 0})
-        assert response.status_code == 422
+        assert response.status_code == 200
+        data = response.get_json()
+        assert len(data) == 25
+        pagination_meta = json.loads(response.headers["X-Pagination"])
+        assert pagination_meta["total"] == 25
+        assert pagination_meta["total_pages"] == 1
 
     def test_complete_article_lifecycle(
         self,
