@@ -20,6 +20,8 @@ class UserSchema(BaseUserSchema):
 
     password = fields.Str(required=True, load_only=True)
     old_password = fields.Str(load_only=True, load_default=None)
+    is_admin = fields.Bool(dump_only=True)
+    is_superadmin = fields.Bool(dump_only=True)
 
 
 class UserLoginSchema(UserSchema):
