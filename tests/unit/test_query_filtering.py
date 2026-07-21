@@ -214,6 +214,18 @@ class TestGenerateFilterSchema:
             for v in (page_size_field.validators if hasattr(page_size_field, "validators") else [])
         )
 
+    def test_filter_schema_includes_nulls_match_field(self) -> None:
+        """nulls_match parameter should always be present, boolean, optional, default False."""
+        filter_schema_class = generate_filter_schema(QueryTestSchema)
+        filter_schema = filter_schema_class()
+
+        assert "nulls_match" in filter_schema.fields
+        nulls_match_field = filter_schema.fields["nulls_match"]
+        assert isinstance(nulls_match_field, fields.Boolean)
+        assert nulls_match_field.required is False
+        assert nulls_match_field.load_default is False
+        assert nulls_match_field.load_only is True
+
 
 class TestGetStatementsFromFilters:
     """Tests for get_statements_from_filters function."""
@@ -329,4 +341,85 @@ class TestGetStatementsFromFilters:
         filters_dict = {"age__max": 65}
         statements = get_statements_from_filters(filters_dict, query_model)
 
+        assert len(statements) == 1
+
+    # ------------------------------------------------------------------
+    # nulls_match tests
+    # ------------------------------------------------------------------
+
+    def test_nulls_match_default_off_exact_behaviour(self, query_model) -> None:
+        """Without nulls_match (default), statements are plain equality/range."""
+        filters_dict = {"name": "Alice", "age__min": 18}
+        statements = get_statements_from_filters(filters_dict, query_model)
+
+        # Two plain conditions, no OR wrapper
+        assert len(statements) == 2
+        for stmt in statements:
+            # Plain BinaryExpression — no ClauseList / BooleanClauseList wrapper
+            assert stmt.__class__.__name__ not in ("BooleanClauseList", "Or", "ClauseList")
+
+    def test_nulls_match_false_explicit(self, query_model) -> None:
+        """nulls_match=False behaves identically to the default (no wrapping)."""
+        filters_dict = {"name": "Bob", "nulls_match": False}
+        statements = get_statements_from_filters(filters_dict, query_model)
+
+        assert len(statements) == 1
+        for stmt in statements:
+            assert stmt.__class__.__name__ not in ("BooleanClauseList", "Or", "ClauseList")
+
+    def test_nulls_match_equality_wraps_with_is_none(self, query_model) -> None:
+        """nulls_match=True wraps equality condition with OR IS NULL."""
+        from sqlalchemy.sql.elements import BooleanClauseList
+
+        filters_dict = {"name": "Carol", "nulls_match": True}
+        statements = get_statements_from_filters(filters_dict, query_model)
+
+        assert len(statements) == 1
+        (stmt,) = statements
+        # The result is an OR clause
+        assert isinstance(stmt, BooleanClauseList)
+        # Rendered SQL contains both the value and IS NULL
+        sql = str(stmt.compile(compile_kwargs={"literal_binds": True}))
+        assert "Carol" in sql
+        assert "IS NULL" in sql
+
+    def test_nulls_match_range_wraps_with_is_none(self, query_model) -> None:
+        """nulls_match=True wraps range (min/max) conditions with OR IS NULL."""
+        from sqlalchemy.sql.elements import BooleanClauseList
+
+        filters_dict = {"age__min": 18, "age__max": 65, "nulls_match": True}
+        statements = get_statements_from_filters(filters_dict, query_model)
+
+        assert len(statements) == 2
+        for stmt in statements:
+            assert isinstance(stmt, BooleanClauseList)
+            sql = str(stmt.compile(compile_kwargs={"literal_binds": True}))
+            assert "IS NULL" in sql
+
+    def test_nulls_match_combined_multi_filter(self, query_model) -> None:
+        """nulls_match=True wraps ALL produced conditions uniformly."""
+        from sqlalchemy.sql.elements import BooleanClauseList
+
+        filters_dict = {
+            "name": "Dave",
+            "age__min": 18,
+            "is_active": True,
+            "nulls_match": True,
+        }
+        statements = get_statements_from_filters(filters_dict, query_model)
+
+        # Three conditions (name, age__min, is_active), each OR-wrapped
+        assert len(statements) == 3
+        for stmt in statements:
+            assert isinstance(stmt, BooleanClauseList)
+            sql = str(stmt.compile(compile_kwargs={"literal_binds": True}))
+            assert "IS NULL" in sql
+
+    def test_nulls_match_does_not_leak_into_valid_columns(self, query_model) -> None:
+        """nulls_match must not be treated as a column reference."""
+        # If nulls_match were passed into the column loop it would raise ValueError
+        # ('nulls_match' is not a column). This test confirms it is popped first.
+        filters_dict = {"name": "Eve", "nulls_match": True}
+        # Should not raise
+        statements = get_statements_from_filters(filters_dict, query_model)
         assert len(statements) == 1

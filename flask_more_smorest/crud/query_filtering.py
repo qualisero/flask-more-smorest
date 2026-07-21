@@ -12,7 +12,7 @@ from collections.abc import Mapping
 
 import marshmallow as ma
 from marshmallow import validate
-from sqlalchemy import ColumnElement, inspect
+from sqlalchemy import ColumnElement, inspect, or_
 
 from flask_more_smorest.sqla.base_model import BaseModel
 
@@ -109,7 +109,13 @@ def generate_filter_schema(base_schema: type[ma.Schema] | ma.Schema) -> type[ma.
     def _remove_none_fields(self: ma.Schema, data: dict, **kwargs: dict) -> dict:
         return {k: v for k, v in data.items() if v is not None}
 
+    # Control parameters have their own load_default values and must not be
+    # reset by the generic _on_bind_field hook that normalises schema fields.
+    _CONTROL_FIELDS = frozenset({"page", "page_size", "nulls_match"})
+
     def _on_bind_field(self: ma.Schema, field_name: str, field_obj: ma.fields.Field) -> None:
+        if field_name in _CONTROL_FIELDS:
+            return
         field_obj.load_default = None
         field_obj.load_only = True
         field_obj.dump_only = False
@@ -153,6 +159,13 @@ def generate_filter_schema(base_schema: type[ma.Schema] | ma.Schema) -> type[ma.
         load_only=True,
         required=False,
         validate=validate.Range(min=0),
+    )
+    # When nulls_match=true, every produced filter condition is widened to
+    # (condition OR model_field IS NULL) — "null in local data counts as a match".
+    attrs["nulls_match"] = ma.fields.Boolean(
+        load_default=False,
+        load_only=True,
+        required=False,
     )
 
     class_name = f"{base_cls.__name__}FilterSchema"
@@ -229,6 +242,11 @@ def get_statements_from_filters(kwargs: Mapping, model: type[BaseModel]) -> set[
     """
     filters: set[ColumnElement[bool]] = set()
 
+    # Pop control parameters before the filter loop so they are never
+    # treated as column references.
+    kwargs = dict(kwargs)
+    nulls_match = bool(kwargs.pop("nulls_match", False))
+
     # Get valid column names from the model for validation
     valid_columns = {col.name for col in inspect(model).columns}
 
@@ -244,14 +262,19 @@ def get_statements_from_filters(kwargs: Mapping, model: type[BaseModel]) -> set[
         model_field = getattr(model, base_field_name)
 
         if field_name.endswith("__from"):
-            filters |= {model_field >= value}
+            condition: ColumnElement[bool] = model_field >= value
         elif field_name.endswith("__to"):
-            filters |= {model_field <= value}
+            condition = model_field <= value
         elif field_name.endswith("__min"):
-            filters |= {model_field >= value}
+            condition = model_field >= value
         elif field_name.endswith("__max"):
-            filters |= {model_field <= value}
+            condition = model_field <= value
         else:
-            filters |= {model_field == value}
+            condition = model_field == value
+
+        if nulls_match:
+            condition = or_(condition, model_field.is_(None))
+
+        filters |= {condition}
 
     return filters

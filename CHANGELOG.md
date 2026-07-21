@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-07-21
+
+### Added
+
+- **`nulls_match` query parameter** on all auto-generated index filter schemas:
+  When `nulls_match=true`, every produced filter condition is widened to
+  `(condition OR column IS NULL)`, so records with a null value in that column
+  are treated as matching candidates. Applies uniformly to equality, `__from`/
+  `__to`, and `__min`/`__max` filters. Default `false` preserves exact
+  pre-existing behaviour.
+
 ## [0.12.0] - 2026-03-15
 
 ### Added
