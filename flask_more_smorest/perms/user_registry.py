@@ -482,7 +482,7 @@ def clear_registration() -> None:
             # ... test ...
             clear_registration()  # Reset for next test
     """
-    state, is_app_state = _get_state()
+    state, _is_app_state = _get_state()
 
     state["user_model"] = None
     state["role_model"] = None
