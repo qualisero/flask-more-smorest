@@ -585,6 +585,21 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
                 )
                 query_filter_schema = generate_filter_schema(base_schema=index_schema_class)
 
+            # Resolve POST schemas outside the class body so decorators can reference them.
+            # arg_schema controls the request input; schema controls the response output.
+            post_input_schema: type[Schema] | None = None
+            post_response_schema: type[Schema] | None = None
+            if CRUDMethod.POST in config.methods:
+                post_config = config.methods[CRUDMethod.POST]
+                post_input_candidate = post_config.get("arg_schema") or post_config.get("schema", schema_cls)
+                post_response_candidate = post_config.get("schema", schema_cls)
+                post_input_schema = self._resolve_schema_class(
+                    post_input_candidate, config=config, method=CRUDMethod.POST
+                )
+                post_response_schema = self._resolve_schema_class(
+                    post_response_candidate, config=config, method=CRUDMethod.POST
+                )
+
             class GenericIndex(MethodView):
                 """Index/Post endpoints."""
 
@@ -637,10 +652,10 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
 
                 if CRUDMethod.POST in config.methods:
 
-                    @self.arguments(config.methods[CRUDMethod.POST].get("schema", schema_cls))
+                    @self.arguments(post_input_schema)  # pyright: ignore[reportArgumentType]
                     @self.response(
                         HTTPStatus.OK,
-                        config.methods[CRUDMethod.POST].get("schema", schema_cls),
+                        post_response_schema,  # pyright: ignore[reportArgumentType]
                     )
                     @self.doc(
                         responses={
