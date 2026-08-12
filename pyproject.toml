@@ -52,7 +52,7 @@ pytest-mock = "^3.12.0"
 pytest-xdist = "^3.5.0"
 
 # Code Quality (ruff replaces black, isort, and flake8)
-ruff = "^0.8.5"
+ruff = "^0.16.2"
 mypy = "^1.19.0"
 bandit = "^1.7.5"
 
@@ -145,7 +145,6 @@ ignore = [
     "B006",  # do not use mutable data structures for argument defaults (using list(CRUDMethod) is intentional)
     "B904",  # within except clause, use raise ... from (not always needed)
     "B017",  # pytest.raises(Exception) should be considered evil (OK in tests)
-    "UP038", # use X | Y in isinstance call instead of (X, Y) (tuple form is clearer)
     "S101",  # Allow asserts (Ruff's bandit check)
 ]
 

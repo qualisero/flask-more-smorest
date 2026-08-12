@@ -213,7 +213,7 @@ class TestPostArgSchema:
 
     def test_post_with_arg_schema_accepts_valid_input(self, item_model: type[BaseModel]) -> None:
         """When arg_schema is set, valid input matching arg_schema is accepted."""
-        client, app, InputSchema, ResponseSchema = self._make_client(item_model, with_arg_schema=True)
+        client, app, _InputSchema, _ResponseSchema = self._make_client(item_model, with_arg_schema=True)
 
         with app.app_context():
             with item_model.bypass_perms():
@@ -227,7 +227,7 @@ class TestPostArgSchema:
 
     def test_post_with_arg_schema_rejects_invalid_secret(self, item_model: type[BaseModel]) -> None:
         """arg_schema validation runs: wrong secret_code yields 422."""
-        client, app, InputSchema, ResponseSchema = self._make_client(item_model, with_arg_schema=True)
+        client, app, _InputSchema, _ResponseSchema = self._make_client(item_model, with_arg_schema=True)
 
         with app.app_context():
             with item_model.bypass_perms():
@@ -237,7 +237,7 @@ class TestPostArgSchema:
 
     def test_post_with_arg_schema_rejects_missing_secret(self, item_model: type[BaseModel]) -> None:
         """arg_schema is enforced: missing secret_code field yields 422."""
-        client, app, InputSchema, ResponseSchema = self._make_client(item_model, with_arg_schema=True)
+        client, app, _InputSchema, _ResponseSchema = self._make_client(item_model, with_arg_schema=True)
 
         with app.app_context():
             with item_model.bypass_perms():
@@ -248,7 +248,7 @@ class TestPostArgSchema:
 
     def test_post_without_arg_schema_uses_schema_for_both(self, item_model: type[BaseModel]) -> None:
         """Without arg_schema, schema is used for both input and response (backwards compat)."""
-        client, app, InputSchema, ResponseSchema = self._make_client(item_model, with_arg_schema=False)
+        client, app, _InputSchema, _ResponseSchema = self._make_client(item_model, with_arg_schema=False)
 
         with app.app_context():
             with item_model.bypass_perms():
