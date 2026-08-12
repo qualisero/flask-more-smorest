@@ -62,8 +62,8 @@ echo -e "${GREEN}✅ Version bumped to: $NEW_VERSION${NC}"
 echo "🔄 Updating __version__ in __init__.py..."
 INIT_FILE="flask_more_smorest/__init__.py"
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS
-    sed -i '' "s/__version__ = \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/__version__ = \"$NEW_VERSION\"/g" "$INIT_FILE"
+    # macOS. BSD sed uses basic regex and does not support \+, so use [0-9][0-9]*.
+    sed -i '' "s/__version__ = \"[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\"/__version__ = \"$NEW_VERSION\"/g" "$INIT_FILE"
 else
     # Linux
     sed -i "s/__version__ = \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/__version__ = \"$NEW_VERSION\"/g" "$INIT_FILE"
@@ -72,8 +72,8 @@ echo -e "${GREEN}✅ __init__.py updated${NC}"
 
 echo "🔄 Updating badge versions in README.md..."
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS
-    sed -i '' "s/?v=[0-9]\+\.[0-9]\+\.[0-9]\+/?v=$NEW_VERSION/g" README.md
+    # macOS. BSD sed uses basic regex and does not support \+, so use [0-9][0-9]*.
+    sed -i '' "s/?v=[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/?v=$NEW_VERSION/g" README.md
 else
     # Linux
     sed -i "s/?v=[0-9]\+\.[0-9]\+\.[0-9]\+/?v=$NEW_VERSION/g" README.md
