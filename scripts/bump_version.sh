@@ -50,7 +50,8 @@ echo -e "${GREEN}✅ Type checks passed${NC}"
 
 echo ""
 echo "🔄 Bumping $BUMP_TYPE version..."
-NEW_VERSION=$(poetry version $BUMP_TYPE | awk '{print $6}')
+poetry version "$BUMP_TYPE"
+NEW_VERSION=$(poetry version -s)
 
 if [ -z "$NEW_VERSION" ]; then
     echo -e "${RED}❌ Failed to bump version${NC}"
@@ -59,26 +60,21 @@ fi
 
 echo -e "${GREEN}✅ Version bumped to: $NEW_VERSION${NC}"
 
+# Determine sed -i flag (BSD sed requires an explicit empty suffix; GNU sed does not)
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    SED_INPLACE=(-i '')
+else
+    SED_INPLACE=(-i)
+fi
+
 echo "🔄 Updating __version__ in __init__.py..."
 INIT_FILE="flask_more_smorest/__init__.py"
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS. BSD sed uses basic regex and does not support \+, so use [0-9][0-9]*.
-    sed -i '' "s/__version__ = \"[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\"/__version__ = \"$NEW_VERSION\"/g" "$INIT_FILE"
-else
-    # Linux
-    sed -i "s/__version__ = \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/__version__ = \"$NEW_VERSION\"/g" "$INIT_FILE"
+sed "${SED_INPLACE[@]}" "s/__version__ = \"[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\"/__version__ = \"$NEW_VERSION\"/g" "$INIT_FILE"
+if ! grep -q "__version__ = \"$NEW_VERSION\"" "$INIT_FILE"; then
+    echo -e "${RED}❌ Failed to update __version__ in $INIT_FILE${NC}"
+    exit 1
 fi
 echo -e "${GREEN}✅ __init__.py updated${NC}"
-
-echo "🔄 Updating badge versions in README.md..."
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS. BSD sed uses basic regex and does not support \+, so use [0-9][0-9]*.
-    sed -i '' "s/?v=[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/?v=$NEW_VERSION/g" README.md
-else
-    # Linux
-    sed -i "s/?v=[0-9]\+\.[0-9]\+\.[0-9]\+/?v=$NEW_VERSION/g" README.md
-fi
-echo -e "${GREEN}✅ README.md badges updated${NC}"
 
 echo ""
 echo -e "${YELLOW}📝 Next steps:${NC}"
@@ -90,7 +86,7 @@ echo "   2. Review changes:"
 echo "      git diff"
 echo ""
 echo "   3. Commit and push:"
-echo "      git add pyproject.toml flask_more_smorest/__init__.py CHANGELOG.md README.md"
+echo "      git add pyproject.toml flask_more_smorest/__init__.py CHANGELOG.md"
 echo "      git commit -m 'chore: bump version to $NEW_VERSION'"
 echo "      git push origin main"
 echo ""
