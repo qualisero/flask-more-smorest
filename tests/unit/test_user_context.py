@@ -16,8 +16,24 @@ from flask_more_smorest.perms.user_context import (
 )
 
 
-@pytest.mark.usefixtures("reset_user_context")
 class TestUserContext:
+    @pytest.fixture(autouse=True)
+    def _register_default_models(self, reset_user_context, app) -> None:
+        """Re-register the default perms models cleared by ``reset_user_context``.
+
+        The SQLAlchemy mapper for ``User`` cannot configure without a registered
+        ``UserRole`` model, so every test in this class must register the defaults
+        before instantiating ``User``. Each test still registers its own
+        ``get_current_user`` getter, which is what these tests actually assert on.
+        """
+        init_fms(
+            user=defaults_module.User,
+            role=defaults_module.UserRole,
+            token=defaults_module.Token,
+            domain=defaults_module.Domain,
+            setting=defaults_module.UserSetting,
+        )
+
     def test_init_fms_registers_getter(self, app, db_session) -> None:
         user = defaults_module.User(email="test@example.com")
         user.set_password("secret")

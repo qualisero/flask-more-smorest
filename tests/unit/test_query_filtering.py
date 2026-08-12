@@ -226,6 +226,41 @@ class TestGenerateFilterSchema:
         assert nulls_match_field.load_default is False
         assert nulls_match_field.load_only is True
 
+    def test_response_meta_fields_allowlist_does_not_strip_pagination_controls(self) -> None:
+        """A Meta.fields allowlist on the response schema must not affect the filter schema.
+
+        When a response schema restricts its output via Meta.fields, that allowlist
+        describes serialisation only. The generated filter schema must still expose
+        page, page_size and nulls_match, and must not widen the filter surface to
+        columns the response schema does not expose (e.g. 'price' and 'id' here).
+        """
+
+        class SlimSchema(QueryTestSchema):
+            class Meta:
+                # Allowlist: only name and age are in the response.
+                fields = ("name", "age")
+
+        filter_schema = generate_filter_schema(SlimSchema)()
+
+        # Control params must survive the allowlist inheritance.
+        assert "page" in filter_schema.fields
+        assert "page_size" in filter_schema.fields
+        assert "nulls_match" in filter_schema.fields
+
+        # Fields derived from the slim response set must be present.
+        assert "name" in filter_schema.fields
+        assert "age" in filter_schema.fields
+        assert "age__min" in filter_schema.fields
+        assert "age__max" in filter_schema.fields
+
+        # Fields NOT in the slim allowlist must not appear (no surface widening).
+        assert "price" not in filter_schema.fields
+        assert "price__min" not in filter_schema.fields
+        assert "price__max" not in filter_schema.fields
+        assert "id" not in filter_schema.fields
+        assert "created_at__from" not in filter_schema.fields
+        assert "created_at__to" not in filter_schema.fields
+
 
 class TestGetStatementsFromFilters:
     """Tests for get_statements_from_filters function."""

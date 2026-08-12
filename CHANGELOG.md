@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`generate_filter_schema` no longer inherits `Meta.fields` / `Meta.exclude` from the
+  response schema.** When a response schema used a `Meta.fields` allowlist, the generated filter
+  schema silently dropped `page`, `page_size` and `nulls_match`, causing those endpoints to reject
+  `page_size` with 422 and to stop advertising pagination controls in the OpenAPI spec. The filter
+  schema now states its own field set explicitly, overriding `fields`, `additional` and `exclude`
+  inherited from the response `Meta`.
+
 ## [0.13.0] - 2026-07-21
 
 ### Added

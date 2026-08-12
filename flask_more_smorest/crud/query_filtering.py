@@ -69,7 +69,6 @@ def generate_filter_schema(base_schema: type[ma.Schema] | ma.Schema) -> type[ma.
 
     field_definitions: dict[str, ma.fields.Field] = {}
     preserved_fields: dict[str, ma.fields.Field] = {}
-    excluded_fields: set[str] = set()
 
     for field_name, field_obj in base_instance.fields.items():
         new_fields: dict[str, ma.fields.Field] = {}
@@ -100,8 +99,6 @@ def generate_filter_schema(base_schema: type[ma.Schema] | ma.Schema) -> type[ma.
 
         if keep_original:
             preserved_fields[field_name] = _clone_field(field_obj)
-        else:
-            excluded_fields.add(field_name)
 
         for new_name, new_field in new_fields.items():
             field_definitions[new_name] = new_field
@@ -122,16 +119,23 @@ def generate_filter_schema(base_schema: type[ma.Schema] | ma.Schema) -> type[ma.
         field_obj.required = False
 
     base_meta = getattr(base_cls, "Meta", object)
-    base_exclude: tuple[str, ...] = tuple(getattr(base_meta, "exclude", ()))
-    combined_exclude = tuple(dict.fromkeys(base_exclude + tuple(sorted(excluded_fields))))
 
     meta_attrs: dict[str, object] = {
         "partial": True,
         "load_instance": False,
         "unknown": ma.RAISE,
+        # The filter schema declares its own field set: the preserved originals,
+        # the derived __min/__max/__from/__to/__in variants and the
+        # page/page_size/nulls_match control params. `fields`, `additional` and
+        # `exclude` are inherited from the RESPONSE schema's Meta, where they
+        # describe what to serialise; applied here they silently drop the control
+        # params (a response `Meta.fields` allowlist made `page_size` return 422
+        # and capped lists at the default page). State the filter schema's own
+        # set explicitly instead.
+        "fields": tuple(preserved_fields) + tuple(field_definitions) + ("page", "page_size", "nulls_match"),
+        "additional": (),
+        "exclude": (),
     }
-    if combined_exclude:
-        meta_attrs["exclude"] = combined_exclude
 
     meta_class = type(
         "Meta",
