@@ -25,10 +25,10 @@ Thank you for your interest in contributing! This document outlines the process 
 
 3. **Bootstrap the dev environment** (dependencies and pre-commit hooks):
    ```bash
-   poetry install --sync && poetry run pre-commit install
+   poetry sync && poetry run pre-commit install
    ```
 
-   Always use `--sync`: a drifted venv produces phantom lint findings, and a stale
+   Always use `poetry sync`: a drifted venv produces phantom lint findings, and a stale
    hook path silently disables all pre-commit gating.
 
 4. **Run tests to verify setup**:
