@@ -224,6 +224,11 @@ class TestPostArgSchema:
                 assert data["name"] == "Aladdin"
                 # Response schema omits secret_code
                 assert "secret_code" not in data
+                # The row is actually persisted, with the arg_schema-only field
+                rows = item_model.query.all()
+                assert len(rows) == 1
+                assert rows[0].name == "Aladdin"
+                assert rows[0].secret_code == "open-sesame"
 
     def test_post_with_arg_schema_rejects_invalid_secret(self, item_model: type[BaseModel]) -> None:
         """arg_schema validation runs: wrong secret_code yields 422."""
@@ -258,6 +263,61 @@ class TestPostArgSchema:
                 assert resp.status_code == 200
                 data = resp.get_json()
                 assert data["name"] == "Ali Baba"
+                rows = item_model.query.all()
+                assert len(rows) == 1
+                assert rows[0].name == "Ali Baba"
+
+    def test_post_with_model_bound_arg_schema_persists(self, item_model: type[BaseModel]) -> None:
+        """A model-bound arg_schema (load_instance=True) also creates the resource."""
+        rand_str = uuid.uuid4().hex
+
+        class BoundInputSchema(item_model.Schema):  # type: ignore[name-defined,misc]
+            invite_code = fields.Str(required=True, load_only=True)
+
+            @validates("invite_code")
+            def validate_invite(self, value: str) -> None:
+                if value != "open-sesame":
+                    raise ValidationError("Invalid invite code.")
+
+        BoundInputSchema.__name__ = f"BoundInputSchema_{rand_str}"
+        BoundInputSchema.__qualname__ = BoundInputSchema.__name__
+
+        class BoundResponseSchema(Schema):
+            id = fields.Str(dump_only=True)
+            name = fields.Str()
+
+        BoundResponseSchema.__name__ = f"BoundResponseSchema_{rand_str}"
+        BoundResponseSchema.__qualname__ = BoundResponseSchema.__name__
+
+        bp = CRUDBlueprint(
+            f"items_{rand_str}",
+            __name__,
+            model=item_model,
+            schema=item_model.Schema,
+            methods={
+                CRUDMethod.POST: {
+                    "arg_schema": BoundInputSchema,
+                    "schema": BoundResponseSchema,
+                }
+            },
+            url_prefix=f"/api/items_{rand_str}/",
+        )
+
+        app = item_model._test_app  # type: ignore[attr-defined]
+        api = make_api(app)
+        api.register_blueprint(bp)
+        client = app.test_client()
+
+        with app.app_context():
+            with item_model.bypass_perms():
+                url = self._post_url(app)
+                assert client.post(url, json={"name": "Morgiana"}).status_code == 422
+                resp = client.post(url, json={"name": "Morgiana", "invite_code": "open-sesame"})
+                assert resp.status_code == 200
+                assert "invite_code" not in resp.get_json()
+                rows = item_model.query.all()
+                assert len(rows) == 1
+                assert rows[0].name == "Morgiana"
 
 
 # ---------------------------------------------------------------------------

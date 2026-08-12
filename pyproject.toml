@@ -230,7 +230,7 @@ warn_unused_ignores = false
 legacy_tox_ini = """
 [tox]
 isolated_build = true
-envlist = py311,py312,lint,mypy
+envlist = py311,py312,py313,py314,lint,mypy
 
 [testenv]
 deps = pytest

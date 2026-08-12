@@ -588,17 +588,16 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
             # Resolve POST schemas outside the class body so decorators can reference them.
             # arg_schema controls the request input; schema controls the response output.
             post_input_schema: type[Schema] | None = None
-            post_response_schema: type[Schema] | None = None
+            post_response_schema: type[Schema] | str | None = None
             if CRUDMethod.POST in config.methods:
                 post_config = config.methods[CRUDMethod.POST]
                 post_input_candidate = post_config.get("arg_schema") or post_config.get("schema", schema_cls)
-                post_response_candidate = post_config.get("schema", schema_cls)
                 post_input_schema = self._resolve_schema_class(
                     post_input_candidate, config=config, method=CRUDMethod.POST
                 )
-                post_response_schema = self._resolve_schema_class(
-                    post_response_candidate, config=config, method=CRUDMethod.POST
-                )
+                # The response schema is passed through untouched, as GET and PATCH do,
+                # so a configured Schema instance keeps its options (many=True, etc.).
+                post_response_schema = post_config.get("schema", schema_cls)
 
             class GenericIndex(MethodView):
                 """Index/Post endpoints."""
@@ -666,10 +665,18 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
                     )
                     def post(
                         _self,
-                        new_object: BaseModel,
+                        new_object: BaseModel | dict[str, Any],
                         **kwargs: str | int | float | bool | bytes | None,
                     ) -> BaseModel:
-                        """Create and return new resource."""
+                        """Create and return new resource.
+
+                        A model-bound input schema (load_instance=True) deserialises
+                        straight to an instance. A plain marshmallow schema, which is
+                        the usual case for an explicit arg_schema, deserialises to a
+                        dict, so build the instance here.
+                        """
+                        if not isinstance(new_object, model_cls):
+                            new_object = model_cls(**new_object)
                         new_object.update(commit=True, **kwargs)
                         return new_object
 
