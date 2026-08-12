@@ -585,19 +585,17 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
                 )
                 query_filter_schema = generate_filter_schema(base_schema=index_schema_class)
 
-            # Resolve POST schemas outside the class body so decorators can reference them.
-            # arg_schema controls the request input; schema controls the response output.
-            post_input_schema: type[Schema] | None = None
-            post_response_schema: type[Schema] | str | None = None
-            if CRUDMethod.POST in config.methods:
-                post_config = config.methods[CRUDMethod.POST]
-                post_input_candidate = post_config.get("arg_schema") or post_config.get("schema", schema_cls)
-                post_input_schema = self._resolve_schema_class(
-                    post_input_candidate, config=config, method=CRUDMethod.POST
-                )
-                # The response schema is passed through untouched, as GET and PATCH do,
-                # so a configured Schema instance keeps its options (many=True, etc.).
-                post_response_schema = post_config.get("schema", schema_cls)
+            # Resolved outside the class body so the decorators can reference them.
+            # arg_schema drives the request input, schema drives the response output.
+            post_config = config.methods.get(CRUDMethod.POST, {})
+            post_input_schema = self._resolve_schema_class(
+                post_config.get("arg_schema") or post_config.get("schema", schema_cls),
+                config=config,
+                method=CRUDMethod.POST,
+            )
+            # The response schema is passed through untouched, as GET and PATCH do,
+            # so a configured Schema instance keeps its options (many=True, etc.).
+            post_response_schema = post_config.get("schema", schema_cls)
 
             class GenericIndex(MethodView):
                 """Index/Post endpoints."""
@@ -651,11 +649,8 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
 
                 if CRUDMethod.POST in config.methods:
 
-                    @self.arguments(post_input_schema)  # pyright: ignore[reportArgumentType]
-                    @self.response(
-                        HTTPStatus.OK,
-                        post_response_schema,  # pyright: ignore[reportArgumentType]
-                    )
+                    @self.arguments(post_input_schema)
+                    @self.response(HTTPStatus.OK, post_response_schema)
                     @self.doc(
                         responses={
                             HTTPStatus.NOT_FOUND: {"description": f"{config.name} resource not found"},
@@ -675,7 +670,7 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
                         the usual case for an explicit arg_schema, deserialises to a
                         dict, so build the instance here.
                         """
-                        if not isinstance(new_object, model_cls):
+                        if isinstance(new_object, dict):
                             new_object = model_cls(**new_object)
                         new_object.update(commit=True, **kwargs)
                         return new_object
