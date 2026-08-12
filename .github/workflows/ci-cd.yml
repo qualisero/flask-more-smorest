@@ -88,31 +88,10 @@ jobs:
         poetry run ruff format --check flask_more_smorest tests
         poetry run ruff check flask_more_smorest tests
         poetry run mypy flask_more_smorest
-        poetry run bandit -r flask_more_smorest
-
-  security:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-    
-    - name: Install Poetry
-      uses: snok/install-poetry@v1
-    
-    - name: Install dependencies
-      run: poetry install --no-interaction
-    
-    - name: Run security checks
-      run: |
-        poetry run bandit -r flask_more_smorest
 
   build:
     runs-on: ubuntu-latest
-    needs: [test, lint, security]
+    needs: [test, lint]
     if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.publish_to_pypi)
     
     steps:

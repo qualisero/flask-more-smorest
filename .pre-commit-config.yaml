@@ -18,9 +18,3 @@ repos:
         entry: poetry run mypy flask_more_smorest
         language: system
         pass_filenames: false
-
-      - id: bandit
-        name: bandit (poetry)
-        entry: poetry run bandit -r flask_more_smorest
-        language: system
-        pass_filenames: false

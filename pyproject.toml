@@ -54,7 +54,6 @@ pytest-xdist = "^3.5.0"
 # Code Quality (ruff replaces black, isort, and flake8)
 ruff = "^0.16.2"
 mypy = "^1.19.0"
-bandit = "^1.7.5"
 
 # Development Tools
 pre-commit = "^3.6.0"
@@ -133,7 +132,7 @@ select = [
     "PT",    # flake8-pytest-style (better tests)
     "RET",   # flake8-return (cleaner returns)
     "RUF",   # Ruff-specific checks
-    "S",     # flake8-bandit (security checks via Ruff - faster than bandit)
+    "S",     # flake8-bandit (security checks via Ruff, the only security lint)
 ]
 ignore = [
     "E501",  # line too long (handled by formatter)
@@ -145,7 +144,7 @@ ignore = [
     "B006",  # do not use mutable data structures for argument defaults (using list(CRUDMethod) is intentional)
     "B904",  # within except clause, use raise ... from (not always needed)
     "B017",  # pytest.raises(Exception) should be considered evil (OK in tests)
-    "S101",  # Allow asserts (Ruff's bandit check)
+    "S101",  # Allow asserts (Ruff's S ruleset)
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -225,15 +224,11 @@ disallow_incomplete_defs = false
 warn_return_any = false
 warn_unused_ignores = false
 
-[tool.bandit]
-exclude_dirs = ["tests/__pycache__"]
-skips = ["B101", "B105", "B106", "B107", "B601"]
-
 [tool.tox]
 legacy_tox_ini = """
 [tox]
 isolated_build = true
-envlist = py311,py312,lint,mypy,security
+envlist = py311,py312,lint,mypy
 
 [testenv]
 deps = pytest
@@ -248,10 +243,6 @@ commands =
 [testenv:mypy]
 deps = mypy
 commands = mypy flask_more_smorest
-
-[testenv:security]
-deps = bandit
-commands = bandit -r flask_more_smorest -s B101,B106,B601
 
 [testenv:coverage]
 deps = 
