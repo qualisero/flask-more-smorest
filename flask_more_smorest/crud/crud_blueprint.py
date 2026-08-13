@@ -660,9 +660,16 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
                         straight to an instance. A plain marshmallow schema, which is
                         the usual case for an explicit arg_schema, deserialises to a
                         dict, so build the instance here.
+
+                        An arg_schema usually differs from the model: the invite-only
+                        signup example validates an invite code that is not a column.
+                        Keys the model does not define are dropped, mirroring what
+                        marshmallow-sqlalchemy does for a model-bound schema, rather
+                        than letting the declarative constructor raise TypeError.
                         """
                         if isinstance(new_object, dict):
-                            new_object = model_cls(**new_object)
+                            model_fields = {key: value for key, value in new_object.items() if hasattr(model_cls, key)}
+                            new_object = model_cls(**model_fields)
                         new_object.update(commit=True, **kwargs)
                         return new_object
 

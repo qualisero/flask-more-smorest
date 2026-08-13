@@ -268,6 +268,60 @@ class TestPostArgSchema:
                 assert len(rows) == 1
                 assert rows[0].name == "Ali Baba"
 
+    def test_post_with_plain_arg_schema_ignores_non_model_fields(self, item_model: type[BaseModel]) -> None:
+        """The documented invite-only signup shape: a validated field with no column.
+
+        arg_schema exists precisely to accept an input shape that differs from the
+        model, so a field the model does not define must be validated and then
+        dropped, not passed to the declarative constructor.
+        """
+        rand_str = uuid.uuid4().hex
+
+        class InviteSignupSchema(Schema):
+            name = fields.Str(required=True)
+            invite_code = fields.Str(required=True, load_only=True)
+
+            @validates("invite_code")
+            def validate_invite(self, value: str) -> None:
+                if value != "open-sesame":
+                    raise ValidationError("Invalid invite code.")
+
+        InviteSignupSchema.__name__ = f"InviteSignupSchema_{rand_str}"
+        InviteSignupSchema.__qualname__ = InviteSignupSchema.__name__
+
+        class PublicSchema(Schema):
+            id = fields.Str(dump_only=True)
+            name = fields.Str()
+
+        PublicSchema.__name__ = f"PublicSchema_{rand_str}"
+        PublicSchema.__qualname__ = PublicSchema.__name__
+
+        bp = CRUDBlueprint(
+            f"items_{rand_str}",
+            __name__,
+            model=item_model,
+            schema=item_model.Schema,
+            methods={CRUDMethod.POST: {"arg_schema": InviteSignupSchema, "schema": PublicSchema}},
+            url_prefix=f"/api/items_{rand_str}/",
+        )
+
+        app = item_model._test_app
+        api = make_api(app)
+        api.register_blueprint(bp)
+        client = app.test_client()
+
+        with app.app_context(), item_model.bypass_perms():
+            url = self._post_url(app)
+            # The invite code is enforced
+            assert client.post(url, json={"name": "Morgiana", "invite_code": "wrong"}).status_code == 422
+            resp = client.post(url, json={"name": "Morgiana", "invite_code": "open-sesame"})
+            assert resp.status_code == 200
+            assert resp.get_json()["name"] == "Morgiana"
+            rows = item_model.query.all()
+            assert len(rows) == 1
+            assert rows[0].name == "Morgiana"
+            assert not hasattr(rows[0], "invite_code")
+
     def test_post_with_model_bound_arg_schema_persists(self, item_model: type[BaseModel]) -> None:
         """A model-bound arg_schema (load_instance=True) also creates the resource."""
         rand_str = uuid.uuid4().hex
