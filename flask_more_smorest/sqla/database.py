@@ -153,7 +153,8 @@ def _register_performance_hooks(app: "Flask") -> None:
         log_all_queries = settings["log_all_queries"]
         log_parameters = settings["log_parameters"]
 
-        # Track request-level statistics if in request context
+        # Track request-level statistics. Reaching here with settings means either
+        # an app context is active or the registering app's fallback applies.
         if has_app_context():
             g.query_count = getattr(g, "query_count", 0) + 1
             g.total_query_time = getattr(g, "total_query_time", 0.0) + duration
@@ -185,8 +186,10 @@ def _register_performance_hooks(app: "Flask") -> None:
     _performance_hooks_registered = True
 
     logger.info(
-        "SQLAlchemy performance monitoring enabled (slow query threshold: %.2fs)",
+        "SQLAlchemy performance monitoring enabled (slow query threshold: %.2fs for %s; "
+        "other apps use their own configuration)",
         _performance_fallback["slow_query_threshold"],
+        app.name,
     )
 
 

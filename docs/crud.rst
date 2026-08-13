@@ -266,13 +266,30 @@ Use different schemas for different operations:
        methods={
            CRUDMethod.INDEX: {"schema": "UserListSchema"},    # List view
            CRUDMethod.GET: {"schema": "UserDetailSchema"},    # Detail view
-           CRUDMethod.POST: {"schema": "UserCreateSchema"},   # Creation
+           CRUDMethod.POST: {
+               "schema": "UserCreateSchema",                  # Creation response
+               "arg_schema": "UserSignupSchema",              # Creation input
+           },
            CRUDMethod.PATCH: {
                "schema": "UserUpdateSchema",                  # Update response
                "arg_schema": "UserUpdateArgsSchema",          # Update input
            },
        },
    )
+
+``arg_schema`` sets the request body schema for ``POST`` and ``PATCH``, while
+``schema`` stays the response schema. It is meant for input shapes that differ
+from the model, such as an invite code or a password confirmation: fields the
+model does not define are validated and then dropped before the resource is
+created.
+
+``INDEX`` ignores ``arg_schema``. Its query parameters are generated from
+``schema`` by ``generate_filter_schema``, which adds the ``__from``, ``__to``,
+``__min``, ``__max`` and ``__in`` suffixes and injects ``page`` and
+``page_size``. Honouring ``arg_schema`` there would either bypass that
+generation, losing the suffixes, or feed it through the generator, which is
+inconsistent with ``PATCH``. That choice is deferred until a use case settles
+it.
 
 Admin-Only Endpoints
 --------------------

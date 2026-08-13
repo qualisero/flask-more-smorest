@@ -79,7 +79,7 @@ def get_current_user(user_type: type[UserT] | None = None) -> UserT | AbstractUs
             return None
         if not isinstance(user, user_type):
             return None
-        # Explicit cast to help mypy's incremental mode understand the narrowing
+        # isinstance narrows to user_type, which is type[UserT] at the call site
         return cast(UserT, user)
 
     return user
