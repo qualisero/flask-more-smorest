@@ -574,9 +574,10 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
         schema_cls: type[Schema] = config.schema_cls
 
         if CRUDMethod.INDEX in config.methods or CRUDMethod.POST in config.methods:
-            # Initialize variables to avoid "possibly unbound" errors
-            index_schema_class: type[Schema] | None = None
-            query_filter_schema: type[Schema] | None = None
+            # The index view is built here, outside the class body, and stashed in
+            # index_views. Building it conditionally keeps one implementation for the
+            # paginated and non-paginated cases: only the decorator stack differs.
+            index_views: dict[str, Any] = {}
 
             if CRUDMethod.INDEX in config.methods:
                 index_schema_candidate = config.methods[CRUDMethod.INDEX].get("schema", schema_cls)
@@ -584,6 +585,40 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
                     index_schema_candidate, config=config, method=CRUDMethod.INDEX
                 )
                 query_filter_schema = generate_filter_schema(base_schema=index_schema_class)
+
+                def index_get(
+                    _self: MethodView,  # NOTE: using _self to avoid collision with outer self
+                    filters: dict,
+                    pagination_parameters: "PaginationParameters | None" = None,
+                    **kwargs: Any,
+                ) -> Sequence[BaseModel]:
+                    """Fetch all resources.
+
+                    kwargs might contains path parameters to filter by (eg /user/<uuid:user_id>/roles/)
+                    pagination_parameters is injected by the paginate decorator, and is None
+                    when the blueprint has no default page size.
+                    """
+                    stmts = get_statements_from_filters(filters, model=model_cls)
+                    base_query = sa.select(model_cls).filter_by(**kwargs).filter(*stmts)
+
+                    if pagination_parameters is not None:
+                        count_query = sa.select(sa.func.count()).select_from(base_query.subquery())
+                        total_items = self._db_session.scalar(count_query)
+                        pagination_parameters.item_count = total_items  # pyright: ignore[reportAttributeAccessIssue]
+
+                        if pagination_parameters.page_size > 0:
+                            base_query = base_query.limit(pagination_parameters.page_size).offset(
+                                pagination_parameters.page_size * (pagination_parameters.page - 1)
+                            )
+
+                    return self._db_session.execute(base_query).scalars().all()
+
+                # Decorators are applied bottom-up, so this list reads in decorator order.
+                index_view = self.doc(operationId=f"list{config.model_name}")(index_get)
+                if self._default_page_size is not None:
+                    index_view = self.paginate(page_size=self._default_page_size)(index_view)
+                index_view = self.response(HTTPStatus.OK, index_schema_class(many=True))(index_view)
+                index_views["get"] = self.arguments(query_filter_schema, location="query", unknown=RAISE)(index_view)
 
             # Resolved outside the class body so the decorators can reference them.
             # arg_schema drives the request input, schema drives the response output.
@@ -600,52 +635,8 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
             class GenericIndex(MethodView):
                 """Index/Post endpoints."""
 
-                if CRUDMethod.INDEX in config.methods:
-                    if self._default_page_size is not None:
-
-                        @self.arguments(query_filter_schema, location="query", unknown=RAISE)  # pyright: ignore[reportArgumentType]
-                        @self.response(HTTPStatus.OK, index_schema_class(many=True))  # type: ignore[misc]  # pyright: ignore[reportArgumentType, reportOptionalCall]
-                        @self.paginate(page_size=self._default_page_size)
-                        @self.doc(operationId=f"list{config.model_name}")
-                        def get(
-                            _self,  # NOTE: using _self to avoid collision with outer self
-                            filters: dict,
-                            pagination_parameters: "PaginationParameters",
-                            **kwargs: Any,
-                        ) -> Sequence[BaseModel]:
-                            """Fetch all resources.
-                            kwargs might contains path parameters to filter by (eg /user/<uuid:user_id>/roles/)
-                            """
-                            stmts = get_statements_from_filters(filters, model=model_cls)
-                            base_query = sa.select(model_cls).filter_by(**kwargs).filter(*stmts)
-
-                            count_query = sa.select(sa.func.count()).select_from(base_query.subquery())
-                            total_items = self._db_session.scalar(count_query)
-                            pagination_parameters.item_count = total_items  # pyright: ignore[reportAttributeAccessIssue]
-
-                            if pagination_parameters.page_size > 0:
-                                paginated_query = base_query.limit(pagination_parameters.page_size).offset(
-                                    pagination_parameters.page_size * (pagination_parameters.page - 1)
-                                )
-                            else:
-                                paginated_query = base_query
-
-                            return self._db_session.execute(paginated_query).scalars().all()
-
-                    else:
-
-                        @self.arguments(query_filter_schema, location="query", unknown=RAISE)  # pyright: ignore[reportArgumentType]
-                        @self.response(HTTPStatus.OK, index_schema_class(many=True))  # type: ignore[misc]  # pyright: ignore[reportArgumentType, reportOptionalCall]
-                        @self.doc(operationId=f"list{config.model_name}")
-                        def get(
-                            _self,
-                            filters: dict,
-                            **kwargs: Any,
-                        ) -> Sequence[BaseModel]:
-                            """Fetch all resources (no pagination)."""
-                            stmts = get_statements_from_filters(filters, model=model_cls)
-                            base_query = sa.select(model_cls).filter_by(**kwargs).filter(*stmts)
-                            return self._db_session.execute(base_query).scalars().all()
+                if "get" in index_views:
+                    get = index_views["get"]
 
                 if CRUDMethod.POST in config.methods:
 
