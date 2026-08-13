@@ -8,7 +8,7 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any
 
-from flask import g, has_app_context
+from flask import current_app, g, has_app_context
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
@@ -62,6 +62,29 @@ def init_db(app: "Flask") -> None:
 # Track if performance hooks have been registered (global to avoid duplicates)
 _performance_hooks_registered = False
 
+# Settings of the app that registered the hooks, used when no app context is active.
+_performance_fallback: dict[str, Any] = {}
+
+
+def _monitoring_settings() -> dict[str, Any] | None:
+    """Resolve monitoring settings for the app handling the current query.
+
+    The event listeners live on the Engine class, so they are shared by every
+    app in the process. Settings are therefore resolved per query rather than
+    captured at registration time, and None means monitoring is off for the
+    app that issued the query.
+    """
+    if has_app_context():
+        config = current_app.config
+        if not config.get("SQLALCHEMY_PERFORMANCE_MONITORING", False):
+            return None
+        return {
+            "slow_query_threshold": config.get("SQLALCHEMY_SLOW_QUERY_THRESHOLD", 1.0),
+            "log_all_queries": config.get("SQLALCHEMY_LOG_ALL_QUERIES", False),
+            "log_parameters": config.get("SQLALCHEMY_LOG_QUERY_PARAMETERS", True),
+        }
+    return _performance_fallback or None
+
 
 def _register_performance_hooks(app: "Flask") -> None:
     """Register SQLAlchemy event hooks for performance monitoring.
@@ -70,11 +93,11 @@ def _register_performance_hooks(app: "Flask") -> None:
     execution times and log slow queries.
 
     Note:
-        Configuration values (thresholds, log settings) are captured at
-        registration time. Changes to Flask config after init_db() won't
-        affect the monitoring behavior. Event listeners are registered
-        globally on the Engine class, so calling init_db() multiple times
-        will skip duplicate registration.
+        Event listeners are registered globally on the Engine class, so
+        calling init_db() multiple times registers them only once. Each query
+        reads the configuration of the app that issued it, so several apps can
+        use different thresholds, and an app that leaves monitoring disabled
+        is never monitored.
 
     Args:
         app: Flask application for configuration
@@ -86,10 +109,14 @@ def _register_performance_hooks(app: "Flask") -> None:
         logger.debug("Performance monitoring hooks already registered, skipping")
         return
 
-    # Get configuration (captured at registration time)
-    slow_query_threshold = app.config.get("SQLALCHEMY_SLOW_QUERY_THRESHOLD", 1.0)
-    log_all_queries = app.config.get("SQLALCHEMY_LOG_ALL_QUERIES", False)
-    log_parameters = app.config.get("SQLALCHEMY_LOG_QUERY_PARAMETERS", True)
+    # Fallback for queries issued outside an app context
+    _performance_fallback.update(
+        {
+            "slow_query_threshold": app.config.get("SQLALCHEMY_SLOW_QUERY_THRESHOLD", 1.0),
+            "log_all_queries": app.config.get("SQLALCHEMY_LOG_ALL_QUERIES", False),
+            "log_parameters": app.config.get("SQLALCHEMY_LOG_QUERY_PARAMETERS", True),
+        }
+    )
 
     @event.listens_for(Engine, "before_cursor_execute")
     def before_cursor_execute(
@@ -118,6 +145,13 @@ def _register_performance_hooks(app: "Flask") -> None:
             return
 
         duration = time.perf_counter() - start_times.pop(-1)
+
+        settings = _monitoring_settings()
+        if settings is None:
+            return
+        slow_query_threshold = settings["slow_query_threshold"]
+        log_all_queries = settings["log_all_queries"]
+        log_parameters = settings["log_parameters"]
 
         # Track request-level statistics if in request context
         if has_app_context():
@@ -152,7 +186,7 @@ def _register_performance_hooks(app: "Flask") -> None:
 
     logger.info(
         "SQLAlchemy performance monitoring enabled (slow query threshold: %.2fs)",
-        slow_query_threshold,
+        _performance_fallback["slow_query_threshold"],
     )
 
 
