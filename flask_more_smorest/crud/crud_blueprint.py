@@ -118,7 +118,7 @@ def resolve_schema(
     # Defensive guard for unexpected types at runtime
     # Type checker correctly marks this as unreachable given the type hints,
     # but we keep it for robustness if called with unexpected types
-    context_msg = f" for {context}" if context else ""  # type: ignore[unreachable]
+    context_msg = f" for {context}" if context else ""
     raise TypeError(
         f"Schema{context_msg} must be a string, Schema subclass, or Schema instance; "
         f"got {type(schema_candidate).__name__}."

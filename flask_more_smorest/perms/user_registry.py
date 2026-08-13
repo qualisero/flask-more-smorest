@@ -47,12 +47,12 @@ if TYPE_CHECKING:
     # Type for user context function
     GetCurrentUserFunc = Callable[[], AbstractUser | None]
 else:  # pragma: no cover - runtime placeholder
-    AbstractUser = object  # type: ignore[assignment,misc]
-    AbstractUserRole = object  # type: ignore[assignment,misc]
-    AbstractToken = object  # type: ignore[assignment,misc]
-    AbstractDomain = object  # type: ignore[assignment,misc]
-    AbstractUserSetting = object  # type: ignore[assignment,misc]
-    GetCurrentUserFunc = Callable[[], object | None]  # type: ignore[assignment,misc]
+    AbstractUser = object
+    AbstractUserRole = object
+    AbstractToken = object
+    AbstractDomain = object
+    AbstractUserSetting = object
+    GetCurrentUserFunc = Callable[[], object | None]
 
 UserT = TypeVar("UserT", bound="AbstractUser")
 RoleT = TypeVar("RoleT", bound="AbstractUserRole")

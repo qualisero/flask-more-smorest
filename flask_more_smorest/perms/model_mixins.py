@@ -59,7 +59,7 @@ class HasUserMixin:
         custom_name: str | None = getattr(cls, "__user_backref_name__", None)
         if custom_name is not None:
             return custom_name
-        return f"{cls.__tablename__}s"  # type: ignore
+        return f"{cls.__tablename__}s"  # pyright: ignore[reportAttributeAccessIssue]
 
     @classmethod
     def _configure_user_aliases(cls) -> None:
@@ -127,7 +127,7 @@ class HasUserMixin:
         return relationship(
             lambda: get_user_model(),
             lazy="joined",
-            foreign_keys=[cls.user_id],  # type: ignore[list-item]
+            foreign_keys=[cls.user_id],  # pyright: ignore[reportArgumentType]
             backref=backref_arg,
         )
 

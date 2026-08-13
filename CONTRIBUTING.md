@@ -63,7 +63,7 @@ Thank you for your interest in contributing! This document outlines the process 
    ```bash
    poetry run ruff format flask-more-smorest/ tests/
    poetry run ruff check flask-more-smorest/ tests/
-   poetry run mypy flask-more-smorest/
+   poetry run pyright
    ```
 
 6. **Commit your changes**:

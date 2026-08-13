@@ -87,7 +87,7 @@ jobs:
       run: |
         poetry run ruff format --check flask_more_smorest tests
         poetry run ruff check flask_more_smorest tests
-        poetry run mypy flask_more_smorest
+        poetry run pyright
 
   build:
     runs-on: ubuntu-latest

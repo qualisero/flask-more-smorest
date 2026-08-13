@@ -33,7 +33,7 @@ def build_models() -> type[AbstractUser]:
     module.__dict__.update(globals())
     sys.modules[module_name] = module
 
-    class CustomUser(AbstractUser):  # type: ignore[misc]
+    class CustomUser(AbstractUser):
         __module__ = module_name
         __allow_unmapped__ = True
 
@@ -111,12 +111,12 @@ class TestCustomGetter:
                 email="external@example.com",
                 password="password123",
             )
-            user.external_id = "EXT123"  # type: ignore[attr-defined]
-            user.source_system = "LDAP"  # type: ignore[attr-defined]
+            user.external_id = "EXT123"
+            user.source_system = "LDAP"
             user.save()
 
         # Mock external authentication
-        def external_get_user() -> CustomUser | None:  # type: ignore[valid-type]
+        def external_get_user() -> CustomUser | None:  # pyright: ignore[reportInvalidTypeForm]
             """Simulate external auth (LDAP, OAuth, etc.)."""
             return db.session.query(CustomUser).filter_by(email="external@example.com").first()
 
@@ -127,8 +127,8 @@ class TestCustomGetter:
         current = CustomUser.get_current_user()
         assert current is not None
         assert isinstance(current, CustomUser)
-        assert current.external_id == "EXT123"  # type: ignore[attr-defined]
-        assert current.source_system == "LDAP"  # type: ignore[attr-defined]
+        assert current.external_id == "EXT123"
+        assert current.source_system == "LDAP"
 
     def test_custom_getter_overrides_jwt_fallback(
         self, unit_app: Flask, db_session: Generator[None, None, None]
@@ -149,7 +149,7 @@ class TestCustomGetter:
             custom_user.save()
 
         # Register custom getter that always returns custom_user
-        def custom_get_user() -> CustomUser | None:  # type: ignore[valid-type]
+        def custom_get_user() -> CustomUser | None:  # pyright: ignore[reportInvalidTypeForm]
             return db.session.query(CustomUser).filter_by(email="custom@example.com").first()
 
         init_fms(get_current_user=custom_get_user)
@@ -167,7 +167,7 @@ class TestCustomGetter:
         init_fms(user=CustomUser)
 
         # Custom getter returns None
-        def unauthenticated_get_user() -> CustomUser | None:  # type: ignore[valid-type]
+        def unauthenticated_get_user() -> CustomUser | None:  # pyright: ignore[reportInvalidTypeForm]
             return None
 
         init_fms(get_current_user=unauthenticated_get_user)
@@ -191,7 +191,7 @@ class TestCustomGetter:
             user.roles.append(defaults_module.UserRole(user=user, role=defaults_module.BaseRoleEnum.ADMIN))
 
         # Custom getter returns admin user
-        def get_admin() -> CustomUser | None:  # type: ignore[valid-type]
+        def get_admin() -> CustomUser | None:  # pyright: ignore[reportInvalidTypeForm]
             return db.session.query(CustomUser).filter_by(email="admin@example.com").first()
 
         init_fms(get_current_user=get_admin)

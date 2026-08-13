@@ -40,10 +40,10 @@ if ! poetry run pytest -q; then
 fi
 echo -e "${GREEN}✅ All tests passed${NC}"
 
-# Run mypy
-echo "🔍 Running mypy type checks..."
-if ! poetry run mypy flask_more_smorest; then
-    echo -e "${RED}❌ Mypy checks failed! Fix type errors before releasing.${NC}"
+# Run type checks
+echo "🔍 Running pyright type checks..."
+if ! poetry run pyright; then
+    echo -e "${RED}❌ Type checks failed! Fix type errors before releasing.${NC}"
     exit 1
 fi
 echo -e "${GREEN}✅ Type checks passed${NC}"

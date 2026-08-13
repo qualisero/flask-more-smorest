@@ -108,7 +108,7 @@ class SharedUserBlueprint(UserBlueprint):
         self.me_schema = kwargs.pop("me_schema", None)
         super().__init__(*args, **kwargs)
 
-    def _validate_login(self, user: CustomUser | None, data: dict) -> None:  # type: ignore[override]
+    def _validate_login(self, user: CustomUser | None, data: dict) -> None:
         """Validate domain access if domain provided."""
         if domain_name := data.get("domain"):
             domain = CustomDomain.get_by_or_404(name=domain_name)
@@ -141,7 +141,7 @@ class SharedUserBlueprint(UserBlueprint):
 
         @self.route("/me", methods=["GET"])
         @self.response(200, self.me_schema)
-        def get_current_user_profile() -> CustomUser:  # type: ignore[misc]
+        def get_current_user_profile() -> CustomUser:
             """Get current user profile."""
             user = CustomUser.get_current_user()
             if not user or not user.id:
@@ -164,14 +164,14 @@ if TYPE_CHECKING:
     UserSchema = SQLAlchemyAutoSchema
 else:
     # At runtime, these are None and will be set by custom_models fixture
-    CustomProfilePic = cast(Any, None)  # type: ignore[misc]
-    CustomInvite = cast(Any, None)  # type: ignore[misc]
-    CustomDomain = cast(Any, None)  # type: ignore[misc]
-    CustomUser = cast(Any, None)  # type: ignore[misc]
-    CustomUserRole = cast(Any, None)  # type: ignore[misc]
-    CustomToken = cast(Any, None)  # type: ignore[misc]
-    CustomUserSetting = cast(Any, None)  # type: ignore[misc]
-    UserSchema = cast(Any, None)  # type: ignore[misc]
+    CustomProfilePic = cast(Any, None)
+    CustomInvite = cast(Any, None)
+    CustomDomain = cast(Any, None)
+    CustomUser = cast(Any, None)
+    CustomUserRole = cast(Any, None)
+    CustomToken = cast(Any, None)
+    CustomUserSetting = cast(Any, None)
+    UserSchema = cast(Any, None)
 
 
 # ============================================================================
@@ -343,7 +343,7 @@ def test_1_basic_login_with_shared_blueprint(app: Flask, api: Api) -> None:
     # Define UserSchema for this test
     class UserSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUser  # type: ignore[misc]
+            model = CustomUser
             load_instance = True
             include_fk = True
 
@@ -383,12 +383,12 @@ def test_2_soft_delete_feature(app: Flask, api: Api) -> None:
 
     class UserSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUser  # type: ignore[misc]
+            model = CustomUser
             load_instance = True
 
     class RoleSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUserRole  # type: ignore[misc]
+            model = CustomUserRole
             load_instance = True
 
     user_bp = SharedUserBlueprint(
@@ -419,7 +419,7 @@ def test_2_soft_delete_feature(app: Flask, api: Api) -> None:
     # Admin-only soft delete endpoint
     @user_bp.route("<uuid:user_id>/soft-delete", methods=["POST"])
     @user_bp.response(200, UserSchema)
-    def soft_delete_user(user_id: uuid.UUID) -> CustomUser:  # type: ignore[misc]
+    def soft_delete_user(user_id: uuid.UUID) -> CustomUser:
         """Soft delete a user (admin only)."""
         current = get_current_user()
         if not current or not current.is_admin:
@@ -432,7 +432,7 @@ def test_2_soft_delete_feature(app: Flask, api: Api) -> None:
     # Admin-only restore endpoint
     @user_bp.route("<uuid:user_id>/restore", methods=["POST"])
     @user_bp.response(200, UserSchema)
-    def restore_user(user_id: uuid.UUID) -> CustomUser:  # type: ignore[misc]
+    def restore_user(user_id: uuid.UUID) -> CustomUser:
         """Restore a soft-deleted user (admin only)."""
         current = get_current_user()
         if not current or not current.is_admin:
@@ -534,7 +534,7 @@ def test_3_profile_mixin_and_display_name(app: Flask, api: Api) -> None:
 
     class UserSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUser  # type: ignore[misc]
+            model = CustomUser
             load_instance = True
             include_fk = True
 
@@ -617,7 +617,7 @@ def test_4_password_recovery_flow(app: Flask, api: Api) -> None:
 
     class UserSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUser  # type: ignore[misc]
+            model = CustomUser
             load_instance = True
 
     user_bp = SharedUserBlueprint(
@@ -740,12 +740,12 @@ def test_5_invite_system(app: Flask, api: Api) -> None:
 
     class UserSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUser  # type: ignore[misc]
+            model = CustomUser
             load_instance = True
 
     class InviteSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomInvite  # type: ignore[misc]
+            model = CustomInvite
             load_instance = False  # Return dict, not instance
             include_fk = True
 
@@ -771,7 +771,7 @@ def test_5_invite_system(app: Flask, api: Api) -> None:
             if not current or (current.id != user_id and not current.is_admin):
                 raise ForbiddenError("Not allowed to send invites")
             payload["sender_user_id"] = user_id  # Set sender from route parameter
-            invite = CustomInvite(**payload)  # type: ignore[misc]
+            invite = CustomInvite(**payload)  # pyright: ignore[reportCallIssue]
             invite.save()
             return invite
 
@@ -847,12 +847,12 @@ def test_6_admin_role_enforcement(app: Flask, api: Api) -> None:
 
     class UserSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUser  # type: ignore[misc]
+            model = CustomUser
             load_instance = True
 
     class RoleSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUserRole  # type: ignore[misc]
+            model = CustomUserRole
             load_instance = True
 
     user_bp = SharedUserBlueprint(
@@ -960,7 +960,7 @@ def test_7_bypass_perms_context(app: Flask, api: Api) -> None:
 
     class UserSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUser  # type: ignore[misc]
+            model = CustomUser
             load_instance = True
 
     user_bp = SharedUserBlueprint(
@@ -1046,7 +1046,7 @@ def test_8_health_endpoint(app: Flask, api: Api) -> None:
 
     class UserSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUser  # type: ignore[misc]
+            model = CustomUser
             load_instance = True
 
     user_bp = SharedUserBlueprint(
@@ -1081,12 +1081,12 @@ def test_9_domain_access_control(app: Flask, api: Api) -> None:
 
     class UserSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUser  # type: ignore[misc]
+            model = CustomUser
             load_instance = True
 
     class RoleSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUserRole  # type: ignore[misc]
+            model = CustomUserRole
             load_instance = True
 
     user_bp = SharedUserBlueprint(
@@ -1177,13 +1177,13 @@ def test_10_user_crud_operations(app: Flask, api: Api) -> None:
     # Define schemas with correct model reference
     class UserOutputSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUser  # type: ignore[misc]
+            model = CustomUser
             load_instance = True
 
     # Create a schema that doesn't load instances (for POST input)
     class UserInputSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUser  # type: ignore[misc]
+            model = CustomUser
             load_instance = False
 
     user_bp = SharedUserBlueprint(
@@ -1205,7 +1205,7 @@ def test_10_user_crud_operations(app: Flask, api: Api) -> None:
     @user_bp.route("create", methods=["POST"])
     @user_bp.arguments(UserInputSchema)
     @user_bp.response(200, UserOutputSchema)
-    def create_user(data: dict[str, Any]) -> CustomUser:  # type: ignore[misc]
+    def create_user(data: dict[str, Any]) -> CustomUser:
         """Create a new user."""
         user = CustomUser(**data)
         user.save()
@@ -1321,7 +1321,7 @@ def test_11_user_profile_picture_update(app: Flask, api: Api) -> None:
     @user_bp.response(200, UserWithProfileSchema)
     def upload_profile_pic(payload: dict[str, Any], user_id: uuid.UUID):
         """Upload user profile picture."""
-        user = CustomUser.get_or_404(user_id)  # type: ignore[misc]
+        user = CustomUser.get_or_404(user_id)
         old_profile_pic_id = user.profile_pic_id
 
         # In real demoapp, this would process the actual file upload
@@ -1335,7 +1335,7 @@ def test_11_user_profile_picture_update(app: Flask, api: Api) -> None:
 
         # Delete old profile pic if exists
         if old_profile_pic_id:
-            old_img = TestImage.get_by(id=old_profile_pic_id)  # type: ignore[misc]
+            old_img = TestImage.get_by(id=old_profile_pic_id)
             if old_img:
                 old_img.delete()
 
@@ -1390,12 +1390,12 @@ def test_12_user_patch_update(app: Flask, api: Api) -> None:
     # Define local schemas to avoid cross-test pollution
     class UserOutputSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUser  # type: ignore[misc]
+            model = CustomUser
             load_instance = True
 
     class UserPrivateSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUser  # type: ignore[misc]
+            model = CustomUser
             load_instance = False
             exclude = ("roles", "settings", "tokens")
 
@@ -1418,7 +1418,7 @@ def test_12_user_patch_update(app: Flask, api: Api) -> None:
     @user_bp.response(200, UserOutputSchema)
     def patch_user(payload: dict[str, Any], user_id: uuid.UUID):
         """Update user if writable."""
-        user = CustomUser.get_or_404(user_id)  # type: ignore[misc]
+        user = CustomUser.get_or_404(user_id)
         user.update(**payload)
         user.save()
         return user
@@ -1479,12 +1479,12 @@ def test_13_user_full_details_endpoint(app: Flask, api: Api) -> None:
 
     class UserSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUser  # type: ignore[misc]
+            model = CustomUser
             load_instance = True
 
     class UserPrivateSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUser  # type: ignore[misc]
+            model = CustomUser
             load_instance = True
             exclude = ("roles", "settings", "tokens")
 
@@ -1505,7 +1505,7 @@ def test_13_user_full_details_endpoint(app: Flask, api: Api) -> None:
         """Get user details with private fields."""
         # In demoapp, this would check permissions
         # For testing, we allow the user to view their own full details
-        return CustomUser.get_or_404(user_id)  # type: ignore[misc]
+        return CustomUser.get_or_404(user_id)
 
     api.register_blueprint(user_bp)
 
@@ -1562,7 +1562,7 @@ def test_14_error_handling_scenarios(app: Flask, api: Api) -> None:
 
     class UserSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUser  # type: ignore[misc]
+            model = CustomUser
             load_instance = True
 
     user_bp = SharedUserBlueprint(
@@ -1627,13 +1627,13 @@ def test_15_demoapp_style_integration(app: Flask, api: Api) -> None:
 
     class UserSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUser  # type: ignore[misc]
+            model = CustomUser
             load_instance = True
             include_fk = True
 
     class RoleSchema(SQLAlchemyAutoSchema):
         class Meta:
-            model = CustomUserRole  # type: ignore[misc]
+            model = CustomUserRole
             load_instance = True
             include_fk = True
 
@@ -1681,7 +1681,7 @@ def test_15_demoapp_style_integration(app: Flask, api: Api) -> None:
 
     @user_bp.route("<uuid:user_id>/settings/", methods=["GET"])
     @user_bp.response(200, UserSettingsSchema(many=True))
-    def list_user_settings(user_id: uuid.UUID) -> list[CustomUserSetting]:  # type: ignore[misc]
+    def list_user_settings(user_id: uuid.UUID) -> list[CustomUserSetting]:
         user = CustomUser.get_or_404(user_id)
         if not user.can_write():
             raise UnauthorizedError("Not allowed")
@@ -1690,17 +1690,17 @@ def test_15_demoapp_style_integration(app: Flask, api: Api) -> None:
     @user_bp.route("<uuid:user_id>/settings/", methods=["POST"])
     @user_bp.arguments(UserSettingsSchema, location="json")
     @user_bp.response(200, UserSettingsSchema(many=True))
-    def user_settings(payload: dict[str, Any], user_id: uuid.UUID) -> list[CustomUserSetting]:  # type: ignore[misc]
+    def user_settings(payload: dict[str, Any], user_id: uuid.UUID) -> list[CustomUserSetting]:
         user = CustomUser.get_or_404(user_id)
         if not user.can_write():
             raise UnauthorizedError("Not allowed")
         key = payload["key"]
-        setting = CustomUserSetting.get_by(user_id=user_id, key=key)  # type: ignore[misc]
+        setting = CustomUserSetting.get_by(user_id=user_id, key=key)
         if setting:
             setting.value = payload.get("value")
             setting.save()
         else:
-            setting = CustomUserSetting(user_id=user_id, key=key, value=payload.get("value"))  # type: ignore[misc]
+            setting = CustomUserSetting(user_id=user_id, key=key, value=payload.get("value"))
             setting.save()
         return CustomUserSetting.query.filter_by(user_id=user_id).all()
 

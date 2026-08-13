@@ -37,7 +37,7 @@ def test_check_permission_raises_for_create(
 
     with app.app_context():
         instance = dummy_perms_model(name="value")
-        instance._can_create = lambda user: False  # type: ignore[method-assign]
+        instance._can_create = lambda user: False
 
     with app.test_request_context("/"):
         with pytest.raises(ForbiddenError):
@@ -52,8 +52,8 @@ def test_can_write_uses_can_create_when_transient(
         instance = dummy_perms_model(name="value")
 
     called: list[str] = []
-    instance._can_create = lambda user: called.append("create") or True  # type: ignore[method-assign,func-returns-value]
-    instance._can_write = lambda user: False  # type: ignore[method-assign]
+    instance._can_create = lambda user: called.append("create") or True
+    instance._can_write = lambda user: False
 
     def fake_inspect(obj: object) -> object:
         @dataclass
@@ -79,8 +79,8 @@ def test_can_write_uses_write_when_persisted(
         instance = dummy_perms_model(name="value")
 
     called: list[str] = []
-    instance._can_create = lambda user: False  # type: ignore[method-assign]
-    instance._can_write = lambda user: called.append("write") or True  # type: ignore[method-assign,func-returns-value]
+    instance._can_create = lambda user: False
+    instance._can_write = lambda user: called.append("write") or True
 
     def fake_inspect(obj: object) -> object:
         @dataclass
@@ -120,7 +120,7 @@ class TestCheckCreateCycles:
 
             root = Node()
             # Create a self-cycle
-            root.parent = root  # pyright: ignore[reportAttributeAccessIssue]
+            root.parent = root
 
             # Should not raise RecursionError due to cycle; any permission
             # exceptions would be raised explicitly instead.

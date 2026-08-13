@@ -136,7 +136,7 @@ class BasePermsModel(SQLABaseModel):
             return True
 
         if self.id is None:
-            return True  # type: ignore[unreachable]  # mypy false positive
+            return True
 
         return self._execute_permission_check(lambda: self._can_read(user), "read")
 

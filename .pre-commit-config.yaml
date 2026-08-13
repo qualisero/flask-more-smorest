@@ -13,8 +13,8 @@ repos:
         language: system
         types: [python]
 
-      - id: mypy
-        name: mypy (poetry)
-        entry: poetry run mypy flask_more_smorest
+      - id: pyright
+        name: pyright (poetry)
+        entry: poetry run pyright
         language: system
         pass_filenames: false

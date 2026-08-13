@@ -312,7 +312,7 @@ def test_methods_dict_invalid_value_raises(app: Flask) -> None:
     )
 
     with pytest.raises(TypeError, match="must be a dict, True, or False"):
-        bp._normalize_methods({CRUDMethod.INDEX: "invalid"})  # type: ignore[dict-item]
+        bp._normalize_methods({CRUDMethod.INDEX: "invalid"})  # pyright: ignore[reportArgumentType]
 
 
 def test_methods_invalid_type_raises(app: Flask) -> None:
@@ -329,7 +329,7 @@ def test_methods_invalid_type_raises(app: Flask) -> None:
     )
 
     with pytest.raises(TypeError, match="must be a list or a dict"):
-        bp._normalize_methods("invalid")  # type: ignore[arg-type]
+        bp._normalize_methods("invalid")  # pyright: ignore[reportArgumentType]
 
 
 def test_empty_methods_list(app: Flask) -> None:

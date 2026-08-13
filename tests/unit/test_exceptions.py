@@ -229,7 +229,7 @@ def test_user_context_included_in_debug_mode() -> None:
 
     try:
         with app.app_context():
-            init_fms(get_current_user=get_mock_user)  # type: ignore[type-var]  # type: ignore[type-var]
+            init_fms(get_current_user=get_mock_user)  # pyright: ignore[reportArgumentType]
             with app.test_request_context():
                 try:
                     raise DummyException("test error")
@@ -279,7 +279,7 @@ def test_user_context_not_included_in_production() -> None:
 
     try:
         with app.app_context():
-            init_fms(get_current_user=get_mock_user)  # type: ignore[type-var]
+            init_fms(get_current_user=get_mock_user)  # pyright: ignore[reportArgumentType]
             with app.test_request_context():
                 try:
                     raise DummyException("test error")

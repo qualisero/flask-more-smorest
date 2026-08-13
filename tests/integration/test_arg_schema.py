@@ -102,7 +102,7 @@ def item_model(tmp_path: object) -> type[BaseModel]:
     with app.app_context():
         db.create_all()
 
-    ItemModel._test_app = app  # type: ignore[attr-defined]
+    ItemModel._test_app = app
     return ItemModel
 
 
@@ -130,7 +130,7 @@ def patch_model(tmp_path: object) -> type[BaseModel]:
     with app.app_context():
         db.create_all()
 
-    WidgetModel._test_app = app  # type: ignore[attr-defined]
+    WidgetModel._test_app = app
     return WidgetModel
 
 
@@ -198,7 +198,7 @@ class TestPostArgSchema:
             url_prefix=f"/api/items_{rand_str}/",
         )
 
-        app = item_model._test_app  # type: ignore[attr-defined]
+        app = item_model._test_app
         api = make_api(app)
         api.register_blueprint(bp)
         client = app.test_client()
@@ -271,7 +271,7 @@ class TestPostArgSchema:
         """A model-bound arg_schema (load_instance=True) also creates the resource."""
         rand_str = uuid.uuid4().hex
 
-        class BoundInputSchema(item_model.Schema):  # type: ignore[name-defined,misc]
+        class BoundInputSchema(item_model.Schema):
             invite_code = fields.Str(required=True, load_only=True)
 
             @validates("invite_code")
@@ -303,7 +303,7 @@ class TestPostArgSchema:
             url_prefix=f"/api/items_{rand_str}/",
         )
 
-        app = item_model._test_app  # type: ignore[attr-defined]
+        app = item_model._test_app
         api = make_api(app)
         api.register_blueprint(bp)
         client = app.test_client()
@@ -358,7 +358,7 @@ class TestPatchArgSchema:
             url_prefix=f"/api/widgets_{rand_str}/",
         )
 
-        app = patch_model._test_app  # type: ignore[attr-defined]
+        app = patch_model._test_app
         api = make_api(app)
         api.register_blueprint(bp)
         return app.test_client(), app

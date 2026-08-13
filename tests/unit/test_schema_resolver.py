@@ -82,14 +82,14 @@ class TestResolveSchema:
     def test_resolve_invalid_type_raises(self) -> None:
         """Test that invalid types raise TypeError."""
         with pytest.raises(TypeError) as exc_info:
-            resolve_schema(123, "")  # type: ignore[arg-type]
+            resolve_schema(123, "")  # pyright: ignore[reportArgumentType]
 
         assert "must be a string, Schema subclass, or Schema instance" in str(exc_info.value)
 
     def test_resolve_with_context_in_type_error(self) -> None:
         """Test that context is included in TypeError message."""
         with pytest.raises(TypeError) as exc_info:
-            resolve_schema(123, "", context="POST method")  # type: ignore[arg-type]
+            resolve_schema(123, "", context="POST method")  # pyright: ignore[reportArgumentType]
 
         assert "for POST method" in str(exc_info.value)
 
@@ -100,7 +100,7 @@ class TestResolveSchema:
             pass
 
         with pytest.raises(TypeError) as exc_info:
-            resolve_schema(NotASchema, "")  # type: ignore[arg-type]
+            resolve_schema(NotASchema, "")  # pyright: ignore[reportArgumentType]
 
         assert "must be a string, Schema subclass, or Schema instance" in str(exc_info.value)
 

@@ -80,7 +80,7 @@ class BaseModelMeta(DeclarativeMeta):
         pass
 
 
-class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined]
+class BaseModel(db.Model, metaclass=BaseModelMeta):
     """Base model for all application models.
 
     This base class provides:
@@ -450,7 +450,7 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
         db.session.expunge(self)
 
         make_transient(self)
-        self.id = None  # type: ignore[assignment]
+        self.id = None  # pyright: ignore[reportAttributeAccessIssue]
 
         return self
 

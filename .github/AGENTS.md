@@ -11,7 +11,7 @@ When asked to create a release:
 1. **Ensure all changes are committed and tests pass:**
    ```bash
    poetry run pytest
-   poetry run mypy flask_more_smorest
+   poetry run pyright
    ```
 
 2. **Run bump version script:**
@@ -21,7 +21,7 @@ When asked to create a release:
    
    This script will:
    - Check for uncommitted changes
-   - Run tests and mypy checks
+   - Run tests and type checks
    - Bump version in `pyproject.toml`
    - Update `__version__` in `flask_more_smorest/__init__.py`
 
@@ -91,7 +91,7 @@ When releasing from a feature branch:
 2. **Run pre-merge checks:**
    ```bash
    poetry run pytest -xvs
-   poetry run mypy flask_more_smorest
+   poetry run pyright
    ```
 
 3. **Push feature branch:**
@@ -113,7 +113,7 @@ When releasing from a feature branch:
 Before running `bump_version.sh`:
 
 - [ ] All tests pass: `poetry run pytest`
-- [ ] Type checks pass: `poetry run mypy flask_more_smorest`
+- [ ] Type checks pass: `poetry run pyright`
 - [ ] Linting passes: `poetry run ruff check flask_more_smorest`
 - [ ] All changes committed
 - [ ] On main branch (or have plan for feature branch merge)
@@ -135,7 +135,7 @@ All files must be committed together in the version bump commit.
 - No explicit `__tablename__` unless custom name required
 - Follow existing patterns in codebase
 - All tests must pass before release
-- Type hints required (mypy checks enforced)
+- Type hints required (pyright checks enforced)
 
 ## Documentation
 
@@ -150,7 +150,7 @@ All files must be committed together in the version bump commit.
 - Ensure 100% pass rate before release
 - Add tests for new features
 - Zero warnings policy
-- Type check: `poetry run mypy flask_more_smorest`
+- Type check: `poetry run pyright`
 
 ## CI/CD Pipeline
 
@@ -161,7 +161,7 @@ All files must be committed together in the version bump commit.
 
 ### Jobs
 1. **test** - Python 3.11 to 3.14 test matrix
-2. **lint** - Ruff formatting, linting (including the S security ruleset) and mypy
+2. **lint** - Ruff formatting, linting (including the S security ruleset) and pyright
 3. **build** - Build Python package
 4. **publish** - Publish to PyPI (release only, via Trusted Publishing)
 5. **trigger-docs** - Trigger ReadTheDocs build (release only)
@@ -186,8 +186,8 @@ sed -i '' "s/__version__ = \".*\"/__version__ = \"$VERSION\"/" flask_more_smores
 # Run tests with verbose output
 poetry run pytest -xvs
 
-# Check for mypy issues
-poetry run mypy flask_more_smorest
+# Check for type errors
+poetry run pyright
 ```
 
 ### PyPI Publication Fails

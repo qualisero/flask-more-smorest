@@ -181,7 +181,7 @@ def custom_models() -> Iterator[SimpleNamespace]:
             # Only admins or premium users can create domains
             return user.has_role(CustomUserRoleEnum.ADMIN) or getattr(user, "is_premium", False)
 
-    class CustomUser(AbstractUser, ProfileMixin, TimestampMixin, SoftDeleteMixin):  # type: ignore[misc]
+    class CustomUser(AbstractUser, ProfileMixin, TimestampMixin, SoftDeleteMixin):
         """User with multiple mixins and custom fields for permission testing."""
 
         __module__ = module_name
@@ -405,10 +405,10 @@ def test_fully_extended_models_and_blueprint(app: Flask, db_session: None, custo
     CustomUser = custom_models.CustomUser
 
     api: Api = Api(app)
-    user_bp: CustomUserBlueprint = CustomUserBlueprint(register=False)  # type: ignore[valid-type]
+    user_bp: CustomUserBlueprint = CustomUserBlueprint(register=False)
 
     # Add custom bio endpoint
-    @user_bp.route("/me/bio/", methods=["GET"])  # type: ignore[attr-defined]
+    @user_bp.route("/me/bio/", methods=["GET"])
     def get_bio() -> dict[str, str | None]:
         user = CustomUser.get_current_user()
         if user is None:
@@ -417,8 +417,8 @@ def test_fully_extended_models_and_blueprint(app: Flask, db_session: None, custo
 
     api.register_blueprint(user_bp)
 
-    user: CustomUser = CustomUser(email="anne@example.com", bio="Hello World")  # type: ignore[valid-type]
-    user.set_password("secret")  # type: ignore[attr-defined]
+    user: CustomUser = CustomUser(email="anne@example.com", bio="Hello World")
+    user.set_password("secret")
     db.session.add(user)
     db.session.commit()
 
@@ -439,7 +439,7 @@ def test_custom_blueprint_profile_endpoint(app: Flask, db_session: None) -> None
     user_bp: CustomUserBlueprint = CustomUserBlueprint(register=False)
 
     # Add custom profile endpoint
-    @user_bp.route("/me/profile/", methods=["GET"])  # type: ignore[attr-defined]
+    @user_bp.route("/me/profile/", methods=["GET"])
     def get_profile() -> dict:
         user = CustomUser.get_current_user()
         if user is None:
@@ -908,7 +908,7 @@ def test_mixin_functionality_soft_delete(app: Flask, db_session: None) -> None:
     user.soft_delete()
     db.session.commit()
     assert user.is_deleted is True
-    assert user.deleted_at is not None  # type: ignore[unreachable]
+    assert user.deleted_at is not None
     assert user.is_enabled is False
 
     # Restore
@@ -1035,7 +1035,7 @@ def test_fully_extended_restore_keeps_related_models(app: Flask, db_session: Non
     user.restore()
     db.session.commit()
     assert user.is_deleted is False
-    assert user.deleted_at is None  # type: ignore[unreachable]
+    assert user.deleted_at is None
     assert user.is_enabled is True
 
     # Related models should still exist
@@ -1064,7 +1064,7 @@ def test_fully_extended_hard_delete_after_restore(app: Flask, db_session: None) 
     assert user.is_deleted is False
 
     # Hard delete should still cascade
-    with CustomUser.bypass_perms():  # type: ignore[unreachable]
+    with CustomUser.bypass_perms():
         user.delete(commit=True)
     assert db.session.query(CustomToken).count() == 0
 

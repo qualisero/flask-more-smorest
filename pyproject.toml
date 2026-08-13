@@ -55,7 +55,6 @@ pytest-xdist = "^3.5.0"
 
 # Code Quality (ruff replaces black, isort, and flake8)
 ruff = "^0.16.2"
-mypy = "^1.19.0"
 
 # Development Tools
 pre-commit = "^3.6.0"
@@ -167,26 +166,9 @@ known-first-party = ["flask_more_smorest"]
 force-single-line = false
 split-on-trailing-comma = true
 
-[tool.mypy]
-python_version = "3.11"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-disallow_untyped_decorators = false
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-warn_no_return = true
-warn_unreachable = true
-strict_equality = true
-show_error_codes = true
-disable_error_code = ["untyped-decorator"]
-
 [tool.pyright]
 include = ["flask_more_smorest", "tests"]
-exclude = ["**/__pycache__", "**/.mypy_cache", "**/node_modules", "**/*.egg-info"]
+exclude = ["**/__pycache__", "**/node_modules", "**/*.egg-info"]
 typeCheckingMode = "standard"
 reportIncompatibleMethodOverride = "warning"
 reportUnknownMemberType = "none"
@@ -196,6 +178,7 @@ reportUnknownParameterType = "none"
 reportAttributeAccessIssue = "warning"
 reportMissingTypeStubs = "none"
 stubPath = "./stubs;./stubs/test_stubs"
+reportUnnecessaryTypeIgnoreComment = "error"
 
 [[tool.pyright.executionEnvironments]]
 root = "tests"
@@ -208,29 +191,11 @@ reportAttributeAccessIssue = "none"
 reportIncompatibleMethodOverride = "none"
 
 
-[[tool.mypy.overrides]]
-module = [
-    "flask_smorest.*",
-    "marshmallow_sqlalchemy.*",
-    "inflect.*",
-]
-ignore_missing_imports = true
-
-# Looser rules for tests: allow untyped defs and tolerate missing imports
-[[tool.mypy.overrides]]
-module = "tests.*"
-ignore_missing_imports = true
-check_untyped_defs = false
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
-warn_return_any = false
-warn_unused_ignores = false
-
 [tool.tox]
 legacy_tox_ini = """
 [tox]
 isolated_build = true
-envlist = py311,py312,py313,py314,lint,mypy
+envlist = py311,py312,py313,py314,lint,types
 
 [testenv]
 deps = pytest
@@ -242,9 +207,9 @@ commands =
     ruff format --check flask_more_smorest tests
     ruff check flask_more_smorest tests
 
-[testenv:mypy]
-deps = mypy
-commands = mypy flask_more_smorest
+[testenv:types]
+deps = pyright
+commands = pyright
 
 [testenv:coverage]
 deps = 

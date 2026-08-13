@@ -52,7 +52,7 @@ def custom_models() -> SimpleNamespace:
                 return True
             if not user or user.id != self.id:
                 return False
-            return self.is_verified  # type: ignore[attr-defined]
+            return self.is_verified
 
     class Note(UserOwnershipMixin, BasePermsModel):
         __tablename__ = "note"
@@ -65,7 +65,7 @@ def custom_models() -> SimpleNamespace:
         content: Mapped[str] = mapped_column(sa.Text, nullable=False)
         is_public: Mapped[bool] = mapped_column(sa.Boolean(), default=False)
         owner_id: Mapped[uuid.UUID] = mapped_column(sa.Uuid(as_uuid=True), sa.ForeignKey("user.id"), nullable=False)
-        owner: Mapped[CustomUserModel] = relationship(CustomUserModel)  # type: ignore[valid-type]
+        owner: Mapped[CustomUserModel] = relationship(CustomUserModel)
 
         def _can_read(self, user: AbstractUser | None) -> bool:
             if self.is_public:
@@ -79,7 +79,7 @@ def custom_models() -> SimpleNamespace:
             if not user:
                 return False
             owner = db.session.get(CustomUserModel, user.id)
-            return owner.is_verified if owner else False  # type: ignore[attr-defined]
+            return owner.is_verified if owner else False
 
     return SimpleNamespace(CustomUserModel=CustomUserModel, Note=Note, Document=Document)
 
@@ -207,9 +207,9 @@ def user_tokens(
         unverified_user = db_session.get(CustomUserModel, test_users["unverified_id"])
 
     return {
-        "admin": create_access_token(identity=admin_user.id),  # type: ignore[union-attr]
-        "verified": create_access_token(identity=verified_user.id),  # type: ignore[union-attr]
-        "unverified": create_access_token(identity=unverified_user.id),  # type: ignore[union-attr]
+        "admin": create_access_token(identity=admin_user.id),  # pyright: ignore[reportOptionalMemberAccess]
+        "verified": create_access_token(identity=verified_user.id),  # pyright: ignore[reportOptionalMemberAccess]
+        "unverified": create_access_token(identity=unverified_user.id),  # pyright: ignore[reportOptionalMemberAccess]
     }
 
 

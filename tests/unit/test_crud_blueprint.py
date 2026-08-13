@@ -6,7 +6,7 @@ from flask_more_smorest import CRUDBlueprint, CRUDMethod
 
 
 def test_normalize_methods_from_list() -> None:
-    normalized = CRUDBlueprint._normalize_methods(None, [CRUDMethod.INDEX, CRUDMethod.GET])  # type: ignore[arg-type]
+    normalized = CRUDBlueprint._normalize_methods(None, [CRUDMethod.INDEX, CRUDMethod.GET])  # pyright: ignore[reportArgumentType]
     assert sorted(normalized.keys()) == [CRUDMethod.GET, CRUDMethod.INDEX]
     assert all(config == {} for config in normalized.values())
 
@@ -17,7 +17,7 @@ def test_normalize_methods_from_mapping() -> None:
         "POST": {"admin_only": True},
         "DELETE": False,
     }
-    normalized = CRUDBlueprint._normalize_methods(None, raw)  # type: ignore[arg-type]
+    normalized = CRUDBlueprint._normalize_methods(None, raw)  # pyright: ignore[reportArgumentType]
     assert CRUDMethod.GET in normalized
     assert normalized[CRUDMethod.GET] == {}
     assert CRUDMethod.POST in normalized
@@ -28,4 +28,4 @@ def test_normalize_methods_from_mapping() -> None:
 def test_normalize_methods_rejects_invalid_values() -> None:
     raw = {"GET": 123}
     with pytest.raises(TypeError):
-        CRUDBlueprint._normalize_methods(None, raw)  # type: ignore[arg-type]
+        CRUDBlueprint._normalize_methods(None, raw)  # pyright: ignore[reportArgumentType]
