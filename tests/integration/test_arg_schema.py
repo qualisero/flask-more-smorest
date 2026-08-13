@@ -24,6 +24,7 @@ from flask_smorest import Api
 from marshmallow import Schema, ValidationError, fields, validates
 
 from flask_more_smorest import BaseModel, CRUDBlueprint, CRUDMethod, db, init_db
+from flask_more_smorest.crud.crud_blueprint import MethodConfig
 from flask_more_smorest.perms import init_fms
 
 if TYPE_CHECKING:
@@ -181,7 +182,7 @@ class TestPostArgSchema:
         setattr(mock_module, ResponseSchema.__name__, ResponseSchema)
         sys.modules[module_name] = mock_module
 
-        methods: dict = {
+        methods: dict[CRUDMethod, MethodConfig] = {
             CRUDMethod.POST: {
                 "schema": ResponseSchema,
             }

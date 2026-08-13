@@ -5,6 +5,7 @@ User-related tables (UserRole, Token, Domain, UserSetting).
 """
 
 import pytest
+from flask import Flask
 from sqlalchemy import inspect
 
 from flask_more_smorest import Api
@@ -21,7 +22,7 @@ def api(unit_api: Api) -> Api:
 class TestUserModelSchema:
     """Tests for User model database schema."""
 
-    def test_foreign_key_relationships(self, unit_app, api, db_session) -> None:
+    def test_foreign_key_relationships(self, unit_app: Flask, api: Api, db_session: None) -> None:
         """Test that foreign key relationships are properly created between User-related tables."""
         inspector = inspect(db.engine)
 

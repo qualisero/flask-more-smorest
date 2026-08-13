@@ -9,6 +9,7 @@ filter parameters into SQLAlchemy query statements. It supports:
 
 import copy
 from collections.abc import Mapping
+from typing import Any
 
 import marshmallow as ma
 from marshmallow import validate
@@ -103,7 +104,7 @@ def generate_filter_schema(base_schema: type[ma.Schema] | ma.Schema) -> type[ma.
         for new_name, new_field in new_fields.items():
             field_definitions[new_name] = new_field
 
-    def _remove_none_fields(self: ma.Schema, data: dict, **kwargs: dict) -> dict:
+    def _remove_none_fields(self: ma.Schema, data: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
         return {k: v for k, v in data.items() if v is not None}
 
     # Control parameters have their own load_default values and must not be
@@ -217,7 +218,7 @@ def _validate_filter_field(field_name: str, model: type[BaseModel], valid_column
     return base_field
 
 
-def get_statements_from_filters(kwargs: Mapping, model: type[BaseModel]) -> set[ColumnElement[bool]]:
+def get_statements_from_filters(kwargs: Mapping[str, Any], model: type[BaseModel]) -> set[ColumnElement[bool]]:
     """Convert query kwargs into SQLAlchemy filters based on the schema.
 
     This function processes filtering parameters and converts them to

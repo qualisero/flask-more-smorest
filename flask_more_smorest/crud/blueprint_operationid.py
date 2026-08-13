@@ -130,10 +130,10 @@ class BlueprintOperationIdMixin(Blueprint):
         operation_id: str | None = None,
         operation_id_prefix: str | None = None,
         operation_id_suffix: str | None = None,
-        parameters: list | None = None,
+        parameters: list[dict[str, Any] | str] | None = None,
         tags: list[str] | None = None,
         **options: Any,
-    ) -> Callable[[type["MethodView"] | Callable], type["MethodView"] | Callable]:
+    ) -> Callable[[type["MethodView"] | Callable[..., Any]], type["MethodView"] | Callable[..., Any]]:
         """Override route() to capture operationId customisation options.
 
         Args:
@@ -162,7 +162,7 @@ class BlueprintOperationIdMixin(Blueprint):
             self._route_operation_id_suffixes[route_key] = operation_id_suffix
 
         return cast(
-            Callable[[type["MethodView"] | Callable], type["MethodView"] | Callable],
+            Callable[[type["MethodView"] | Callable[..., Any]], type["MethodView"] | Callable[..., Any]],
             super().route(rule, parameters=parameters, tags=tags, **options),
         )
 
@@ -170,10 +170,10 @@ class BlueprintOperationIdMixin(Blueprint):
         self,
         rule: str,
         endpoint: str | None = None,
-        view_func: Callable | None = None,
+        view_func: Callable[..., Any] | None = None,
         provide_automatic_options: bool | None = None,
         *,
-        parameters: list | None = None,
+        parameters: list[dict[str, Any] | str] | None = None,
         tags: list[str] | None = None,
         **options: Any,
     ) -> None:
@@ -208,7 +208,7 @@ class BlueprintOperationIdMixin(Blueprint):
     def _store_endpoint_docs(
         self,
         endpoint: str,
-        obj: type["MethodView"] | Callable,
+        obj: type["MethodView"] | Callable[..., Any],
         parameters: Any,
         tags: Any,
         **options: Any,
@@ -324,7 +324,7 @@ class BlueprintOperationIdMixin(Blueprint):
 
     def _generate_operation_id_for_method(
         self,
-        obj: type["MethodView"] | Callable,
+        obj: type["MethodView"] | Callable[..., Any],
         method_name: str,
         rule: str,
         prefix_or_custom: str | None,

@@ -307,7 +307,9 @@ class BasePermsModel(SQLABaseModel):
 
         raise ForbiddenError(f"User not allowed to read resource: {res}")
 
-    def check_create(self, val: list | set | tuple | object, _visited: set[int] | None = None) -> None:
+    def check_create(
+        self, val: list[Any] | set[Any] | tuple[Any, ...] | object, _visited: set[int] | None = None
+    ) -> None:
         """Recursively check that all BaseModel instances can be created.
 
         Args:

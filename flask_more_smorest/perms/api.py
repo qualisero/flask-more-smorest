@@ -45,7 +45,7 @@ class Api(ApiOrig):
         >>> api = Api(app)
     """
 
-    def __init__(self, app: "Flask | None" = None, *, spec_kwargs: dict | None = None) -> None:
+    def __init__(self, app: "Flask | None" = None, *, spec_kwargs: dict[str, Any] | None = None) -> None:
         """Initialize the API with custom Marshmallow plugin.
 
         Args:

@@ -34,7 +34,7 @@ canonical integration point for the permissions system.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
 
 from flask import has_app_context
 
@@ -64,7 +64,7 @@ SettingT = TypeVar("SettingT", bound="AbstractUserSetting")
 _USER_REGISTRY_STATE_KEY = "user_registry"
 
 
-def _get_app_state() -> dict:
+def _get_app_state() -> dict[str, Any]:
     """Get app state from Flask extensions.
 
     Syncs with global state to ensure consistency when init_fms() is called
@@ -102,10 +102,10 @@ def _get_app_state() -> dict:
         app_state["models_initialized"] = _models_initialized
         app_state["helpers_initialized"] = _helpers_initialized
 
-    return cast(dict, app_state)
+    return cast(dict[str, Any], app_state)
 
 
-def _get_state() -> tuple[dict, bool]:
+def _get_state() -> tuple[dict[str, Any], bool]:
     """Get registry state, returning (state_dict, is_app_state)."""
     if has_app_context():
         return _get_app_state(), True

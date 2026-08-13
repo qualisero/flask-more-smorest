@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from flask import Flask
 
 from flask_more_smorest import db
 from flask_more_smorest.perms import clear_registration, init_fms
@@ -18,7 +19,7 @@ from flask_more_smorest.perms.user_context import (
 
 class TestUserContext:
     @pytest.fixture(autouse=True)
-    def _register_default_models(self, reset_user_context, app) -> None:
+    def _register_default_models(self, reset_user_context: None, app: Flask) -> None:
         """Re-register the default perms models cleared by ``reset_user_context``.
 
         The SQLAlchemy mapper for ``User`` cannot configure without a registered
@@ -34,7 +35,7 @@ class TestUserContext:
             setting=defaults_module.UserSetting,
         )
 
-    def test_init_fms_registers_getter(self, app, db_session) -> None:
+    def test_init_fms_registers_getter(self, app: Flask, db_session: None) -> None:
         user = defaults_module.User(email="test@example.com")
         user.set_password("secret")
         db.session.add(user)
@@ -48,7 +49,7 @@ class TestUserContext:
         current = defaults_module.User.get_current_user()
         assert current is user
 
-    def test_clear_registration_resets_getter(self, app, db_session) -> None:
+    def test_clear_registration_resets_getter(self, app: Flask, db_session: None) -> None:
         user = defaults_module.User(email="clear@example.com")
         user.set_password("secret")
         db.session.add(user)
@@ -59,7 +60,7 @@ class TestUserContext:
 
         assert defaults_module.User.get_current_user() is None
 
-    def test_user_type_filter_returns_none(self, app, db_session) -> None:
+    def test_user_type_filter_returns_none(self, app: Flask, db_session: None) -> None:
         class OtherUser(defaults_module.User):
             __abstract__ = True
 
@@ -72,7 +73,7 @@ class TestUserContext:
 
         assert OtherUser.get_current_user() is None
 
-    def test_get_current_user_id(self, app, db_session) -> None:
+    def test_get_current_user_id(self, app: Flask, db_session: None) -> None:
         user = defaults_module.User(email="id@example.com")
         user.set_password("secret")
         db.session.add(user)
@@ -82,7 +83,7 @@ class TestUserContext:
 
         assert get_current_user_id() == user.id
 
-    def test_is_current_user_admin(self, app, db_session) -> None:
+    def test_is_current_user_admin(self, app: Flask, db_session: None) -> None:
         user = defaults_module.User(email="admin@example.com")
         user.set_password("secret")
         db.session.add(user)
@@ -98,7 +99,7 @@ class TestUserContext:
         assert user.has_role(ROLE_ADMIN) is True
         assert user.has_role(ROLE_SUPERADMIN) is False
 
-    def test_is_current_user_superadmin(self, app, db_session) -> None:
+    def test_is_current_user_superadmin(self, app: Flask, db_session: None) -> None:
         user = defaults_module.User(email="super@example.com")
         user.set_password("secret")
         db.session.add(user)

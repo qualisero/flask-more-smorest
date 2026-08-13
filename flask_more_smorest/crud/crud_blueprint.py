@@ -525,7 +525,7 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
 
     def _prepare_update_schema(
         self, config: CRUDConfig
-    ) -> Schema | type[Schema] | SQLAlchemySchema | type[SQLAlchemySchema]:
+    ) -> Schema | type[Schema] | SQLAlchemySchema[Any] | type[SQLAlchemySchema[Any]]:
         """Create update schema for PATCH operations.
 
         If an explicit arg_schema is provided in PATCH method config, it's used.
@@ -588,7 +588,7 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
 
                 def index_get(
                     _self: MethodView,  # NOTE: using _self to avoid collision with outer self
-                    filters: dict,
+                    filters: dict[str, Any],
                     pagination_parameters: "PaginationParameters | None" = None,
                     **kwargs: Any,
                 ) -> Sequence[BaseModel]:
@@ -712,7 +712,7 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
                     HTTPStatus.OK,
                     config.methods[CRUDMethod.PATCH].get("schema", schema_cls),
                 )
-                def patch(_self, payload: dict, **kwargs: str | int | uuid.UUID | bool | None) -> BaseModel:
+                def patch(_self, payload: dict[str, Any], **kwargs: str | int | uuid.UUID | bool | None) -> BaseModel:
                     """Update resource."""
                     kwargs[config.res_id_name] = kwargs.pop(config.res_id_param_name)
                     res = model_cls.get_by_or_404(**kwargs)

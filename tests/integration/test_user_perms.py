@@ -30,6 +30,7 @@ from flask_more_smorest.perms.models import defaults as defaults_module
 from flask_more_smorest.perms.models.abstract_user import AbstractUser
 
 if TYPE_CHECKING:
+    from flask_sqlalchemy.session import Session
     from sqlalchemy.orm import scoped_session
 
 
@@ -114,7 +115,7 @@ def user_perms_app(custom_models: SimpleNamespace) -> Flask:
 
 
 @pytest.fixture
-def db_session(user_perms_app: Flask) -> Iterator[scoped_session]:
+def db_session(user_perms_app: Flask) -> Iterator[scoped_session[Session]]:
     """Create a database session for tests."""
     with user_perms_app.app_context():
         db.create_all()
@@ -125,7 +126,7 @@ def db_session(user_perms_app: Flask) -> Iterator[scoped_session]:
 
 @pytest.fixture
 def test_users(
-    user_perms_app: Flask, db_session: scoped_session, custom_models: SimpleNamespace
+    user_perms_app: Flask, db_session: scoped_session[Session], custom_models: SimpleNamespace
 ) -> dict[str, uuid.UUID]:
     """Create test users with different roles and permissions.
 
@@ -195,7 +196,7 @@ def test_users(
 @pytest.fixture
 def user_tokens(
     user_perms_app: Flask,
-    db_session: scoped_session,
+    db_session: scoped_session[Session],
     test_users: dict[str, uuid.UUID],
     custom_models: SimpleNamespace,
 ) -> dict[str, str]:
@@ -217,7 +218,7 @@ class TestCustomUserModelExtension:
     """Test CustomUserModel with default defaults_module.Domain/defaults_module.UserRole/Token/UserSetting."""
 
     def test_custom_user_creation(
-        self, db_session: scoped_session, test_users: dict[str, uuid.UUID], custom_models: SimpleNamespace
+        self, db_session: scoped_session[Session], test_users: dict[str, uuid.UUID], custom_models: SimpleNamespace
     ) -> None:
         """Test that CustomUserModel can be created with custom fields."""
         CustomUserModel = custom_models.CustomUserModel
@@ -229,7 +230,7 @@ class TestCustomUserModelExtension:
         assert user.is_verified is True
 
     def test_custom_user_inherits_user_methods(
-        self, db_session: scoped_session, test_users: dict[str, uuid.UUID], custom_models: SimpleNamespace
+        self, db_session: scoped_session[Session], test_users: dict[str, uuid.UUID], custom_models: SimpleNamespace
     ) -> None:
         """Test that CustomUserModel inherits User class methods."""
         CustomUserModel = custom_models.CustomUserModel
@@ -244,7 +245,7 @@ class TestCustomUserModelExtension:
         assert not user.has_role(defaults_module.BaseRoleEnum.ADMIN)
 
     def test_custom_user_with_default_domain_and_role(
-        self, db_session: scoped_session, test_users: dict[str, uuid.UUID], custom_models: SimpleNamespace
+        self, db_session: scoped_session[Session], test_users: dict[str, uuid.UUID], custom_models: SimpleNamespace
     ) -> None:
         """Test that CustomUserModel works with default defaults_module.Domain and defaults_module.UserRole classes."""
         CustomUserModel = custom_models.CustomUserModel
@@ -268,7 +269,7 @@ class TestCustomUserModelExtension:
     def test_custom_user_custom_permissions(
         self,
         user_perms_app: Flask,
-        db_session: scoped_session,
+        db_session: scoped_session[Session],
         test_users: dict[str, uuid.UUID],
         user_tokens: dict[str, str],
         custom_models: SimpleNamespace,

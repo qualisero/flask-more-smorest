@@ -169,7 +169,7 @@ class UserBlueprint(PermsBlueprint):
         @self.route("/login/", methods=["POST"])
         @self.arguments(UserLoginSchema)
         @self.response(HTTPStatus.OK, TokenSchema)
-        def login(data: dict) -> dict[str, str]:
+        def login(data: dict[str, Any]) -> dict[str, str]:
             """Login and get JWT token (public endpoint)."""
 
             user_model_cls: type[BaseModel] = self._config.model_cls

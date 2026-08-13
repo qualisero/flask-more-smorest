@@ -3,6 +3,8 @@
 import uuid
 from typing import Any
 
+from flask import Flask
+
 from flask_more_smorest.perms import clear_registration, init_fms
 from flask_more_smorest.perms.models import defaults as defaults_module
 from flask_more_smorest.perms.models.abstract_role import AbstractDomain, AbstractUserRole
@@ -40,7 +42,7 @@ def test_token_polymorphic_subclass(unit_app: Any, db_session: Any) -> None:
     assert len(user.tokens) == 2
 
 
-def test_user_setting_polymorphic_subclass(unit_app, db_session):
+def test_user_setting_polymorphic_subclass(unit_app: Flask, db_session: None):
     """Test that defaults_module.UserSetting supports polymorphic inheritance via discriminator."""
 
     sqla_db.create_all()
@@ -68,7 +70,7 @@ def test_user_setting_polymorphic_subclass(unit_app, db_session):
     assert len(user.settings) == 2
 
 
-def test_token_default_discriminator(unit_app, db_session):
+def test_token_default_discriminator(unit_app: Flask, db_session: None):
     """Test that defaults_module.Token has correct default discriminator."""
     sqla_db.create_all()
 
@@ -83,7 +85,7 @@ def test_token_default_discriminator(unit_app, db_session):
     assert token.id is not None
 
 
-def test_user_setting_default_discriminator(unit_app, db_session):
+def test_user_setting_default_discriminator(unit_app: Flask, db_session: None):
     """Test that defaults_module.UserSetting has correct default discriminator."""
     sqla_db.create_all()
 

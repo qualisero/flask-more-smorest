@@ -6,7 +6,7 @@ import contextlib
 import uuid
 from collections.abc import Iterator
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 import sqlalchemy as sa
@@ -440,7 +440,7 @@ def test_custom_blueprint_profile_endpoint(app: Flask, db_session: None) -> None
 
     # Add custom profile endpoint
     @user_bp.route("/me/profile/", methods=["GET"])
-    def get_profile() -> dict:
+    def get_profile() -> dict[str, Any]:
         user = CustomUser.get_current_user()
         if user is None:
             raise UnauthorizedError("Not authenticated")

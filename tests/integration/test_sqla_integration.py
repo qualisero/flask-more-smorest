@@ -7,7 +7,7 @@ import contextlib
 import uuid
 from collections.abc import Iterator
 from datetime import datetime
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from flask import Flask
@@ -273,25 +273,25 @@ class TestDatabaseInitialization:
         class Model1(BaseModel):
             field1 = db.Column(db.String(50))
 
-            def _can_read(self, user) -> bool:
+            def _can_read(self, user: Any) -> bool:
                 return True
 
-            def _can_write(self, user) -> bool:
+            def _can_write(self, user: Any) -> bool:
                 return True
 
-            def _can_create(self, user) -> bool:
+            def _can_create(self, user: Any) -> bool:
                 return True
 
         class Model2(BaseModel):
             field2 = db.Column(db.Integer)
 
-            def _can_read(self, user) -> bool:
+            def _can_read(self, user: Any) -> bool:
                 return True
 
-            def _can_write(self, user) -> bool:
+            def _can_write(self, user: Any) -> bool:
                 return True
 
-            def _can_create(self, user) -> bool:
+            def _can_create(self, user: Any) -> bool:
                 return True
 
         with app.app_context():

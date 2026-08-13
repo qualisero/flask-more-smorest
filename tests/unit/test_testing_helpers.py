@@ -16,6 +16,7 @@ from flask_more_smorest import Api, UserBlueprint, db
 from flask_more_smorest.perms.models import defaults as defaults_module
 
 if TYPE_CHECKING:
+    from flask_sqlalchemy.session import Session
     from sqlalchemy.orm import scoped_session
 
 
@@ -40,7 +41,7 @@ from tests.testing_utils import (
 
 
 @pytest.fixture
-def db_session(unit_app: Flask) -> Iterator[scoped_session]:
+def db_session(unit_app: Flask) -> Iterator[scoped_session[Session]]:
     """Create a database session for integration tests."""
     with unit_app.app_context():
         db.create_all()
@@ -214,7 +215,7 @@ class TestAsAnonymousContextManager:
 class TestAsUserIntegration:
     """Test as_user context manager - INTEGRATION TESTS."""
 
-    def test_as_user_sets_auth_header(self, unit_app: Flask, api: Api, db_session: scoped_session) -> None:
+    def test_as_user_sets_auth_header(self, unit_app: Flask, api: Api, db_session: scoped_session[Session]) -> None:
         """Test that as_user sets JWT auth header."""
         # Register user blueprint
         bp = UserBlueprint()
@@ -233,7 +234,9 @@ class TestAsUserIntegration:
             assert response.json is not None
             assert response.json["email"] == "test@example.com"
 
-    def test_as_user_with_additional_claims(self, unit_app: Flask, api: Api, db_session: scoped_session) -> None:
+    def test_as_user_with_additional_claims(
+        self, unit_app: Flask, api: Api, db_session: scoped_session[Session]
+    ) -> None:
         """Test as_user with additional JWT claims."""
         bp = UserBlueprint()
         api.register_blueprint(bp)
@@ -251,7 +254,7 @@ class TestAsUserIntegration:
 class TestAsAdminIntegration:
     """Test as_admin context manager - INTEGRATION TESTS."""
 
-    def test_as_admin_sets_auth_header(self, unit_app: Flask, api: Api, db_session: scoped_session) -> None:
+    def test_as_admin_sets_auth_header(self, unit_app: Flask, api: Api, db_session: scoped_session[Session]) -> None:
         """Test that as_admin sets JWT auth header with admin role."""
         bp = UserBlueprint()
         api.register_blueprint(bp)
@@ -267,7 +270,9 @@ class TestAsAdminIntegration:
             response = client.get("/api/users/")
             assert response.status_code == 200
 
-    def test_as_admin_with_superadmin_role(self, unit_app: Flask, api: Api, db_session: scoped_session) -> None:
+    def test_as_admin_with_superadmin_role(
+        self, unit_app: Flask, api: Api, db_session: scoped_session[Session]
+    ) -> None:
         """Test as_admin with superadmin role."""
         bp = UserBlueprint()
         api.register_blueprint(bp)

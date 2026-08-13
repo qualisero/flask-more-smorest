@@ -32,6 +32,7 @@ from flask_more_smorest.perms.models.base_roles import BaseRoleEnum
 
 if TYPE_CHECKING:
     from flask.testing import FlaskClient
+    from flask_sqlalchemy.session import Session
     from sqlalchemy.orm import scoped_session
 
     from flask_more_smorest.perms.models.defaults import (
@@ -94,7 +95,7 @@ def _load_defaults() -> Iterator[None]:
         published: Mapped[bool] = db.Column(db.Boolean, default=False)
         view_count: Mapped[int] = db.Column(db.Integer, default=0)
 
-        def _can_read(self, current_user) -> bool:
+        def _can_read(self, current_user: Any) -> bool:
             """Published articles can be read by anyone."""
             return self.published or self.can_write()
 
@@ -112,7 +113,7 @@ def _load_defaults() -> Iterator[None]:
         # Relationships - no backref needed for testing
         article: Mapped["Article"] = db.relationship("Article", foreign_keys=[article_id])  # pyright: ignore[reportAssignmentType]
 
-        def _can_read(self, current_user) -> bool:
+        def _can_read(self, current_user: Any) -> bool:
             """Comments are readable if article is readable."""
             return self.article._can_read(current_user) if self.article else True
 
@@ -135,7 +136,7 @@ def _load_defaults() -> Iterator[None]:
             backref="topics",
         )
 
-        def _can_create(self, current_user) -> bool:
+        def _can_create(self, current_user: Any) -> bool:
             """Only admins can create topics."""
             return is_current_user_admin()
 
@@ -204,7 +205,7 @@ def maximal_app() -> Flask:
 
 
 @pytest.fixture
-def db_session(maximal_app: Flask) -> Iterator["scoped_session"]:
+def db_session(maximal_app: Flask) -> Iterator["scoped_session[Session]"]:
     """Create a database session for tests."""
     with maximal_app.app_context():
         db.create_all()
@@ -214,7 +215,7 @@ def db_session(maximal_app: Flask) -> Iterator["scoped_session"]:
 
 
 @pytest.fixture
-def api(maximal_app: Flask, db_session: "scoped_session") -> Api:
+def api(maximal_app: Flask, db_session: "scoped_session[Session]") -> Api:
     """Create API instance."""
     return Api(maximal_app)
 
@@ -286,7 +287,7 @@ def api_with_blueprints(api: Api, blueprints: dict[str, CRUDBlueprint]) -> Api:
 
 
 @pytest.fixture
-def client(maximal_app: Flask, api_with_blueprints: Api, db_session: "scoped_session") -> "FlaskClient":
+def client(maximal_app: Flask, api_with_blueprints: Api, db_session: "scoped_session[Session]") -> "FlaskClient":
     """Create a base test client for unauthenticated requests."""
     _ = db_session
     return maximal_app.test_client()
@@ -304,7 +305,7 @@ def token_factory(maximal_app: Flask) -> Callable[[uuid.UUID], str]:
 
 
 @pytest.fixture
-def test_user(db_session: "scoped_session") -> Iterator[User]:  # pyright: ignore[reportInvalidTypeForm]
+def test_user(db_session: "scoped_session[Session]") -> Iterator[User]:  # pyright: ignore[reportInvalidTypeForm]
     """Create a test user."""
 
     u = User(email="test@test.com", password="password")
@@ -316,7 +317,7 @@ def test_user(db_session: "scoped_session") -> Iterator[User]:  # pyright: ignor
 
 
 @pytest.fixture
-def test_other_user(db_session: "scoped_session") -> Iterator[User]:  # pyright: ignore[reportInvalidTypeForm]
+def test_other_user(db_session: "scoped_session[Session]") -> Iterator[User]:  # pyright: ignore[reportInvalidTypeForm]
     """Create another test user."""
 
     u = User(email="another@example.com", password="password2")
@@ -328,7 +329,7 @@ def test_other_user(db_session: "scoped_session") -> Iterator[User]:  # pyright:
 
 
 @pytest.fixture
-def admin_user(db_session: "scoped_session") -> Iterator[User]:  # pyright: ignore[reportInvalidTypeForm]
+def admin_user(db_session: "scoped_session[Session]") -> Iterator[User]:  # pyright: ignore[reportInvalidTypeForm]
     """Create a user with admin privileges scoped to a domain."""
 
     domain = Domain(name="primary-domain", display_name="Primary Domain")
@@ -385,7 +386,12 @@ def admin_client(
 class TestMaximalFeatureIntegration:
     """Integration tests demonstrating maximal feature usage."""
 
-    def test_pagination(self, auth_client: "FlaskClient", db_session: "scoped_session", test_user: User) -> None:  # pyright: ignore[reportInvalidTypeForm]
+    def test_pagination(
+        self,
+        auth_client: "FlaskClient",
+        db_session: "scoped_session[Session]",
+        test_user: User,  # pyright: ignore[reportInvalidTypeForm]
+    ) -> None:
         """Test pagination functionality."""
         import json
 
@@ -520,7 +526,7 @@ class TestMaximalFeatureIntegration:
         assert len(articles) == 2
         assert all(a["published"] is True for a in articles)
 
-    def test_related_models(self, db_session: "scoped_session", test_user: User) -> None:  # pyright: ignore[reportInvalidTypeForm]
+    def test_related_models(self, db_session: "scoped_session[Session]", test_user: User) -> None:  # pyright: ignore[reportInvalidTypeForm]
         """Test relationships between articles and comments."""
 
         # Create an article
@@ -542,14 +548,14 @@ class TestMaximalFeatureIntegration:
         db.session.commit()
 
         # Verify comments are associated
-        comments: list = db.session.query(Comment).filter_by(article_id=article_id).all()
+        comments: list[Any] = db.session.query(Comment).filter_by(article_id=article_id).all()
         assert len(comments) == 2
         assert comments[0].article_id == article_id
         assert comments[1].article_id == article_id
 
     def test_permissions_on_models(
         self,
-        db_session: "scoped_session",
+        db_session: "scoped_session[Session]",
         auth_client: "FlaskClient",
         other_auth_client: "FlaskClient",
         admin_client: "FlaskClient",
@@ -612,7 +618,7 @@ class TestMaximalFeatureIntegration:
         assert "published" in schema.fields
         assert "view_count" in schema.fields
 
-    def test_timestamps_are_automatic(self, db_session: "scoped_session", test_user: User) -> None:  # pyright: ignore[reportInvalidTypeForm]
+    def test_timestamps_are_automatic(self, db_session: "scoped_session[Session]", test_user: User) -> None:  # pyright: ignore[reportInvalidTypeForm]
         """Test that timestamps are automatically set and updated."""
 
         article = Article(title="Test", content="Test content", published=True, author_id=test_user.id)
@@ -629,7 +635,9 @@ class TestMaximalFeatureIntegration:
         # updated_at should be newer
         assert article.updated_at >= original_updated_at
 
-    def test_multiple_blueprints_coexist(self, auth_client: "FlaskClient", db_session: "scoped_session") -> None:
+    def test_multiple_blueprints_coexist(
+        self, auth_client: "FlaskClient", db_session: "scoped_session[Session]"
+    ) -> None:
         """Test that multiple CRUD blueprints work together."""
 
         # Both endpoints should be accessible
@@ -639,7 +647,7 @@ class TestMaximalFeatureIntegration:
         response = auth_client.get("/api/comments/")
         assert response.status_code == 200
 
-    def test_uuid_primary_keys(self, db_session: "scoped_session", test_user: User) -> None:  # pyright: ignore[reportInvalidTypeForm]
+    def test_uuid_primary_keys(self, db_session: "scoped_session[Session]", test_user: User) -> None:  # pyright: ignore[reportInvalidTypeForm]
         """Test that models use UUID primary keys."""
 
         article = Article(
@@ -654,7 +662,7 @@ class TestMaximalFeatureIntegration:
         assert article.id is not None
         assert isinstance(article.id, uuid.UUID)
 
-    def test_model_convenience_methods(self, db_session: "scoped_session", test_user: User) -> None:  # pyright: ignore[reportInvalidTypeForm]
+    def test_model_convenience_methods(self, db_session: "scoped_session[Session]", test_user: User) -> None:  # pyright: ignore[reportInvalidTypeForm]
         """Test BaseModel convenience methods (get, get_or_404, etc.)."""
 
         article = Article(title="Test", content="Test", published=True, author_id=test_user.id)
@@ -750,7 +758,7 @@ class TestMaximalFeatureIntegration:
     def test_advanced_filter_range_queries(
         self,
         auth_client: "FlaskClient",
-        db_session: "scoped_session",
+        db_session: "scoped_session[Session]",
         test_user: User,  # pyright: ignore[reportInvalidTypeForm]
     ) -> None:
         """Query parameters with __min/__from suffixes should filter results."""
@@ -779,7 +787,7 @@ class TestMaximalFeatureIntegration:
         assert len(data) == 1
         assert data[0]["title"] == "Range Article 1"
 
-    def test_user_domain_role_and_token_models(self, db_session: "scoped_session") -> None:
+    def test_user_domain_role_and_token_models(self, db_session: "scoped_session[Session]") -> None:
         """Domain, UserRole, Token, and UserSetting models integrate end-to-end."""
 
         domain = Domain(name="tenant-a", display_name="Tenant A")
@@ -803,7 +811,7 @@ class TestMaximalFeatureIntegration:
         db.session.expire(user, ["roles"])
         assert user.roles == []
 
-    def test_get_clone_creates_distinct_record(self, db_session: "scoped_session", test_user: User) -> None:  # pyright: ignore[reportInvalidTypeForm]
+    def test_get_clone_creates_distinct_record(self, db_session: "scoped_session[Session]", test_user: User) -> None:  # pyright: ignore[reportInvalidTypeForm]
         """BaseModel.get_clone should produce a detached copy with new UUID."""
 
         article = Article(

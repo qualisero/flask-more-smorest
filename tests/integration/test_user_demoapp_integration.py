@@ -108,7 +108,7 @@ class SharedUserBlueprint(UserBlueprint):
         self.me_schema = kwargs.pop("me_schema", None)
         super().__init__(*args, **kwargs)
 
-    def _validate_login(self, user: CustomUser | None, data: dict) -> None:
+    def _validate_login(self, user: CustomUser | None, data: dict[str, Any]) -> None:
         """Validate domain access if domain provided."""
         if domain_name := data.get("domain"):
             domain = CustomDomain.get_by_or_404(name=domain_name)
@@ -161,7 +161,7 @@ if TYPE_CHECKING:
     CustomUserRole = AbstractUserRole
     CustomToken = AbstractToken
     CustomUserSetting = AbstractUserSetting
-    UserSchema = SQLAlchemyAutoSchema
+    UserSchema = SQLAlchemyAutoSchema[Any]
 else:
     # At runtime, these are None and will be set by custom_models fixture
     CustomProfilePic = cast(Any, None)
@@ -341,7 +341,7 @@ def test_1_basic_login_with_shared_blueprint(app: Flask, api: Api) -> None:
     """Test that the shared UserBlueprint with login works."""
 
     # Define UserSchema for this test
-    class UserSchema(SQLAlchemyAutoSchema):
+    class UserSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUser
             load_instance = True
@@ -381,12 +381,12 @@ def test_1_basic_login_with_shared_blueprint(app: Flask, api: Api) -> None:
 def test_2_soft_delete_feature(app: Flask, api: Api) -> None:
     """Test SoftDeleteMixin functionality used by demoapp."""
 
-    class UserSchema(SQLAlchemyAutoSchema):
+    class UserSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUser
             load_instance = True
 
-    class RoleSchema(SQLAlchemyAutoSchema):
+    class RoleSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUserRole
             load_instance = True
@@ -532,7 +532,7 @@ def test_2_soft_delete_feature(app: Flask, api: Api) -> None:
 def test_3_profile_mixin_and_display_name(app: Flask, api: Api) -> None:
     """Test ProfileMixin and custom display_name property used by demoapp."""
 
-    class UserSchema(SQLAlchemyAutoSchema):
+    class UserSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUser
             load_instance = True
@@ -615,7 +615,7 @@ def test_3_profile_mixin_and_display_name(app: Flask, api: Api) -> None:
 def test_4_password_recovery_flow(app: Flask, api: Api) -> None:
     """Test password recovery endpoints used by demoapp."""
 
-    class UserSchema(SQLAlchemyAutoSchema):
+    class UserSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUser
             load_instance = True
@@ -738,12 +738,12 @@ def test_4_password_recovery_flow(app: Flask, api: Api) -> None:
 def test_5_invite_system(app: Flask, api: Api) -> None:
     """Test invite creation and listing (demoapp-specific model)."""
 
-    class UserSchema(SQLAlchemyAutoSchema):
+    class UserSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUser
             load_instance = True
 
-    class InviteSchema(SQLAlchemyAutoSchema):
+    class InviteSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomInvite
             load_instance = False  # Return dict, not instance
@@ -764,7 +764,7 @@ def test_5_invite_system(app: Flask, api: Api) -> None:
     class InviteEndpoint(MethodView):
         @user_bp.arguments(InviteInputSchema)  # Use input schema (sender_user_id is set programmatically)
         @user_bp.response(200, InviteSchema)  # Use output schema for response
-        def post(self, payload, user_id):
+        def post(self, payload: dict[str, Any], user_id: uuid.UUID) -> Any:
             """Create an invite."""
             # Verify sender has permission
             current = get_current_user()
@@ -776,7 +776,7 @@ def test_5_invite_system(app: Flask, api: Api) -> None:
             return invite
 
         @user_bp.response(200, InviteSchema(many=True))
-        def get(self, user_id):
+        def get(self, user_id: uuid.UUID) -> Any:
             """List invites sent by user."""
             current = get_current_user()
             if not current or (current.id != user_id and not current.is_admin):
@@ -845,12 +845,12 @@ def test_5_invite_system(app: Flask, api: Api) -> None:
 def test_6_admin_role_enforcement(app: Flask, api: Api) -> None:
     """Test admin role properties and enforcement."""
 
-    class UserSchema(SQLAlchemyAutoSchema):
+    class UserSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUser
             load_instance = True
 
-    class RoleSchema(SQLAlchemyAutoSchema):
+    class RoleSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUserRole
             load_instance = True
@@ -958,7 +958,7 @@ def test_6_admin_role_enforcement(app: Flask, api: Api) -> None:
 def test_7_bypass_perms_context(app: Flask, api: Api) -> None:
     """Test bypass_perms context manager for admin operations."""
 
-    class UserSchema(SQLAlchemyAutoSchema):
+    class UserSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUser
             load_instance = True
@@ -1044,7 +1044,7 @@ def test_7_bypass_perms_context(app: Flask, api: Api) -> None:
 def test_8_health_endpoint(app: Flask, api: Api) -> None:
     """Test health endpoint registration and response."""
 
-    class UserSchema(SQLAlchemyAutoSchema):
+    class UserSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUser
             load_instance = True
@@ -1079,12 +1079,12 @@ def test_8_health_endpoint(app: Flask, api: Api) -> None:
 def test_9_domain_access_control(app: Flask, api: Api) -> None:
     """Test domain access control with has_domain_access method."""
 
-    class UserSchema(SQLAlchemyAutoSchema):
+    class UserSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUser
             load_instance = True
 
-    class RoleSchema(SQLAlchemyAutoSchema):
+    class RoleSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUserRole
             load_instance = True
@@ -1175,13 +1175,13 @@ def test_10_user_crud_operations(app: Flask, api: Api) -> None:
     """Test complete CRUD operations on users."""
 
     # Define schemas with correct model reference
-    class UserOutputSchema(SQLAlchemyAutoSchema):
+    class UserOutputSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUser
             load_instance = True
 
     # Create a schema that doesn't load instances (for POST input)
-    class UserInputSchema(SQLAlchemyAutoSchema):
+    class UserInputSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUser
             load_instance = False
@@ -1292,13 +1292,13 @@ def test_11_user_profile_picture_update(app: Flask, api: Api) -> None:
         filename: Mapped[str] = mapped_column(sa.String(255), nullable=False)
         description: Mapped[str | None] = mapped_column(sa.String(500), nullable=True)
 
-        def _can_read(self, current_user):
+        def _can_read(self, current_user: Any) -> bool:
             return True
 
-        def _can_write(self, current_user):
+        def _can_write(self, current_user: Any) -> bool:
             return True
 
-        def _can_create(self, current_user):
+        def _can_create(self, current_user: Any) -> bool:
             return True
 
     class UserWithProfileSchema(Schema):
@@ -1388,12 +1388,12 @@ def test_12_user_patch_update(app: Flask, api: Api) -> None:
     """Test user update via PATCH endpoint used by demoapp."""
 
     # Define local schemas to avoid cross-test pollution
-    class UserOutputSchema(SQLAlchemyAutoSchema):
+    class UserOutputSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUser
             load_instance = True
 
-    class UserPrivateSchema(SQLAlchemyAutoSchema):
+    class UserPrivateSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUser
             load_instance = False
@@ -1477,12 +1477,12 @@ def test_12_user_patch_update(app: Flask, api: Api) -> None:
 def test_13_user_full_details_endpoint(app: Flask, api: Api) -> None:
     """Test GET /full endpoint for private user details."""
 
-    class UserSchema(SQLAlchemyAutoSchema):
+    class UserSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUser
             load_instance = True
 
-    class UserPrivateSchema(SQLAlchemyAutoSchema):
+    class UserPrivateSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUser
             load_instance = True
@@ -1560,7 +1560,7 @@ def test_13_user_full_details_endpoint(app: Flask, api: Api) -> None:
 def test_14_error_handling_scenarios(app: Flask, api: Api) -> None:
     """Test various error scenarios."""
 
-    class UserSchema(SQLAlchemyAutoSchema):
+    class UserSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUser
             load_instance = True
@@ -1625,13 +1625,13 @@ def test_14_error_handling_scenarios(app: Flask, api: Api) -> None:
 def test_15_demoapp_style_integration(app: Flask, api: Api) -> None:
     """Test demoapp-style integration with token login."""
 
-    class UserSchema(SQLAlchemyAutoSchema):
+    class UserSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUser
             load_instance = True
             include_fk = True
 
-    class RoleSchema(SQLAlchemyAutoSchema):
+    class RoleSchema(SQLAlchemyAutoSchema[Any]):
         class Meta:
             model = CustomUserRole
             load_instance = True

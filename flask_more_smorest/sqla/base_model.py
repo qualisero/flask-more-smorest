@@ -25,7 +25,7 @@ from ..error.exceptions import NotFoundError
 from .database import db
 from .schema import BaseSchema, create_model_schema
 
-PropertyOrColumn: TypeAlias = MapperProperty | sa.Column
+PropertyOrColumn: TypeAlias = MapperProperty[Any] | sa.Column[Any]
 
 
 class BaseModelMeta(DeclarativeMeta):
@@ -496,7 +496,7 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):
         """
         pass
 
-    def check_create(self, val: list | set | tuple | object) -> None:
+    def check_create(self, val: list[Any] | set[Any] | tuple[Any, ...] | object) -> None:
         """Recursively validate nested models before creating them.
 
         Ensures nested BaseModel instances have an opportunity to perform

@@ -179,6 +179,9 @@ reportAttributeAccessIssue = "warning"
 reportMissingTypeStubs = "none"
 stubPath = "./stubs;./stubs/test_stubs"
 reportUnnecessaryTypeIgnoreComment = "error"
+# Replaces mypy's disallow_untyped_defs / disallow_incomplete_defs
+reportMissingParameterType = "error"
+reportMissingTypeArgument = "error"
 
 [[tool.pyright.executionEnvironments]]
 root = "tests"

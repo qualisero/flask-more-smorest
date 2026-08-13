@@ -19,9 +19,10 @@ Example response:
 import logging
 import sys
 import traceback
+from collections.abc import Mapping, Sequence
 from http import HTTPStatus
 from pprint import pformat
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from flask import current_app, has_app_context, has_request_context, make_response, request
 
@@ -31,6 +32,12 @@ if TYPE_CHECKING:
     from flask import Response
 
 logger = logging.getLogger(__name__)
+
+# Debug context is a JSON-shaped structure: scalars, plus nested mappings and
+# sequences of the same. Mapping/Sequence keep it covariant, so a plain
+# dict[str, str | None] can be stored as a value.
+DebugContextValue: TypeAlias = "str | int | bool | Sequence[DebugContextValue] | Mapping[str, DebugContextValue] | None"
+DebugContext: TypeAlias = dict[str, DebugContextValue]
 
 
 def _is_debug_mode() -> bool:
@@ -85,7 +92,7 @@ class ApiException(Exception):
     # None means use environment detection (debug/testing mode)
     # True/False explicitly enables/disables traceback
     INCLUDE_TRACEBACK: bool | None = None
-    _debug_context: dict[str, str | int | bool | dict | None] | None = None
+    _debug_context: DebugContext | None = None
     _debug_context_kwargs: dict[str, str | int | bool | None]
 
     def __init__(
@@ -120,7 +127,7 @@ class ApiException(Exception):
         self.log_exception()
 
     @property
-    def debug_context(self) -> dict[str, str | int | bool | dict | None]:
+    def debug_context(self) -> DebugContext:
         """Lazily compute debug context on first access.
 
         This property defers the expensive operation of collecting user context
@@ -134,7 +141,7 @@ class ApiException(Exception):
             self._debug_context = self._compute_debug_context(**self._debug_context_kwargs)
         return self._debug_context
 
-    def _compute_debug_context(self, **kwargs: str | int | bool | None) -> dict[str, str | int | bool | dict | None]:
+    def _compute_debug_context(self, **kwargs: str | int | bool | None) -> DebugContext:
         """Compute debug context (expensive operation).
 
         This method is only called when debug_context is actually accessed,
@@ -157,7 +164,7 @@ class ApiException(Exception):
         """
         return convert_camel_to_snake(cls.__name__)
 
-    def get_debug_context(self, **kwargs: str | int | bool | None) -> dict[str, str | int | bool | dict | None]:
+    def get_debug_context(self, **kwargs: str | int | bool | None) -> DebugContext:
         """Get debugging context information.
 
         Collects user context via the configurable user context system, which works
@@ -169,7 +176,7 @@ class ApiException(Exception):
         Returns:
             Dictionary containing debug context including user information (in debug mode)
         """
-        debug_context: dict[str, str | int | bool | dict | None] = dict()
+        debug_context: DebugContext = dict()
         debug_context.update(kwargs)
 
         # Only collect user context in debug mode to avoid performance overhead
@@ -464,7 +471,7 @@ class InternalServerError(ApiException):
     TITLE = "Internal Server Error"
     HTTP_STATUS_CODE = HTTPStatus.INTERNAL_SERVER_ERROR
 
-    def get_debug_context(self, **kwargs: str | int | bool | None) -> dict[str, str | int | bool | dict | None]:
+    def get_debug_context(self, **kwargs: str | int | bool | None) -> DebugContext:
         """Get debugging context including exception information.
 
         Args:
