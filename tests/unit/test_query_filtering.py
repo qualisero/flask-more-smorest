@@ -3,6 +3,7 @@
 import contextlib
 import enum
 import uuid
+from collections.abc import Iterator
 from datetime import date, datetime
 
 import pytest
@@ -20,7 +21,7 @@ from flask_more_smorest.sqla.base_model import BaseModel
 
 
 @pytest.fixture(autouse=True)
-def _init_db(app: Flask):
+def _init_db(app: Flask) -> Iterator[None]:
     with app.app_context():
         yield
         db.session.remove()

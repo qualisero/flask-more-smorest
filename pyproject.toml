@@ -53,8 +53,9 @@ pytest-cov = "^6.1.1"
 pytest-mock = "^3.12.0"
 pytest-xdist = "^3.5.0"
 
-# Code Quality (ruff replaces black, isort, and flake8)
+# Code Quality (ruff replaces black, isort and flake8; pyright is the type checker)
 ruff = "^0.16.2"
+pyright = "^1.1.408"
 
 # Development Tools
 pre-commit = "^3.6.0"
@@ -65,7 +66,6 @@ sphinx = "^7.2.6"
 sphinx-rtd-theme = "^2.0.0"
 myst-parser = "^2.0.0"
 sphinx-autodoc-typehints = "^2.0.0"
-pyright = "^1.1.408"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -177,7 +177,7 @@ reportUnknownArgumentType = "none"
 reportUnknownParameterType = "none"
 reportAttributeAccessIssue = "warning"
 reportMissingTypeStubs = "none"
-stubPath = "./stubs;./stubs/test_stubs"
+pythonVersion = "3.11"
 reportUnnecessaryTypeIgnoreComment = "error"
 # Replaces mypy's disallow_untyped_defs / disallow_incomplete_defs
 reportMissingParameterType = "error"
