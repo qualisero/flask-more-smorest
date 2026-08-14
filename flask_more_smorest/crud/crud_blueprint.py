@@ -669,9 +669,19 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
                         Keys the model does not define are dropped, mirroring what
                         marshmallow-sqlalchemy does for a model-bound schema, rather
                         than letting the declarative constructor raise TypeError.
+
+                        Callables are excluded as well. SQLAlchemy's constructor admits
+                        any attribute the class has, so a field named after a method
+                        would shadow it on the instance and break the update() call
+                        below. Columns, relationships, hybrids and property setters are
+                        all non-callable, so they still pass.
                         """
                         if isinstance(new_object, dict):
-                            model_fields = {key: value for key, value in new_object.items() if hasattr(model_cls, key)}
+                            model_fields = {
+                                key: value
+                                for key, value in new_object.items()
+                                if hasattr(model_cls, key) and not callable(getattr(model_cls, key, None))
+                            }
                             new_object = model_cls(**model_fields)
                         new_object.update(commit=True, **kwargs)
                         return new_object

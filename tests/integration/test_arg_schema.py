@@ -327,6 +327,53 @@ class TestPostArgSchema:
             assert rows[0].name == "Morgiana"
             assert not hasattr(rows[0], "invite_code")
 
+    def test_post_with_plain_arg_schema_ignores_fields_named_after_methods(self, item_model: type[BaseModel]) -> None:
+        """A field named after a model method must not shadow it on the instance.
+
+        SQLAlchemy's declarative constructor admits any attribute the class has,
+        methods included, so filtering on existence alone would let `update` be
+        set on the instance and break the update() call that persists it.
+        """
+        rand_str = uuid.uuid4().hex
+
+        class ShadowingSchema(Schema):
+            name = fields.Str(required=True)
+            update = fields.Str(required=True, load_only=True)
+
+        ShadowingSchema.__name__ = f"ShadowingSchema_{rand_str}"
+        ShadowingSchema.__qualname__ = ShadowingSchema.__name__
+
+        class PlainSchema(Schema):
+            id = fields.Str(dump_only=True)
+            name = fields.Str()
+
+        PlainSchema.__name__ = f"PlainSchema_{rand_str}"
+        PlainSchema.__qualname__ = PlainSchema.__name__
+
+        bp = CRUDBlueprint(
+            f"items_{rand_str}",
+            __name__,
+            model=item_model,
+            schema=item_model.Schema,
+            methods={CRUDMethod.POST: {"arg_schema": ShadowingSchema, "schema": PlainSchema}},
+            url_prefix=f"/api/items_{rand_str}/",
+        )
+
+        app = item_model._test_app
+        api = make_api(app)
+        api.register_blueprint(bp)
+        client = app.test_client()
+
+        with app.app_context(), item_model.bypass_perms():
+            url = self._post_url(app)
+            resp = client.post(url, json={"name": "Ali Baba", "update": "not-a-method"})
+            assert resp.status_code == 200
+            rows = item_model.query.all()
+            assert len(rows) == 1
+            assert rows[0].name == "Ali Baba"
+            # The method survived, so the row was persisted through it
+            assert callable(rows[0].update)
+
     def test_post_with_model_bound_arg_schema_persists(self, item_model: type[BaseModel]) -> None:
         """A model-bound arg_schema (load_instance=True) also creates the resource."""
         rand_str = uuid.uuid4().hex

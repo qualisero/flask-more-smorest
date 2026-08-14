@@ -36,7 +36,9 @@ logger = logging.getLogger(__name__)
 # Debug context is a JSON-shaped structure: scalars, plus nested mappings and
 # sequences of the same. Mapping/Sequence keep it covariant, so a plain
 # dict[str, str | None] can be stored as a value.
-DebugContextValue: TypeAlias = "str | int | bool | Sequence[DebugContextValue] | Mapping[str, DebugContextValue] | None"
+DebugContextValue: TypeAlias = (
+    str | int | bool | Sequence["DebugContextValue"] | Mapping[str, "DebugContextValue"] | None
+)
 DebugContext: TypeAlias = dict[str, DebugContextValue]
 
 
