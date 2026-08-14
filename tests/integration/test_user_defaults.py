@@ -37,11 +37,11 @@ if TYPE_CHECKING:
 else:
     # Runtime: declare as type[Any] placeholder, will be set by _load_defaults fixture
     # Using Any type for runtime placeholder; TYPE_CHECKING block provides proper types
-    Domain: type[Any] = cast(type[Any], None)  # type: ignore[assignment]
-    Token: type[Any] = cast(type[Any], None)  # type: ignore[assignment]
-    User: type[Any] = cast(type[Any], None)  # type: ignore[assignment]
-    UserRole: type[Any] = cast(type[Any], None)  # type: ignore[assignment]
-    UserSetting: type[Any] = cast(type[Any], None)  # type: ignore[assignment]
+    Domain: type[Any] = cast(type[Any], None)
+    Token: type[Any] = cast(type[Any], None)
+    User: type[Any] = cast(type[Any], None)
+    UserRole: type[Any] = cast(type[Any], None)
+    UserSetting: type[Any] = cast(type[Any], None)
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -59,12 +59,12 @@ def _load_defaults() -> Iterator[None]:
     # and NoForeignKeysError because old classes remained in db.Model registry.
     # Since conftest.py handles unloading, we don't need to force reload here.
 
-    global Domain, Token, User, UserRole, UserSetting  # type: ignore[misc]
-    Domain = defaults_module.Domain  # type: ignore[misc]
-    Token = defaults_module.Token  # type: ignore[misc]
-    User = defaults_module.User  # type: ignore[misc]
-    UserRole = defaults_module.UserRole  # type: ignore[misc]
-    UserSetting = defaults_module.UserSetting  # type: ignore[misc]
+    global Domain, Token, User, UserRole, UserSetting
+    Domain = defaults_module.Domain
+    Token = defaults_module.Token
+    User = defaults_module.User
+    UserRole = defaults_module.UserRole
+    UserSetting = defaults_module.UserSetting
 
     yield
 

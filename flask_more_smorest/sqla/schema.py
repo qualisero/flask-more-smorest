@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     PropertyOrColumn = ColumnProperty[Any] | Any
 
 
-class BaseSchema(SQLAlchemyAutoSchema):
+class BaseSchema(SQLAlchemyAutoSchema[Any]):
     """Base schema for all Marshmallow schemas.
 
     This schema extends SQLAlchemyAutoSchema with automatic view_args

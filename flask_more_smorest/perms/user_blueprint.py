@@ -102,7 +102,7 @@ class UserBlueprint(PermsBlueprint):
             schema = UserSchema
 
         # Register the model if requested
-        if register and model is not None:
+        if register:
             from .user_registry import init_fms
 
             if not isinstance(model, type):
@@ -116,7 +116,7 @@ class UserBlueprint(PermsBlueprint):
         # Check if PUBLIC_REGISTRATION is enabled on the model
         # If so, make the POST endpoint public
         public_registration = getattr(model, "PUBLIC_REGISTRATION", False)
-        if public_registration and methods is not None:
+        if public_registration:
             # Convert methods list to dict if needed to add public config
             if isinstance(methods, list):
                 methods_dict: dict[CRUDMethod, MethodConfig | bool] = {m: {} for m in methods}
@@ -169,7 +169,7 @@ class UserBlueprint(PermsBlueprint):
         @self.route("/login/", methods=["POST"])
         @self.arguments(UserLoginSchema)
         @self.response(HTTPStatus.OK, TokenSchema)
-        def login(data: dict) -> dict[str, str]:
+        def login(data: dict[str, Any]) -> dict[str, str]:
             """Login and get JWT token (public endpoint)."""
 
             user_model_cls: type[BaseModel] = self._config.model_cls

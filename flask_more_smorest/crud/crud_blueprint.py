@@ -118,7 +118,7 @@ def resolve_schema(
     # Defensive guard for unexpected types at runtime
     # Type checker correctly marks this as unreachable given the type hints,
     # but we keep it for robustness if called with unexpected types
-    context_msg = f" for {context}" if context else ""  # type: ignore[unreachable]
+    context_msg = f" for {context}" if context else ""
     raise TypeError(
         f"Schema{context_msg} must be a string, Schema subclass, or Schema instance; "
         f"got {type(schema_candidate).__name__}."
@@ -525,7 +525,7 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
 
     def _prepare_update_schema(
         self, config: CRUDConfig
-    ) -> Schema | type[Schema] | SQLAlchemySchema | type[SQLAlchemySchema]:
+    ) -> Schema | type[Schema] | SQLAlchemySchema[Any] | type[SQLAlchemySchema[Any]]:
         """Create update schema for PATCH operations.
 
         If an explicit arg_schema is provided in PATCH method config, it's used.
@@ -552,7 +552,10 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
         # NOTE: the following will trigger a warning in apispec if no custom resolver is set
         update_schema = config.schema_cls(partial=True)
         if isinstance(update_schema, SQLAlchemySchema):
-            update_schema._load_instance = False
+            # marshmallow-sqlalchemy exposes load_instance only through Meta, which is
+            # fixed when the class is built; this is the only way to turn it off on an
+            # already-instantiated partial schema.
+            update_schema._load_instance = False  # pyright: ignore[reportPrivateUsage]
 
         return update_schema
 
@@ -574,9 +577,10 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
         schema_cls: type[Schema] = config.schema_cls
 
         if CRUDMethod.INDEX in config.methods or CRUDMethod.POST in config.methods:
-            # Initialize variables to avoid "possibly unbound" errors
-            index_schema_class: type[Schema] | None = None
-            query_filter_schema: type[Schema] | None = None
+            # The index view is built here, outside the class body, and stashed in
+            # index_views. Building it conditionally keeps one implementation for the
+            # paginated and non-paginated cases: only the decorator stack differs.
+            index_views: dict[str, Any] = {}
 
             if CRUDMethod.INDEX in config.methods:
                 index_schema_candidate = config.methods[CRUDMethod.INDEX].get("schema", schema_cls)
@@ -585,63 +589,62 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
                 )
                 query_filter_schema = generate_filter_schema(base_schema=index_schema_class)
 
+                def index_get(
+                    _self: MethodView,  # NOTE: using _self to avoid collision with outer self
+                    filters: dict[str, Any],
+                    pagination_parameters: "PaginationParameters | None" = None,
+                    **kwargs: Any,
+                ) -> Sequence[BaseModel]:
+                    """Fetch all resources.
+
+                    kwargs might contains path parameters to filter by (eg /user/<uuid:user_id>/roles/)
+                    pagination_parameters is injected by the paginate decorator, and is None
+                    when the blueprint has no default page size.
+                    """
+                    stmts = get_statements_from_filters(filters, model=model_cls)
+                    base_query = sa.select(model_cls).filter_by(**kwargs).filter(*stmts)
+
+                    if pagination_parameters is not None:
+                        count_query = sa.select(sa.func.count()).select_from(base_query.subquery())
+                        total_items = self._db_session.scalar(count_query)
+                        pagination_parameters.item_count = total_items  # pyright: ignore[reportAttributeAccessIssue]
+
+                        if pagination_parameters.page_size > 0:
+                            base_query = base_query.limit(pagination_parameters.page_size).offset(
+                                pagination_parameters.page_size * (pagination_parameters.page - 1)
+                            )
+
+                    return self._db_session.execute(base_query).scalars().all()
+
+                # Decorators are applied bottom-up, so this list reads in decorator order.
+                index_view = self.doc(operationId=f"list{config.model_name}")(index_get)
+                if self._default_page_size is not None:
+                    index_view = self.paginate(page_size=self._default_page_size)(index_view)
+                index_view = self.response(HTTPStatus.OK, index_schema_class(many=True))(index_view)
+                index_views["get"] = self.arguments(query_filter_schema, location="query", unknown=RAISE)(index_view)
+
+            # Resolved outside the class body so the decorators can reference them.
+            # arg_schema drives the request input, schema drives the response output.
+            post_config = config.methods.get(CRUDMethod.POST, {})
+            post_input_schema = self._resolve_schema_class(
+                post_config.get("arg_schema") or post_config.get("schema", schema_cls),
+                config=config,
+                method=CRUDMethod.POST,
+            )
+            # The response schema is passed through untouched, as GET and PATCH do,
+            # so a configured Schema instance keeps its options (many=True, etc.).
+            post_response_schema = post_config.get("schema", schema_cls)
+
             class GenericIndex(MethodView):
                 """Index/Post endpoints."""
 
-                if CRUDMethod.INDEX in config.methods:
-                    if self._default_page_size is not None:
-
-                        @self.arguments(query_filter_schema, location="query", unknown=RAISE)  # pyright: ignore[reportArgumentType]
-                        @self.response(HTTPStatus.OK, index_schema_class(many=True))  # type: ignore[misc]  # pyright: ignore[reportArgumentType, reportOptionalCall]
-                        @self.paginate(page_size=self._default_page_size)
-                        @self.doc(operationId=f"list{config.model_name}")
-                        def get(
-                            _self,  # NOTE: using _self to avoid collision with outer self
-                            filters: dict,
-                            pagination_parameters: "PaginationParameters",
-                            **kwargs: Any,
-                        ) -> Sequence[BaseModel]:
-                            """Fetch all resources.
-                            kwargs might contains path parameters to filter by (eg /user/<uuid:user_id>/roles/)
-                            """
-                            stmts = get_statements_from_filters(filters, model=model_cls)
-                            base_query = sa.select(model_cls).filter_by(**kwargs).filter(*stmts)
-
-                            count_query = sa.select(sa.func.count()).select_from(base_query.subquery())
-                            total_items = self._db_session.scalar(count_query)
-                            pagination_parameters.item_count = total_items  # pyright: ignore[reportAttributeAccessIssue]
-
-                            if pagination_parameters.page_size > 0:
-                                paginated_query = base_query.limit(pagination_parameters.page_size).offset(
-                                    pagination_parameters.page_size * (pagination_parameters.page - 1)
-                                )
-                            else:
-                                paginated_query = base_query
-
-                            return self._db_session.execute(paginated_query).scalars().all()
-
-                    else:
-
-                        @self.arguments(query_filter_schema, location="query", unknown=RAISE)  # pyright: ignore[reportArgumentType]
-                        @self.response(HTTPStatus.OK, index_schema_class(many=True))  # type: ignore[misc]  # pyright: ignore[reportArgumentType, reportOptionalCall]
-                        @self.doc(operationId=f"list{config.model_name}")
-                        def get(
-                            _self,
-                            filters: dict,
-                            **kwargs: Any,
-                        ) -> Sequence[BaseModel]:
-                            """Fetch all resources (no pagination)."""
-                            stmts = get_statements_from_filters(filters, model=model_cls)
-                            base_query = sa.select(model_cls).filter_by(**kwargs).filter(*stmts)
-                            return self._db_session.execute(base_query).scalars().all()
+                if "get" in index_views:
+                    get = index_views["get"]
 
                 if CRUDMethod.POST in config.methods:
 
-                    @self.arguments(config.methods[CRUDMethod.POST].get("schema", schema_cls))
-                    @self.response(
-                        HTTPStatus.OK,
-                        config.methods[CRUDMethod.POST].get("schema", schema_cls),
-                    )
+                    @self.arguments(post_input_schema)
+                    @self.response(HTTPStatus.OK, post_response_schema)
                     @self.doc(
                         responses={
                             HTTPStatus.NOT_FOUND: {"description": f"{config.name} resource not found"},
@@ -651,10 +654,35 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
                     )
                     def post(
                         _self,
-                        new_object: BaseModel,
+                        new_object: BaseModel | dict[str, Any],
                         **kwargs: str | int | float | bool | bytes | None,
                     ) -> BaseModel:
-                        """Create and return new resource."""
+                        """Create and return new resource.
+
+                        A model-bound input schema (load_instance=True) deserialises
+                        straight to an instance. A plain marshmallow schema, which is
+                        the usual case for an explicit arg_schema, deserialises to a
+                        dict, so build the instance here.
+
+                        An arg_schema usually differs from the model: the invite-only
+                        signup example validates an invite code that is not a column.
+                        Keys the model does not define are dropped, mirroring what
+                        marshmallow-sqlalchemy does for a model-bound schema, rather
+                        than letting the declarative constructor raise TypeError.
+
+                        Callables are excluded as well. SQLAlchemy's constructor admits
+                        any attribute the class has, so a field named after a method
+                        would shadow it on the instance and break the update() call
+                        below. Columns, relationships, hybrids and property setters are
+                        all non-callable, so they still pass.
+                        """
+                        if isinstance(new_object, dict):
+                            model_fields = {
+                                key: value
+                                for key, value in new_object.items()
+                                if hasattr(model_cls, key) and not callable(getattr(model_cls, key, None))
+                            }
+                            new_object = model_cls(**model_fields)
                         new_object.update(commit=True, **kwargs)
                         return new_object
 
@@ -704,7 +732,7 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
                     HTTPStatus.OK,
                     config.methods[CRUDMethod.PATCH].get("schema", schema_cls),
                 )
-                def patch(_self, payload: dict, **kwargs: str | int | uuid.UUID | bool | None) -> BaseModel:
+                def patch(_self, payload: dict[str, Any], **kwargs: str | int | uuid.UUID | bool | None) -> BaseModel:
                     """Update resource."""
                     kwargs[config.res_id_name] = kwargs.pop(config.res_id_param_name)
                     res = model_cls.get_by_or_404(**kwargs)

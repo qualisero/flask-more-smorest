@@ -135,8 +135,9 @@ class BasePermsModel(SQLABaseModel):
         if self._check_admin_bypass(user):
             return True
 
-        if self.id is None:
-            return True  # type: ignore[unreachable]  # mypy false positive
+        # A not-yet-persisted object is readable by its creator.
+        if getattr(self, "id", None) is None:
+            return True
 
         return self._execute_permission_check(lambda: self._can_read(user), "read")
 
@@ -307,7 +308,9 @@ class BasePermsModel(SQLABaseModel):
 
         raise ForbiddenError(f"User not allowed to read resource: {res}")
 
-    def check_create(self, val: list | set | tuple | object, _visited: set[int] | None = None) -> None:
+    def check_create(
+        self, val: list[Any] | set[Any] | tuple[Any, ...] | object, _visited: set[int] | None = None
+    ) -> None:
         """Recursively check that all BaseModel instances can be created.
 
         Args:

@@ -126,7 +126,7 @@ Removing Roles:
    # Find and delete specific role
    role = UserRole.query.filter_by(
        user_id=user.id,
-       role=BaseRoleEnum.MODERATOR
+       role=BaseRoleEnum.USER
    ).first()
    if role:
        role.delete()

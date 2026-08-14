@@ -130,7 +130,7 @@ def test_paginate_page_size_zero_includes_safe_header_metadata() -> None:
 def test_paginate_page_size_zero_empty_result() -> None:
     """page_size=0 with empty results should not error."""
     dummy = DummyPagination()
-    dummy.PAGINATION_HEADER_NAME = "X-Pagination"  # type: ignore[assignment]
+    dummy.PAGINATION_HEADER_NAME = "X-Pagination"
 
     def fake_set_pagination_metadata(params: object, result: object, headers: object) -> tuple[object, object]:
         assert isinstance(headers, dict)
@@ -138,7 +138,7 @@ def test_paginate_page_size_zero_empty_result() -> None:
         headers["X-Pagination"] = f'{{"total": {params.item_count}, "total_pages": 1}}'
         return result, headers
 
-    dummy._set_pagination_metadata = fake_set_pagination_metadata  # type: ignore[attr-defined]
+    dummy._set_pagination_metadata = fake_set_pagination_metadata
 
     captured: dict[str, PaginationParameters] = {}
 

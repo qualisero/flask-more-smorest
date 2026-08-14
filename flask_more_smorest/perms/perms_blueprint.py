@@ -5,6 +5,7 @@ endpoints as public or admin-only.
 """
 
 from collections.abc import Callable
+from typing import Any
 
 from flask.views import MethodView
 
@@ -56,7 +57,7 @@ class PermsBlueprintMixin:
             if method_config.get("public", False):
                 self.public_endpoint(method)
 
-    def public_endpoint(self, func: Callable) -> Callable:
+    def public_endpoint(self, func: Callable[..., Any]) -> Callable[..., Any]:
         """Decorator to mark an endpoint as public.
 
         Public endpoints do not require authentication and can be
@@ -74,14 +75,14 @@ class PermsBlueprintMixin:
             >>> def health_check():
             ...     return {'status': 'ok'}
         """
-        func._is_public = True  # type: ignore[attr-defined]
+        func._is_public = True  # pyright: ignore[reportFunctionMemberAccess]
         if func.__doc__ is None:
             func.__doc__ = "Public endpoint"
         else:
             func.__doc__ += " | 🌐 Public"
         return func
 
-    def admin_endpoint(self, func: Callable) -> Callable:
+    def admin_endpoint(self, func: Callable[..., Any]) -> Callable[..., Any]:
         """Decorator to mark an endpoint as admin only.
 
         Admin endpoints require the user to have admin privileges.
@@ -100,7 +101,7 @@ class PermsBlueprintMixin:
             ...     # Only admins can delete users
             ...     pass
         """
-        func._is_admin = True  # type: ignore[attr-defined]
+        func._is_admin = True  # pyright: ignore[reportFunctionMemberAccess]
         if func.__doc__ is None:
             func.__doc__ = "Admin only endpoint"
         else:

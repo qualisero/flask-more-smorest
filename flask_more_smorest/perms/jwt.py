@@ -1,5 +1,6 @@
 import logging
 import uuid
+from typing import Any
 
 from flask import Flask
 from flask_jwt_extended import JWTManager
@@ -36,7 +37,9 @@ def init_jwt(app: Flask) -> None:
 
     jwt = JWTManager()
     jwt.init_app(app)
-    jwt._set_error_handler_callbacks(app)
+    # flask-jwt-extended registers its error handlers on init_app only for the app it
+    # was constructed with; there is no public API to attach them to another app.
+    jwt._set_error_handler_callbacks(app)  # pyright: ignore[reportPrivateUsage]
 
     # Set up user_identity_lookup for JWT
     @jwt.user_identity_loader
@@ -45,7 +48,7 @@ def init_jwt(app: Flask) -> None:
 
     # Set up user_lookup_callback for JWT
     @jwt.user_lookup_loader
-    def user_lookup_callback(_jwt_header: dict, jwt_data: dict) -> AbstractUser | None:
+    def user_lookup_callback(_jwt_header: dict[str, Any], jwt_data: dict[str, Any]) -> AbstractUser | None:
         from ..sqla import db
         from .user_registry import get_user_model
 

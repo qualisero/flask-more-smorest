@@ -28,11 +28,12 @@ from flask_more_smorest.perms.models import defaults as defaults_module
 from flask_more_smorest.perms.models.abstract_user import AbstractUser
 
 if TYPE_CHECKING:
+    from flask_sqlalchemy.session import Session
     from sqlalchemy.orm import scoped_session
 
 
 @pytest.fixture
-def db_session(unit_app: Flask) -> Iterator["scoped_session"]:
+def db_session(unit_app: Flask) -> Iterator["scoped_session[Session]"]:
     """Create a database session for tests."""
     with unit_app.app_context():
         db.create_all()
@@ -140,7 +141,9 @@ class TestUserBlueprintClass:
             rules = [rule.rule for rule in unit_app.url_map.iter_rules()]
             assert "/api/users/me" in rules
 
-    def test_user_blueprint_skip_methods(self, unit_app: Flask, api: Api, db_session: "scoped_session") -> None:
+    def test_user_blueprint_skip_methods(
+        self, unit_app: Flask, api: Api, db_session: "scoped_session[Session]"
+    ) -> None:
         """Test UserBlueprint skip_methods configuration."""
         bp = UserBlueprint(skip_methods=[CRUDMethod.DELETE, CRUDMethod.PATCH])
         api.register_blueprint(bp)
@@ -203,7 +206,7 @@ class TestUserBlueprintWithCustomUser:
             db.create_all()
 
     def test_user_blueprint_with_custom_user_class(
-        self, unit_app: Flask, api: Api, db_session: "scoped_session"
+        self, unit_app: Flask, api: Api, db_session: "scoped_session[Session]"
     ) -> None:
         """Test UserBlueprint works with custom User model."""
 
@@ -224,7 +227,7 @@ class TestUserBlueprintWithCustomUser:
         assert CustomUser.PUBLIC_REGISTRATION is True
 
     def test_public_registration_makes_post_endpoint_public(
-        self, unit_app: Flask, api: Api, db_session: "scoped_session"
+        self, unit_app: Flask, api: Api, db_session: "scoped_session[Session]"
     ) -> None:
         """Test that PUBLIC_REGISTRATION=True makes POST endpoint public."""
         from flask_more_smorest.crud.crud_blueprint import CRUDMethod
@@ -244,7 +247,7 @@ class TestUserBlueprintWithCustomUser:
         assert post_config.get("public") is True, "POST should be marked as public when PUBLIC_REGISTRATION=True"
 
     def test_no_public_registration_requires_auth_for_post(
-        self, unit_app: Flask, api: Api, db_session: "scoped_session"
+        self, unit_app: Flask, api: Api, db_session: "scoped_session[Session]"
     ) -> None:
         """Test that without PUBLIC_REGISTRATION, POST requires authentication."""
         from flask_more_smorest.crud.crud_blueprint import CRUDMethod

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from flask import Flask
 
 from flask_more_smorest import __version__, db, init_db
 from flask_more_smorest.perms import Api
@@ -18,7 +19,7 @@ def api(unit_api: Api) -> Api:
 class TestHealthEndpointDefault:
     """Tests for default health endpoint configuration."""
 
-    def test_health_endpoint_returns_healthy(self, unit_app) -> None:
+    def test_health_endpoint_returns_healthy(self, unit_app: Flask) -> None:
         """Test that health endpoint returns healthy status."""
         with unit_app.test_client() as client:
             response = client.get("/health")
@@ -30,7 +31,7 @@ class TestHealthEndpointDefault:
             assert data["version"] == __version__
             assert "timestamp" in data
 
-    def test_health_endpoint_is_public(self, unit_app) -> None:
+    def test_health_endpoint_is_public(self, unit_app: Flask) -> None:
         """Test that health endpoint doesn't require authentication."""
         with unit_app.test_client() as client:
             # No auth headers provided

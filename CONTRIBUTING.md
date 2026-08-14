@@ -23,17 +23,15 @@ Thank you for your interest in contributing! This document outlines the process 
    curl -sSL https://install.python-poetry.org | python3 -
    ```
 
-3. **Install dependencies**:
+3. **Bootstrap the dev environment** (dependencies and pre-commit hooks):
    ```bash
-   poetry install
+   poetry sync && poetry run pre-commit install
    ```
 
-4. **Install pre-commit hooks**:
-   ```bash
-   poetry run pre-commit install
-   ```
+   Always use `poetry sync`: a drifted venv produces phantom lint findings, and a stale
+   hook path silently disables all pre-commit gating.
 
-5. **Run tests to verify setup**:
+4. **Run tests to verify setup**:
    ```bash
    poetry run pytest
    ```
@@ -65,7 +63,7 @@ Thank you for your interest in contributing! This document outlines the process 
    ```bash
    poetry run ruff format flask-more-smorest/ tests/
    poetry run ruff check flask-more-smorest/ tests/
-   poetry run mypy flask-more-smorest/
+   poetry run pyright
    ```
 
 6. **Commit your changes**:

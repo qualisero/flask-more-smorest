@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **POST endpoints now honour `arg_schema`.** `MethodConfig["arg_schema"]` was documented for
+  `POST` but only implemented for `PATCH`: the configured input schema was ignored and the
+  response schema was used for the request body as well. `arg_schema` now sets the request body
+  schema while `schema` stays the response schema. Fields the model does not define, such as the
+  invite code in the invite-only signup example, are validated and then dropped rather than passed
+  to the model constructor.
+
+- **POST with a plain (non model-bound) schema now creates the resource.** The handler assumed the
+  deserialised payload was a model instance, so with a plain `marshmallow.Schema` it wrote a key
+  into the payload dict and returned 200 without persisting anything.
+
+- **Performance monitoring settings are resolved per application.** The SQLAlchemy event hooks are
+  registered once on the `Engine` class but captured `SQLALCHEMY_SLOW_QUERY_THRESHOLD` and the
+  logging flags from whichever app registered first. Later apps silently inherited that
+  configuration, and an app that never enabled `SQLALCHEMY_PERFORMANCE_MONITORING` was still
+  monitored and still had its queries counted. Each query now reads the configuration of the app
+  that issued it.
+
+### Changed
+
+- **`BaseRoleEnum` is now an `enum.StrEnum`** instead of `(str, enum.Enum)`. Comparisons, `.value`
+  and JSON serialisation are unchanged, and stored values are unchanged, but `str(role)`,
+  f-strings and `%s` now produce `ADMIN` instead of `BaseRoleEnum.ADMIN`. Check any log line, URL
+  fragment or template that interpolates a role directly.
+
+- **`ApiException.get_debug_context` is annotated as `DebugContext`**, a recursive alias for the
+  JSON-shaped structure it already returned. Runtime behaviour is unchanged.
+
+### Removed
+
+- **Bandit.** It had five configuration sources, three of which were dead, and reported no issues.
+  Ruff's `S` ruleset already covers `flask_more_smorest` and `tests` and remains the security lint.
+
+- **mypy.** Pyright is now the only type checker, with `reportMissingParameterType`,
+  `reportMissingTypeArgument` and `reportUnnecessaryTypeIgnoreComment` enabled.
+
+- **The Codecov upload step.** It required an account token that this project does not
+  have, so every upload failed with `Token required - not valid tokenless upload` while
+  `fail_ci_if_error: false` hid it. Coverage is still reported in the CI test log.
+
+- **The `stubs/` tree.** The package ships `py.typed` and the stubs were never shipped, never
+  consulted (`stubPath` pointed at a directory that does not exist) and had drifted from the
+  source they duplicated.
+
 ## [0.13.1] - 2026-08-12
 
 ### Fixed

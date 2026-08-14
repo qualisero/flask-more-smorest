@@ -5,9 +5,10 @@ using up-to-date features from flask-smorest, SQLAlchemy, and marshmallow_sqlalc
 """
 
 import contextlib
+import json
 import uuid
 from collections.abc import Iterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from apispec.ext.marshmallow import MarshmallowPlugin
@@ -67,6 +68,11 @@ def api(app: Flask) -> Api:
     return Api(app, spec_kwargs=spec_kwargs)
 
 
+def _always_allowed(_self: Any) -> bool:
+    """Permission hook for test models: everything is permitted."""
+    return True
+
+
 @pytest.fixture
 def product_model(app: Flask) -> type[BaseModel]:
     """Create a Product model for testing."""
@@ -83,9 +89,9 @@ def product_model(app: Flask) -> type[BaseModel]:
             "description": db.Column(db.String(500)),
             "price": db.Column(db.Float, nullable=False),
             "in_stock": db.Column(db.Boolean, default=True),
-            "_can_read": lambda self: True,
-            "_can_write": lambda self: True,
-            "_can_create": classmethod(lambda cls: True),
+            "_can_read": _always_allowed,
+            "_can_write": _always_allowed,
+            "_can_create": classmethod(_always_allowed),
         },
     )
 
@@ -329,6 +335,71 @@ class TestCRUDIntegration:
             response = client.post("/api/products/", json=product_data)
             # Should return 422 for validation errors
             assert response.status_code == 422
+
+
+class TestIndexPagination:
+    """The index view is one implementation; only its decorator stack differs."""
+
+    def _client(
+        self,
+        app: Flask,
+        api: Api,
+        product_model: type[BaseModel],
+        *,
+        default_page_size: int | None,
+    ) -> tuple["FlaskClient", str]:
+        rand_str = uuid.uuid4().hex
+        url_prefix = f"/api/paged_{rand_str}/"
+        blueprint = CRUDBlueprint(
+            f"paged_{rand_str}",
+            __name__,
+            model=product_model,
+            schema=product_model.Schema,
+            url_prefix=url_prefix,
+            default_page_size=default_page_size,
+        )
+        api.register_blueprint(blueprint)
+
+        with app.app_context(), product_model.bypass_perms():
+            for i in range(25):
+                product_model(name=f"Product {i:02d}", price=1.0 + i).save()
+
+        return app.test_client(), url_prefix
+
+    def test_index_paginates_by_default_page_size(self, app: Flask, api: Api, product_model: type[BaseModel]) -> None:
+        client, url = self._client(app, api, product_model, default_page_size=5)
+
+        with app.app_context(), product_model.bypass_perms():
+            response = client.get(url)
+            assert response.status_code == 200
+            assert len(response.get_json()) == 5
+            assert json.loads(response.headers["X-Pagination"])["total"] == 25
+
+            second_page = client.get(f"{url}?page=2&page_size=5")
+            assert [p["name"] for p in second_page.get_json()] == [f"Product {i:02d}" for i in range(5, 10)]
+
+    def test_index_without_pagination_returns_every_row(
+        self, app: Flask, api: Api, product_model: type[BaseModel]
+    ) -> None:
+        """default_page_size=None drops the paginate decorator: no limit, no header."""
+        client, url = self._client(app, api, product_model, default_page_size=None)
+
+        with app.app_context(), product_model.bypass_perms():
+            response = client.get(url)
+            assert response.status_code == 200
+            assert len(response.get_json()) == 25
+            assert "X-Pagination" not in response.headers
+
+    def test_index_without_pagination_ignores_page_params(
+        self, app: Flask, api: Api, product_model: type[BaseModel]
+    ) -> None:
+        """page/page_size come from the filter schema, so they are accepted but inert."""
+        client, url = self._client(app, api, product_model, default_page_size=None)
+
+        with app.app_context(), product_model.bypass_perms():
+            response = client.get(f"{url}?page=2&page_size=5")
+            assert response.status_code == 200
+            assert len(response.get_json()) == 25
 
 
 @pytest.fixture(scope="module", autouse=True)

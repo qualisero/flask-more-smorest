@@ -23,8 +23,8 @@ if TYPE_CHECKING:
 
     GetCurrentUserFunc = Callable[[], AbstractUser | None]
 else:  # pragma: no cover - runtime placeholder
-    AbstractUser = object  # type: ignore[assignment]
-    GetCurrentUserFunc = Callable[[], object | None]  # type: ignore[assignment]
+    AbstractUser = object
+    GetCurrentUserFunc = Callable[[], object | None]
 
 UserT = TypeVar("UserT", bound="AbstractUser")
 
@@ -79,8 +79,8 @@ def get_current_user(user_type: type[UserT] | None = None) -> UserT | AbstractUs
             return None
         if not isinstance(user, user_type):
             return None
-        # Explicit cast to help mypy's incremental mode understand the narrowing
-        return cast(UserT, user)  # type: ignore[redundant-cast]
+        # isinstance narrows to user_type, which is type[UserT] at the call site
+        return user
 
     return user
 

@@ -2,11 +2,13 @@
 
 import uuid
 
+from flask import Flask
+
 from flask_more_smorest.perms.models import defaults as defaults_module
 from flask_more_smorest.sqla import db as sqla_db
 
 
-def test_has_domain_access_with_specific_domain(unit_app, db_session):
+def test_has_domain_access_with_specific_domain(unit_app: Flask, db_session: None):
     """Test has_domain_access with a specific domain ID."""
     sqla_db.create_all()
 
@@ -28,7 +30,7 @@ def test_has_domain_access_with_specific_domain(unit_app, db_session):
     assert user.has_domain_access(other_domain_id) is False
 
 
-def test_has_domain_access_with_none(unit_app, db_session):
+def test_has_domain_access_with_none(unit_app: Flask, db_session: None):
     """Test has_domain_access with None (global access)."""
     sqla_db.create_all()
 
@@ -40,7 +42,7 @@ def test_has_domain_access_with_none(unit_app, db_session):
     assert user.has_domain_access(None) is True
 
 
-def test_has_domain_access_with_wildcard(unit_app, db_session):
+def test_has_domain_access_with_wildcard(unit_app: Flask, db_session: None):
     """Test has_domain_access with wildcard role."""
     sqla_db.create_all()
 
@@ -60,7 +62,7 @@ def test_has_domain_access_with_wildcard(unit_app, db_session):
     assert user.has_domain_access(None) is True
 
 
-def test_has_domain_access_multiple_domains(unit_app, db_session):
+def test_has_domain_access_multiple_domains(unit_app: Flask, db_session: None):
     """Test has_domain_access with multiple domain roles."""
     sqla_db.create_all()
 
@@ -85,7 +87,7 @@ def test_has_domain_access_multiple_domains(unit_app, db_session):
     assert user.has_domain_access(domain3_id) is False
 
 
-def test_has_domain_access_no_roles(unit_app, db_session):
+def test_has_domain_access_no_roles(unit_app: Flask, db_session: None):
     """Test has_domain_access for user without roles."""
     sqla_db.create_all()
 
@@ -99,7 +101,7 @@ def test_has_domain_access_no_roles(unit_app, db_session):
     assert user.has_domain_access(None) is True
 
 
-def test_domain_ids_property(unit_app, db_session):
+def test_domain_ids_property(unit_app: Flask, db_session: None):
     """Test domain_ids property returns correct set."""
     sqla_db.create_all()
 
@@ -122,7 +124,7 @@ def test_domain_ids_property(unit_app, db_session):
     assert "*" in user.domain_ids
 
 
-def test_has_domain_access_docstring_examples(unit_app, db_session):
+def test_has_domain_access_docstring_examples(unit_app: Flask, db_session: None):
     """Test the examples from the has_domain_access docstring."""
     sqla_db.create_all()
 

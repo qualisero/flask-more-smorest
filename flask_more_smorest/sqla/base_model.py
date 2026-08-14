@@ -25,7 +25,7 @@ from ..error.exceptions import NotFoundError
 from .database import db
 from .schema import BaseSchema, create_model_schema
 
-PropertyOrColumn: TypeAlias = MapperProperty | sa.Column
+PropertyOrColumn: TypeAlias = MapperProperty[Any] | sa.Column[Any]
 
 
 class BaseModelMeta(DeclarativeMeta):
@@ -80,7 +80,7 @@ class BaseModelMeta(DeclarativeMeta):
         pass
 
 
-class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined]
+class BaseModel(db.Model, metaclass=BaseModelMeta):
     """Base model for all application models.
 
     This base class provides:
@@ -151,12 +151,10 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
             RuntimeError: If database session is not active
         """
         try:
-            session_proxy = db.session
+            # Accessing the session is the check: it raises when init_db was not run.
+            _ = db.session
         except RuntimeError as exc:  # Raised if init_db/app context not configured
             raise RuntimeError("In order to use BaseModel, you must import init_db from sqla and run it.") from exc
-
-        if session_proxy is None:
-            raise RuntimeError("In order to use BaseModel, you must import init_db from sqla and run it.")
 
         super().__init__(**kwargs)
 
@@ -450,7 +448,7 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
         db.session.expunge(self)
 
         make_transient(self)
-        self.id = None  # type: ignore[assignment]
+        self.id = None  # pyright: ignore[reportAttributeAccessIssue]
 
         return self
 
@@ -496,7 +494,7 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):  # type: ignore[name-defined
         """
         pass
 
-    def check_create(self, val: list | set | tuple | object) -> None:
+    def check_create(self, val: list[Any] | set[Any] | tuple[Any, ...] | object) -> None:
         """Recursively validate nested models before creating them.
 
         Ensures nested BaseModel instances have an opportunity to perform

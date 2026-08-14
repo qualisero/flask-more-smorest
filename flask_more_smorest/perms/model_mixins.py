@@ -59,7 +59,7 @@ class HasUserMixin:
         custom_name: str | None = getattr(cls, "__user_backref_name__", None)
         if custom_name is not None:
             return custom_name
-        return f"{cls.__tablename__}s"  # type: ignore
+        return f"{cls.__tablename__}s"  # pyright: ignore[reportAttributeAccessIssue]
 
     @classmethod
     def _configure_user_aliases(cls) -> None:
@@ -127,7 +127,7 @@ class HasUserMixin:
         return relationship(
             lambda: get_user_model(),
             lazy="joined",
-            foreign_keys=[cls.user_id],  # type: ignore[list-item]
+            foreign_keys=[cls.user_id],  # pyright: ignore[reportArgumentType]
             backref=backref_arg,
         )
 
@@ -161,7 +161,9 @@ class UserOwnershipMixin(HasUserMixin):
 
     def _can_write(self, user: Any) -> bool:
         if self.__delegate_to_user__:
-            return self.user._can_write(user)
+            # _can_* is this library's permission hook protocol: models override it and
+            # related models delegate to each other through it, by design.
+            return self.user._can_write(user)  # pyright: ignore[reportPrivateUsage]
         return bool(user) and self.user_id == user.id
 
     def _can_read(self, user: Any) -> bool:
@@ -186,7 +188,7 @@ class UserOwnershipMixin(HasUserMixin):
             if not owner:
                 return False
 
-            return owner._can_write(user)
+            return owner._can_write(user)  # pyright: ignore[reportPrivateUsage]
 
         return self._can_write(user)
 

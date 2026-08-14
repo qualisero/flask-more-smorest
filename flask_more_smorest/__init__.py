@@ -54,7 +54,6 @@ User Authentication Example:
 """
 
 import logging
-import uuid
 from typing import TYPE_CHECKING
 
 from .crud.blueprint_operationid import BlueprintOperationIdMixin
@@ -94,8 +93,6 @@ from .utils import convert_snake_to_camel
 
 # Type stubs for lazy-loaded objects - provides proper typing without premature import
 if TYPE_CHECKING:
-    from flask_smorest import Blueprint as _Blueprint
-
     # User models are typed via perms module delegation
     from .perms import (
         AbstractDomain,

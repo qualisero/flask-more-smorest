@@ -45,7 +45,7 @@ class Api(ApiOrig):
         >>> api = Api(app)
     """
 
-    def __init__(self, app: "Flask | None" = None, *, spec_kwargs: dict | None = None) -> None:
+    def __init__(self, app: "Flask | None" = None, *, spec_kwargs: dict[str, Any] | None = None) -> None:
         """Initialize the API with custom Marshmallow plugin.
 
         Args:
@@ -126,11 +126,11 @@ class Api(ApiOrig):
                     public_endpoint = getattr(fn, "_is_public", False)
                     admin_endpoint = getattr(fn, "_is_admin", False)
                     if hasattr(fn, "view_class"):
-                        view_class = getattr(fn, "view_class", None)  # pyright: ignore[reportFunctionMemberAccess]
+                        view_class = getattr(fn, "view_class", None)
                         public_endpoint |= getattr(view_class, "_is_public", False)
                         admin_endpoint |= getattr(view_class, "_is_admin", False)
                         # Handle MethodView classes:
-                        if actual_method := getattr(view_class, request.method.lower(), None):  # pyright: ignore[reportFunctionMemberAccess]
+                        if actual_method := getattr(view_class, request.method.lower(), None):
                             public_endpoint |= getattr(actual_method, "_is_public", False)
                             admin_endpoint |= getattr(actual_method, "_is_admin", False)
                     if public_endpoint and not admin_endpoint:
@@ -205,7 +205,7 @@ class Api(ApiOrig):
             return jsonify(health), 200
 
         # Mark as public endpoint
-        health_check._is_public = True  # type: ignore[attr-defined]
+        health_check._is_public = True  # pyright: ignore[reportFunctionMemberAccess]
 
         logger.debug("Registered health endpoint at %s", health_path)
 

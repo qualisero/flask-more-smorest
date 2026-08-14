@@ -27,7 +27,10 @@ class CRUDPaginationMixin:
         """
         # If a pager class/instance is provided, use standard behavior
         if pager is not None:
-            return super().paginate(pager, page=page, page_size=page_size, max_page_size=max_page_size)  # type: ignore
+            # CRUDPaginationMixin is always mixed in alongside flask-smorest's PaginationMixin.
+            return super().paginate(  # pyright: ignore[reportAttributeAccessIssue]
+                pager, page=page, page_size=page_size, max_page_size=max_page_size
+            )
 
         # Custom behavior for pager=None (manual pagination handling)
         def decorator(func: Any) -> Any:
@@ -112,9 +115,9 @@ class CRUDPaginationMixin:
                             page=1,
                             page_size=safe_page_size,
                         )
-                        metadata_parameters.item_count = item_count
+                        metadata_parameters.item_count = item_count  # pyright: ignore[reportAttributeAccessIssue]
 
-                    result, headers = self._set_pagination_metadata(  # type: ignore
+                    result, headers = self._set_pagination_metadata(  # pyright: ignore[reportAttributeAccessIssue]
                         metadata_parameters, result, headers
                     )
 

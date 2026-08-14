@@ -3,10 +3,12 @@
 import contextlib
 import enum
 import uuid
+from collections.abc import Iterator
 from datetime import date, datetime
 
 import pytest
 import sqlalchemy as sa
+from flask import Flask
 from marshmallow import Schema, fields, validate
 from sqlalchemy import Boolean, Column, Date, Integer, String
 
@@ -19,7 +21,7 @@ from flask_more_smorest.sqla.base_model import BaseModel
 
 
 @pytest.fixture(autouse=True)
-def _init_db(app):
+def _init_db(app: Flask) -> Iterator[None]:
     with app.app_context():
         yield
         db.session.remove()
@@ -265,7 +267,7 @@ class TestGenerateFilterSchema:
 class TestGetStatementsFromFilters:
     """Tests for get_statements_from_filters function."""
 
-    def test_basic_equality_filter(self, query_model) -> None:
+    def test_basic_equality_filter(self, query_model: type[BaseModel]) -> None:
         """Test basic equality filtering."""
         filters_dict = {"name": "John", "is_active": True}
         statements = get_statements_from_filters(filters_dict, query_model)
@@ -273,7 +275,7 @@ class TestGetStatementsFromFilters:
         assert len(statements) == 2
         # Statements should be SQLAlchemy expressions
 
-    def test_range_filtering_datetime(self, query_model) -> None:
+    def test_range_filtering_datetime(self, query_model: type[BaseModel]) -> None:
         """Test range filtering with __from and __to suffixes for DateTime."""
         filters_dict = {
             "created_at__from": datetime(2024, 1, 1),
@@ -283,7 +285,7 @@ class TestGetStatementsFromFilters:
 
         assert len(statements) == 2
 
-    def test_range_filtering_date(self, query_model) -> None:
+    def test_range_filtering_date(self, query_model: type[BaseModel]) -> None:
         """Test range filtering with __from and __to suffixes for Date."""
         filters_dict = {
             "birth_date__from": date(2000, 1, 1),
@@ -293,14 +295,14 @@ class TestGetStatementsFromFilters:
 
         assert len(statements) == 2
 
-    def test_min_max_filtering(self, query_model) -> None:
+    def test_min_max_filtering(self, query_model: type[BaseModel]) -> None:
         """Test min/max filtering with __min and __max suffixes."""
         filters_dict = {"age__min": 18, "age__max": 65}
         statements = get_statements_from_filters(filters_dict, query_model)
 
         assert len(statements) == 2
 
-    def test_none_values_ignored(self, query_model) -> None:
+    def test_none_values_ignored(self, query_model: type[BaseModel]) -> None:
         """Test that None values are ignored in filtering."""
         filters_dict = {"name": None, "age": 25, "is_active": None}
         statements = get_statements_from_filters(filters_dict, query_model)
@@ -308,7 +310,7 @@ class TestGetStatementsFromFilters:
         # Only age filter should be included
         assert len(statements) == 1
 
-    def test_mixed_filter_types(self, query_model) -> None:
+    def test_mixed_filter_types(self, query_model: type[BaseModel]) -> None:
         """Test combining different filter types."""
         filters_dict = {
             "name": "John",
@@ -321,12 +323,12 @@ class TestGetStatementsFromFilters:
 
         assert len(statements) == 5
 
-    def test_empty_filters(self, query_model) -> None:
+    def test_empty_filters(self, query_model: type[BaseModel]) -> None:
         """Test with empty filters dictionary."""
         statements = get_statements_from_filters({}, query_model)
         assert len(statements) == 0
 
-    def test_invalid_field_names(self, query_model) -> None:
+    def test_invalid_field_names(self, query_model: type[BaseModel]) -> None:
         """Test handling of invalid field names."""
         filters_dict = {"nonexistent_field": "value"}
 
@@ -334,7 +336,7 @@ class TestGetStatementsFromFilters:
         with pytest.raises(ValueError, match="Invalid filter field 'nonexistent_field'"):
             get_statements_from_filters(filters_dict, query_model)
 
-    def test_invalid_field_with_suffix(self, query_model) -> None:
+    def test_invalid_field_with_suffix(self, query_model: type[BaseModel]) -> None:
         """Test handling of invalid field names with filter suffixes."""
         # Field 'invalid' does not exist, even with __from suffix
         filters_dict = {"invalid__from": "2024-01-01"}
@@ -342,7 +344,7 @@ class TestGetStatementsFromFilters:
         with pytest.raises(ValueError, match="Invalid filter field 'invalid'"):
             get_statements_from_filters(filters_dict, query_model)
 
-    def test_private_attribute_access_blocked(self, query_model) -> None:
+    def test_private_attribute_access_blocked(self, query_model: type[BaseModel]) -> None:
         """Test that private attributes cannot be accessed via filters."""
         # Attempting to filter by private/internal attributes should fail
         filters_dict = {"_sa_instance_state": "value"}
@@ -350,28 +352,28 @@ class TestGetStatementsFromFilters:
         with pytest.raises(ValueError, match="Invalid filter field '_sa_instance_state'"):
             get_statements_from_filters(filters_dict, query_model)
 
-    def test_from_only_filter(self, query_model) -> None:
+    def test_from_only_filter(self, query_model: type[BaseModel]) -> None:
         """Test range filter with only __from suffix."""
         filters_dict = {"created_at__from": datetime(2024, 1, 1)}
         statements = get_statements_from_filters(filters_dict, query_model)
 
         assert len(statements) == 1
 
-    def test_to_only_filter(self, query_model) -> None:
+    def test_to_only_filter(self, query_model: type[BaseModel]) -> None:
         """Test range filter with only __to suffix."""
         filters_dict = {"created_at__to": datetime(2024, 12, 31)}
         statements = get_statements_from_filters(filters_dict, query_model)
 
         assert len(statements) == 1
 
-    def test_min_only_filter(self, query_model) -> None:
+    def test_min_only_filter(self, query_model: type[BaseModel]) -> None:
         """Test min filter without max."""
         filters_dict = {"age__min": 18}
         statements = get_statements_from_filters(filters_dict, query_model)
 
         assert len(statements) == 1
 
-    def test_max_only_filter(self, query_model) -> None:
+    def test_max_only_filter(self, query_model: type[BaseModel]) -> None:
         """Test max filter without min."""
         filters_dict = {"age__max": 65}
         statements = get_statements_from_filters(filters_dict, query_model)
@@ -382,7 +384,7 @@ class TestGetStatementsFromFilters:
     # nulls_match tests
     # ------------------------------------------------------------------
 
-    def test_nulls_match_default_off_exact_behaviour(self, query_model) -> None:
+    def test_nulls_match_default_off_exact_behaviour(self, query_model: type[BaseModel]) -> None:
         """Without nulls_match (default), statements are plain equality/range."""
         filters_dict = {"name": "Alice", "age__min": 18}
         statements = get_statements_from_filters(filters_dict, query_model)
@@ -393,7 +395,7 @@ class TestGetStatementsFromFilters:
             # Plain BinaryExpression — no ClauseList / BooleanClauseList wrapper
             assert stmt.__class__.__name__ not in ("BooleanClauseList", "Or", "ClauseList")
 
-    def test_nulls_match_false_explicit(self, query_model) -> None:
+    def test_nulls_match_false_explicit(self, query_model: type[BaseModel]) -> None:
         """nulls_match=False behaves identically to the default (no wrapping)."""
         filters_dict = {"name": "Bob", "nulls_match": False}
         statements = get_statements_from_filters(filters_dict, query_model)
@@ -402,7 +404,7 @@ class TestGetStatementsFromFilters:
         for stmt in statements:
             assert stmt.__class__.__name__ not in ("BooleanClauseList", "Or", "ClauseList")
 
-    def test_nulls_match_equality_wraps_with_is_none(self, query_model) -> None:
+    def test_nulls_match_equality_wraps_with_is_none(self, query_model: type[BaseModel]) -> None:
         """nulls_match=True wraps equality condition with OR IS NULL."""
         from sqlalchemy.sql.elements import BooleanClauseList
 
@@ -418,7 +420,7 @@ class TestGetStatementsFromFilters:
         assert "Carol" in sql
         assert "IS NULL" in sql
 
-    def test_nulls_match_range_wraps_with_is_none(self, query_model) -> None:
+    def test_nulls_match_range_wraps_with_is_none(self, query_model: type[BaseModel]) -> None:
         """nulls_match=True wraps range (min/max) conditions with OR IS NULL."""
         from sqlalchemy.sql.elements import BooleanClauseList
 
@@ -431,7 +433,7 @@ class TestGetStatementsFromFilters:
             sql = str(stmt.compile(compile_kwargs={"literal_binds": True}))
             assert "IS NULL" in sql
 
-    def test_nulls_match_combined_multi_filter(self, query_model) -> None:
+    def test_nulls_match_combined_multi_filter(self, query_model: type[BaseModel]) -> None:
         """nulls_match=True wraps ALL produced conditions uniformly."""
         from sqlalchemy.sql.elements import BooleanClauseList
 
@@ -450,7 +452,7 @@ class TestGetStatementsFromFilters:
             sql = str(stmt.compile(compile_kwargs={"literal_binds": True}))
             assert "IS NULL" in sql
 
-    def test_nulls_match_does_not_leak_into_valid_columns(self, query_model) -> None:
+    def test_nulls_match_does_not_leak_into_valid_columns(self, query_model: type[BaseModel]) -> None:
         """nulls_match must not be treated as a column reference."""
         # If nulls_match were passed into the column loop it would raise ValueError
         # ('nulls_match' is not a column). This test confirms it is popped first.

@@ -237,3 +237,57 @@ class TestPerformanceMonitoringConfig:
 
             db.session.remove()
             db.drop_all()
+
+
+class TestPerformanceMonitoringPerApp:
+    """The Engine hooks are global, so each query must read its own app's config."""
+
+    def _make_app(self, **config: object) -> Flask:
+        app = Flask(__name__)
+        app.config["TESTING"] = True
+        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
+        app.config.update(config)
+        init_db(app)
+        return app
+
+    def test_second_app_is_not_bound_to_the_first_apps_threshold(self) -> None:
+        """A low threshold registered by one app must not leak into another."""
+        noisy = self._make_app(
+            SQLALCHEMY_PERFORMANCE_MONITORING=True,
+            SQLALCHEMY_SLOW_QUERY_THRESHOLD=0.0,
+        )
+        quiet = self._make_app(
+            SQLALCHEMY_PERFORMANCE_MONITORING=True,
+            SQLALCHEMY_SLOW_QUERY_THRESHOLD=5.0,
+        )
+        db_logger = logging.getLogger("flask_more_smorest.sqla.database")
+
+        with noisy.app_context():
+            db.create_all()
+            with patch.object(db_logger, "warning") as mock_warning:
+                db.session.execute(sa.text("SELECT 1"))
+                mock_warning.assert_called()
+            db.session.remove()
+            db.drop_all()
+
+        with quiet.app_context():
+            db.create_all()
+            with patch.object(db_logger, "warning") as mock_warning:
+                db.session.execute(sa.text("SELECT 1"))
+                mock_warning.assert_not_called()
+            db.session.remove()
+            db.drop_all()
+
+    def test_app_without_monitoring_is_never_monitored(self) -> None:
+        """Hooks registered by another app must stay inert for an opted-out app."""
+        self._make_app(SQLALCHEMY_PERFORMANCE_MONITORING=True, SQLALCHEMY_SLOW_QUERY_THRESHOLD=0.0)
+        plain = self._make_app()
+
+        with plain.app_context():
+            db.create_all()
+            with patch.object(logging.getLogger("flask_more_smorest.sqla.database"), "warning") as mock_warning:
+                db.session.execute(sa.text("SELECT 1"))
+                mock_warning.assert_not_called()
+            assert get_request_query_stats()["query_count"] == 0
+            db.session.remove()
+            db.drop_all()
