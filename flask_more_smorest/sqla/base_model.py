@@ -151,12 +151,10 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):
             RuntimeError: If database session is not active
         """
         try:
-            session_proxy = db.session
+            # Accessing the session is the check: it raises when init_db was not run.
+            _ = db.session
         except RuntimeError as exc:  # Raised if init_db/app context not configured
             raise RuntimeError("In order to use BaseModel, you must import init_db from sqla and run it.") from exc
-
-        if session_proxy is None:
-            raise RuntimeError("In order to use BaseModel, you must import init_db from sqla and run it.")
 
         super().__init__(**kwargs)
 

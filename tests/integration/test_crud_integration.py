@@ -8,7 +8,7 @@ import contextlib
 import json
 import uuid
 from collections.abc import Iterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from apispec.ext.marshmallow import MarshmallowPlugin
@@ -68,6 +68,11 @@ def api(app: Flask) -> Api:
     return Api(app, spec_kwargs=spec_kwargs)
 
 
+def _always_allowed(_self: Any) -> bool:
+    """Permission hook for test models: everything is permitted."""
+    return True
+
+
 @pytest.fixture
 def product_model(app: Flask) -> type[BaseModel]:
     """Create a Product model for testing."""
@@ -84,9 +89,9 @@ def product_model(app: Flask) -> type[BaseModel]:
             "description": db.Column(db.String(500)),
             "price": db.Column(db.Float, nullable=False),
             "in_stock": db.Column(db.Boolean, default=True),
-            "_can_read": lambda self: True,
-            "_can_write": lambda self: True,
-            "_can_create": classmethod(lambda cls: True),
+            "_can_read": _always_allowed,
+            "_can_write": _always_allowed,
+            "_can_create": classmethod(_always_allowed),
         },
     )
 

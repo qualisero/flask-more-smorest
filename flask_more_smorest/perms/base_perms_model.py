@@ -135,7 +135,8 @@ class BasePermsModel(SQLABaseModel):
         if self._check_admin_bypass(user):
             return True
 
-        if self.id is None:
+        # A not-yet-persisted object is readable by its creator.
+        if getattr(self, "id", None) is None:
             return True
 
         return self._execute_permission_check(lambda: self._can_read(user), "read")

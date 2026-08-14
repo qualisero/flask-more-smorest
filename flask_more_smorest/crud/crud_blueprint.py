@@ -552,7 +552,10 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
         # NOTE: the following will trigger a warning in apispec if no custom resolver is set
         update_schema = config.schema_cls(partial=True)
         if isinstance(update_schema, SQLAlchemySchema):
-            update_schema._load_instance = False
+            # marshmallow-sqlalchemy exposes load_instance only through Meta, which is
+            # fixed when the class is built; this is the only way to turn it off on an
+            # already-instantiated partial schema.
+            update_schema._load_instance = False  # pyright: ignore[reportPrivateUsage]
 
         return update_schema
 

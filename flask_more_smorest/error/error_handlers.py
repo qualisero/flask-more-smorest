@@ -4,6 +4,7 @@ This module provides error handler functions and a RequestHandlers class
 for registering error handlers with Flask applications.
 """
 
+import contextlib
 import logging
 from typing import TYPE_CHECKING
 
@@ -104,8 +105,9 @@ def handle_db_exception(e: DatabaseError) -> "Response":
     # Rollback the session:
     from ..sqla import db
 
-    # Check that db was initialized
-    if db.session is not None:
+    # db.session raises RuntimeError when init_db was never run. Never mask the
+    # original database error with that.
+    with contextlib.suppress(RuntimeError):
         db.session.rollback()
     api_exc = DBError(*e.args)
     return api_exc.make_error_response()

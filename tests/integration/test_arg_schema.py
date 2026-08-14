@@ -13,7 +13,7 @@ import sys
 import types
 import uuid
 from collections.abc import Iterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 import sqlalchemy as sa
@@ -74,6 +74,11 @@ def make_api(app: Flask) -> Api:
     return Api(app, spec_kwargs={"marshmallow_plugin": ma_plugin})
 
 
+def _always_allowed(_self: Any) -> bool:
+    """Permission hook for test models: everything is permitted."""
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -93,9 +98,9 @@ def item_model(tmp_path: object) -> type[BaseModel]:
             "name": db.Column(db.String(100), nullable=False),
             "secret_code": db.Column(db.String(50), nullable=True),
             "public_note": db.Column(db.String(200), nullable=True),
-            "_can_read": lambda self: True,
-            "_can_write": lambda self: True,
-            "_can_create": classmethod(lambda cls: True),
+            "_can_read": _always_allowed,
+            "_can_write": _always_allowed,
+            "_can_create": classmethod(_always_allowed),
         },
     )
 
@@ -121,9 +126,9 @@ def patch_model(tmp_path: object) -> type[BaseModel]:
             "name": db.Column(db.String(100), nullable=False),
             "internal_value": db.Column(db.Integer, nullable=True),
             "public_value": db.Column(db.Integer, nullable=True),
-            "_can_read": lambda self: True,
-            "_can_write": lambda self: True,
-            "_can_create": classmethod(lambda cls: True),
+            "_can_read": _always_allowed,
+            "_can_write": _always_allowed,
+            "_can_create": classmethod(_always_allowed),
         },
     )
 

@@ -169,17 +169,38 @@ split-on-trailing-comma = true
 [tool.pyright]
 include = ["flask_more_smorest", "tests"]
 exclude = ["**/__pycache__", "**/node_modules", "**/*.egg-info"]
-typeCheckingMode = "standard"
-reportIncompatibleMethodOverride = "warning"
+typeCheckingMode = "strict"
+# Track the supported floor, not the development interpreter.
+pythonVersion = "3.11"
+
+# flask-smorest, marshmallow-sqlalchemy and flask-jwt-extended ship no type
+# information, so nearly every call into them produces a partially unknown type.
+# Enabling this family reports 220 such results in the package and 284 in the
+# tests, none of which is a defect in this repository.
 reportUnknownMemberType = "none"
 reportUnknownVariableType = "none"
 reportUnknownArgumentType = "none"
 reportUnknownParameterType = "none"
-reportAttributeAccessIssue = "warning"
 reportMissingTypeStubs = "none"
-pythonVersion = "3.11"
+
+# SQLAlchemy's declarative attributes are not visible to a static checker, so
+# these stay visible but non-blocking.
+reportIncompatibleMethodOverride = "warning"
+reportAttributeAccessIssue = "warning"
+
+# This library validates caller input at its public boundaries: init_fms checks
+# the model classes it is handed, get_by checks the id type, check_password
+# checks the password type. The annotations describe the contract; the checks
+# defend against untyped callers, for whom the contract is not enforced.
+reportUnnecessaryIsInstance = "none"
+
+# Callbacks registered through a decorator (@event.listens_for,
+# @jwt.user_lookup_loader, @blueprint.route) are never referenced by name.
+reportUnusedFunction = "none"
+
+# Replaces mypy's warn_unused_ignores, disallow_untyped_defs and
+# disallow_incomplete_defs.
 reportUnnecessaryTypeIgnoreComment = "error"
-# Replaces mypy's disallow_untyped_defs / disallow_incomplete_defs
 reportMissingParameterType = "error"
 reportMissingTypeArgument = "error"
 
@@ -192,6 +213,11 @@ reportUnknownArgumentType = "none"
 reportUnknownParameterType = "none"
 reportAttributeAccessIssue = "none"
 reportIncompatibleMethodOverride = "none"
+# Tests exercise the _can_read/_can_write/_can_create hooks directly, and define
+# models and schemas inside fixtures that SQLAlchemy and the blueprints pick up
+# by registration rather than by name.
+reportPrivateUsage = "none"
+reportUnusedClass = "none"
 
 
 [tool.tox]

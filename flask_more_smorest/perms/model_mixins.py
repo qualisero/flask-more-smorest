@@ -161,7 +161,9 @@ class UserOwnershipMixin(HasUserMixin):
 
     def _can_write(self, user: Any) -> bool:
         if self.__delegate_to_user__:
-            return self.user._can_write(user)
+            # _can_* is this library's permission hook protocol: models override it and
+            # related models delegate to each other through it, by design.
+            return self.user._can_write(user)  # pyright: ignore[reportPrivateUsage]
         return bool(user) and self.user_id == user.id
 
     def _can_read(self, user: Any) -> bool:
@@ -186,7 +188,7 @@ class UserOwnershipMixin(HasUserMixin):
             if not owner:
                 return False
 
-            return owner._can_write(user)
+            return owner._can_write(user)  # pyright: ignore[reportPrivateUsage]
 
         return self._can_write(user)
 

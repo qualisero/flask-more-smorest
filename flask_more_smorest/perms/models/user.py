@@ -108,7 +108,7 @@ class User(AbstractUser):
         """
         from ..user_context import get_current_user
 
-        return cast("UserModelT | None", get_current_user(cls))
+        return get_current_user(cls)
 
     def normalize_email(self, email: str | None) -> str | None:
         """Normalize email to lowercase for case-insensitive lookups.

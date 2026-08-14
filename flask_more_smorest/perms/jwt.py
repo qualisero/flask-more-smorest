@@ -37,7 +37,9 @@ def init_jwt(app: Flask) -> None:
 
     jwt = JWTManager()
     jwt.init_app(app)
-    jwt._set_error_handler_callbacks(app)
+    # flask-jwt-extended registers its error handlers on init_app only for the app it
+    # was constructed with; there is no public API to attach them to another app.
+    jwt._set_error_handler_callbacks(app)  # pyright: ignore[reportPrivateUsage]
 
     # Set up user_identity_lookup for JWT
     @jwt.user_identity_loader

@@ -80,7 +80,7 @@ def get_current_user(user_type: type[UserT] | None = None) -> UserT | AbstractUs
         if not isinstance(user, user_type):
             return None
         # isinstance narrows to user_type, which is type[UserT] at the call site
-        return cast(UserT, user)
+        return user
 
     return user
 

@@ -1151,11 +1151,11 @@ def test_fully_extended_type_helpers() -> None:
         assert isinstance(user.bio, str | None)
 
     if TYPE_CHECKING:
-        assert_type(cast(type[CustomUser], expect_user_model(CustomUser)), type[CustomUser])
-        assert_type(cast(type[CustomUserRole], expect_role_model(CustomUserRole)), type[CustomUserRole])
-        assert_type(cast(type[CustomToken], expect_token_model(CustomToken)), type[CustomToken])
-        assert_type(cast(type[CustomDomain], expect_domain_model(CustomDomain)), type[CustomDomain])
-        assert_type(cast(type[CustomUserSetting], expect_setting_model(CustomUserSetting)), type[CustomUserSetting])
+        assert_type(expect_user_model(CustomUser), type[CustomUser])
+        assert_type(expect_role_model(CustomUserRole), type[CustomUserRole])
+        assert_type(expect_token_model(CustomToken), type[CustomToken])
+        assert_type(expect_domain_model(CustomDomain), type[CustomDomain])
+        assert_type(expect_setting_model(CustomUserSetting), type[CustomUserSetting])
 
 
 def test_permission_enforcement_with_forbidden_errors(app: Flask, db_session: None) -> None:
