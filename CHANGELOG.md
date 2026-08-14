@@ -45,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **mypy.** Pyright is now the only type checker, with `reportMissingParameterType`,
   `reportMissingTypeArgument` and `reportUnnecessaryTypeIgnoreComment` enabled.
 
+- **The Codecov upload step.** It required an account token that this project does not
+  have, so every upload failed with `Token required - not valid tokenless upload` while
+  `fail_ci_if_error: false` hid it. Coverage is still reported in the CI test log.
+
 - **The `stubs/` tree.** The package ships `py.typed` and the stubs were never shipped, never
   consulted (`stubPath` pointed at a directory that does not exist) and had drifted from the
   source they duplicated.

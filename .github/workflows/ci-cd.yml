@@ -53,15 +53,7 @@ jobs:
     
     - name: Run tests
       run: |
-        poetry run pytest --cov=flask_more_smorest --cov-report=xml --cov-report=term-missing
-    
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v5
-      with:
-        files: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
+        poetry run pytest --cov=flask_more_smorest --cov-report=term-missing
 
   lint:
     runs-on: ubuntu-latest
