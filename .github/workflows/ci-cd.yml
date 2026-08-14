@@ -19,6 +19,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      # One version failing, or one transient network error installing Poetry,
+      # should not cancel the other versions' results.
+      fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
     
