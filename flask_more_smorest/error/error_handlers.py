@@ -15,7 +15,7 @@ from werkzeug.exceptions import HTTPException
 from .exceptions import ApiException, DBError, ForbiddenError
 from .exceptions import InternalServerError as ApiInternalServerError
 from .exceptions import _is_debug_mode as _is_debug_mode  # pyright: ignore[reportPrivateUsage]
-from .integrity import GENERIC_DB_ERROR_MESSAGE, to_api_exception
+from .integrity import GENERIC_DB_ERROR_MESSAGE, parse_integrity_error, to_api_exception
 
 if TYPE_CHECKING:
     from flask import Flask, Response
@@ -125,8 +125,23 @@ def handle_integrity_error(e: IntegrityError) -> "Response":
     """
     _rollback_session()
 
-    # Expected outcome of user input, not a server fault: log without traceback.
-    logger.warning("Integrity error: %s", e)
+    # Expected outcome of user input, not a server fault: log without traceback,
+    # and without str(e), which embeds the SQL statement and bound parameter
+    # values. The full detail is available at DEBUG level.
+    violation = parse_integrity_error(e)
+    if violation is not None:
+        logger.warning(
+            "Integrity violation: kind=%s table=%s columns=%s",
+            violation.kind,
+            violation.table,
+            ",".join(violation.columns),
+        )
+    else:
+        logger.warning(
+            "Unparseable integrity error (%s)",
+            type(e.orig).__name__ if e.orig is not None else "no orig",
+        )
+    logger.debug("Integrity error detail: %s", e)
     return to_api_exception(e).make_error_response()
 
 
@@ -144,7 +159,10 @@ def handle_db_exception(e: DatabaseError) -> "Response":
     """
     _rollback_session()
 
-    logger.exception("Database error: %s", e)
+    # No str(e) in the message: it embeds SQL and bound parameter values. The
+    # traceback (which ends with the same text) is retained deliberately —
+    # genuine database faults are rare and need full context for diagnosis.
+    logger.exception("Database error")
     # Never echo the driver's error text (SQL statement and parameter values)
     # outside debug/testing mode.
     api_exc = DBError(*e.args) if _is_debug_mode() else DBError(GENERIC_DB_ERROR_MESSAGE)

@@ -17,8 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   PostgreSQL is parsed from the structured `diag` diagnostics (psycopg2/psycopg3 detected by
   duck-typing, no driver import); SQLite from its message strings, with deterministic
   degradation where SQLite provides no attribution. Column *names* are extracted, never values.
-  `RequestHandlers` registers the handler automatically; message copy is customisable via
-  `FIELD_TEMPLATES` / `DETAIL_OVERRIDES` / `IN_USE_TEMPLATE`.
+  Foreign-key direction (missing target vs blocked delete) is discriminated on the `DETAIL`
+  string with a locale-independent statement-verb fallback, since Postgres provides no
+  structured field for it. `RequestHandlers` registers the handler automatically; message copy
+  is customisable via `FIELD_TEMPLATES` / `DETAIL_OVERRIDES` / `RESTRICT_TEMPLATE` /
+  `EXCLUSION_TEMPLATE`.
 
 ### Fixed
 
@@ -26,8 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `handle_db_exception` previously put the driver's error text — including the SQL statement
   and every bound parameter value — into the response `detail`, and `handle_generic_exception`
   echoed `str(e)`. Both are now gated on debug/testing mode and return a generic message in
-  production. Database errors are also logged (`exception` level) and integrity violations are
-  logged at `warning` without a traceback, since they are expected outcomes of user input.
+  production. Database errors are also logged (`exception` level, without duplicating the
+  driver text in the message) and integrity violations are logged at `warning` as a value-free
+  structured summary (kind/table/columns) — full driver detail only at `debug` — since they are
+  expected outcomes of user input and must not push request values into production logs.
 
 ## [0.14.0] - 2026-08-15
 

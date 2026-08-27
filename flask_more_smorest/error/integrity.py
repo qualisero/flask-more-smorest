@@ -29,7 +29,8 @@ Column *names* are extracted from the database diagnostics; the offending
 *values* (and the statement/parameters) are never forwarded to responses.
 
 The response copy can be customised by mutating :data:`FIELD_TEMPLATES`,
-:data:`DETAIL_OVERRIDES` and :data:`IN_USE_TEMPLATE` at application startup.
+:data:`DETAIL_OVERRIDES`, :data:`RESTRICT_TEMPLATE` and :data:`EXCLUSION_TEMPLATE`
+at application startup.
 """
 
 import logging
@@ -59,8 +60,14 @@ FIELD_TEMPLATES: dict[str, str] = {
 #: per-field message. Kinds absent here reuse the field message.
 DETAIL_OVERRIDES: dict[str, str] = {"not_null": "Missing required field."}
 
-#: Message template for 409 state conflicts (restrict / exclusion).
-IN_USE_TEMPLATE = "This {noun} is still referenced by other records and cannot be deleted."
+#: Message for deletes/updates blocked by existing references (RESTRICT). No
+#: resource name: Postgres reports the *referencing* table in its diagnostics,
+#: so naming it would blame the wrong resource.
+RESTRICT_TEMPLATE = "This record is still referenced by other records and cannot be deleted."
+
+#: Message template for exclusion violations (e.g. overlapping ranges), which
+#: occur on inserts/updates rather than deletes.
+EXCLUSION_TEMPLATE = "This {resource} conflicts with an existing record."
 
 
 @dataclass(frozen=True)
@@ -84,6 +91,12 @@ _PG_COLS_RE = re.compile(r"Key \((?P<cols>[^)]+)\)=")
 # Matches the table name in Postgres DETAIL, e.g.: 'is not present in table "country"'
 _PG_TABLE_RE = re.compile(r'table "(\w+)"')
 
+# Leading DML verb and target table of a statement, e.g. 'INSERT INTO "t" ...',
+# 'UPDATE public.t SET ...', 'DELETE FROM t ...'.
+_DML_RE = re.compile(
+    r'\s*(?P<verb>INSERT|UPDATE|DELETE|MERGE)\b\s*(?:INTO\s+|FROM\s+)?(?P<target>[\w."]+)?', re.IGNORECASE
+)
+
 
 def _parse_pg_columns(message_detail: str | None) -> tuple[str, ...]:
     """Extract column names from a Postgres DETAIL string (never values)."""
@@ -102,6 +115,41 @@ def _parse_pg_target_table(message_detail: str | None) -> str | None:
         return None
     m = _PG_TABLE_RE.search(message_detail)
     return m.group(1) if m else None
+
+
+def _fk_kind_from_statement(statement: str | None, table_name: str | None) -> Literal["fk_missing", "restrict"]:
+    """Classify a 23503 violation from the failing statement.
+
+    Locale-independent fallback for when the DETAIL string is absent or not in
+    English (Postgres localises it via ``lc_messages``). Postgres provides no
+    structured field for the FK direction: both directions share the SQLSTATE,
+    constraint name, source function, and even ``diag.table_name`` (always the
+    *referencing* table). The statement itself is the only reliable signal:
+
+    * INSERT/MERGE can only violate the constraint by referencing a missing
+      target -> ``fk_missing``.
+    * DELETE can only be blocked by existing references -> ``restrict``.
+    * UPDATE is ambiguous: updating the referencing table's FK column hits a
+      missing target, updating the referenced table's key is blocked by
+      references. The statement's target table disambiguates: it equals
+      ``diag.table_name`` (the referencing table) only in the first case.
+
+    Defaults to ``restrict`` (a generic 409 state conflict) when the statement
+    is unavailable, mirroring the documented SQLite degrade rule.
+    """
+    m = _DML_RE.match(statement or "")
+    if not m:
+        return "restrict"
+    verb = m.group("verb").upper()
+    if verb in ("INSERT", "MERGE"):
+        return "fk_missing"
+    if verb == "DELETE":
+        return "restrict"
+    # UPDATE: compare the statement's target table with the constraint's table.
+    target = (m.group("target") or "").replace('"', "").split(".")[-1]
+    if table_name and target and target == table_name:
+        return "fk_missing"
+    return "restrict"
 
 
 def _parse_sqlite(orig_str: str) -> Violation | None:
@@ -213,16 +261,16 @@ def parse_integrity_error(exc: IntegrityError) -> Violation | None:
 
         if sqlstate == "23503":  # foreign_key_violation — discriminate on DETAIL tail
             detail = message_detail or ""
+            kind: Literal["fk_missing", "restrict"]
             if "is not present in table" in detail:
-                return Violation(
-                    kind="fk_missing",
-                    columns=_parse_pg_columns(message_detail),
-                    table=table_name,
-                    target_table=_parse_pg_target_table(message_detail),
-                )
-            # "is still referenced from table" -> caller must remove the reference first
+                kind = "fk_missing"
+            elif "is still referenced from table" in detail:
+                kind = "restrict"
+            else:
+                # DETAIL absent or localised: fall back to the statement verb.
+                kind = _fk_kind_from_statement(exc.statement, table_name)
             return Violation(
-                kind="restrict",
+                kind=kind,
                 columns=_parse_pg_columns(message_detail),
                 table=table_name,
                 target_table=_parse_pg_target_table(message_detail),
@@ -278,7 +326,6 @@ def to_api_exception(exc: IntegrityError) -> ApiException:
         return IntegrityConflict(fields=fields, message=detail)
 
     # restrict / exclusion — state conflict, no field to blame.
-    # On Postgres restrict, diag.table_name is the *referencing* (child) table,
-    # so naming it would blame the wrong resource; use a generic noun.
-    noun = "record" if violation.kind == "restrict" else resource
-    return ResourceInUse(message=IN_USE_TEMPLATE.format(noun=noun))
+    if violation.kind == "exclusion":
+        return ResourceInUse(message=EXCLUSION_TEMPLATE.format(resource=resource))
+    return ResourceInUse(message=RESTRICT_TEMPLATE)

@@ -35,6 +35,7 @@ def make_pg_exc(
     table_name: str | None = None,
     column_name: str | None = None,
     message_detail: str | None = None,
+    statement: str = "SELECT 1",
 ) -> IntegrityError:
     """Return a synthetic psycopg-style IntegrityError with a .diag namespace.
 
@@ -47,7 +48,7 @@ def make_pg_exc(
         message_detail=message_detail,
     )
     orig = types.SimpleNamespace(diag=diag)
-    return IntegrityError("SELECT 1", {}, orig)  # type: ignore[arg-type]
+    return IntegrityError(statement, {}, orig)  # type: ignore[arg-type]
 
 
 def make_sqlite_exc(message: str) -> IntegrityError:
@@ -135,6 +136,55 @@ class TestParseIntegrityErrorPostgres:
         assert v.kind == "not_null"
         assert v.columns == ("name",)
         assert v.table == "vessel"
+
+    # -- 23503 statement-verb fallback (DETAIL absent or localised) ----------
+    # Postgres provides no structured FK direction: both directions share the
+    # SQLSTATE, constraint name, source function and diag.table_name (always
+    # the referencing table). Verified empirically against Postgres 16.
+
+    def test_fk_no_detail_insert_falls_back_to_fk_missing(self) -> None:
+        exc = make_pg_exc("23503", table_name="child", statement="INSERT INTO child (pid) VALUES (%(pid)s)")
+        v = parse_integrity_error(exc)
+        assert v is not None
+        assert v.kind == "fk_missing"
+
+    def test_fk_no_detail_delete_falls_back_to_restrict(self) -> None:
+        exc = make_pg_exc("23503", table_name="child", statement="DELETE FROM parent WHERE id = %(id)s")
+        v = parse_integrity_error(exc)
+        assert v is not None
+        assert v.kind == "restrict"
+
+    def test_fk_localised_detail_uses_statement_fallback(self) -> None:
+        """A non-English DETAIL (lc_messages) must not break classification."""
+        exc = make_pg_exc(
+            "23503",
+            table_name="child",
+            message_detail="La clé (pid)=(ZZ) n’est pas présente dans la table « parent ».",  # noqa: RUF001 — realistic fr_FR locale output
+            statement="INSERT INTO child (pid) VALUES (%(pid)s)",
+        )
+        v = parse_integrity_error(exc)
+        assert v is not None
+        assert v.kind == "fk_missing"
+
+    def test_fk_no_detail_update_on_referencing_table_is_fk_missing(self) -> None:
+        """UPDATE on the constraint's own (referencing) table -> missing target."""
+        exc = make_pg_exc("23503", table_name="child", statement='UPDATE "child" SET pid = %(pid)s')
+        v = parse_integrity_error(exc)
+        assert v is not None
+        assert v.kind == "fk_missing"
+
+    def test_fk_no_detail_update_on_referenced_table_is_restrict(self) -> None:
+        """UPDATE on the referenced (parent) table -> blocked by references."""
+        exc = make_pg_exc("23503", table_name="child", statement="UPDATE parent SET id = %(id)s")
+        v = parse_integrity_error(exc)
+        assert v is not None
+        assert v.kind == "restrict"
+
+    def test_fk_no_detail_no_statement_degrades_to_restrict(self) -> None:
+        exc = make_pg_exc("23503", table_name="child", statement="")
+        v = parse_integrity_error(exc)
+        assert v is not None
+        assert v.kind == "restrict"
 
     def test_check_violation(self) -> None:
         exc = make_pg_exc(
@@ -298,6 +348,9 @@ class TestToApiExceptionMapping:
             result = to_api_exception(exc)
         assert isinstance(result, ResourceInUse)
         assert result.HTTP_STATUS_CODE == 409
+        # Exclusion fires on inserts/updates: the message must not talk about deletion.
+        assert "deleted" not in result.message
+        assert "conflicts with an existing record" in result.message
 
     def test_unparseable_maps_to_db_error_500(self, app: Flask) -> None:
         with app.app_context():
@@ -368,6 +421,16 @@ class TestIntegrityHandlerWireFormat:
         assert "INSERT INTO" not in body
         assert "[parameters:" not in body
         assert "[SQL" not in body
+
+    def test_no_leak_in_warning_logs(self, dup_client: FlaskClient, caplog: pytest.LogCaptureFixture) -> None:
+        """At default log level, integrity logging carries no SQL or values."""
+        with caplog.at_level("WARNING", logger="flask_more_smorest.error.error_handlers"):
+            dup_client.post("/dup")
+        log_text = caplog.text
+        assert "Integrity violation" in log_text
+        assert "dup@example.com" not in log_text
+        assert "INSERT INTO" not in log_text
+        assert "[parameters:" not in log_text
 
 
 class TestSanitisedHandlersOutsideDebug:
