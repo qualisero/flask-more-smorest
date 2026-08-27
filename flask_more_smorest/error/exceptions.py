@@ -467,6 +467,26 @@ class UnprocessableEntity(ApiException):
         return response
 
 
+class IntegrityConflict(UnprocessableEntity):
+    """422 for database constraint violations the caller can fix.
+
+    Produced by :func:`flask_more_smorest.error.integrity.to_api_exception`
+    for unique, missing-foreign-key-target, not-null and check violations.
+    Inherits the standard validation payload shape
+    (``errors: {location: {field: [msg]}}``) and the "Validation Error" title.
+    """
+
+
+class ResourceInUse(ConflictError):
+    """409 Conflict for a delete blocked by existing references.
+
+    Raised when a database RESTRICT (or exclusion) constraint prevents the
+    operation: the payload is fine, the resource's current state is not.
+    """
+
+    TITLE = "Resource In Use"
+
+
 class InternalServerError(ApiException):
     """500 Internal Server Error."""
 
