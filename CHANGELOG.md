@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-08-30
+
+### Fixed
+
+- **Filter schemas no longer inherit write validators.** `generate_filter_schema` cloned
+  base-schema fields together with their `validate=` chain (Regexp, Length, Range, custom
+  callables), so filtering by a stored value that predates a newly added write-time rule
+  returned 422 and made those rows unreachable (e.g. a legacy `imo` that no longer matches a
+  later-added format validator). `_clone_field` now clears `validators` on every cloned filter
+  field — equality fields and `__from`/`__to`/`__min`/`__max` variants alike. Filtering by an
+  arbitrary value is always safe (it simply matches nothing); field-type coercion still applies,
+  and the `page`/`page_size` bounds are unaffected.
+
 ## [0.15.0] - 2026-08-27
 
 ### Added
