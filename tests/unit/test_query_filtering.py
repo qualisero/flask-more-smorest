@@ -9,7 +9,7 @@ from datetime import date, datetime
 import pytest
 import sqlalchemy as sa
 from flask import Flask
-from marshmallow import Schema, fields, validate
+from marshmallow import Schema, ValidationError, fields, validate
 from sqlalchemy import Boolean, Column, Date, Integer, String
 
 from flask_more_smorest import db
@@ -215,6 +215,37 @@ class TestGenerateFilterSchema:
             isinstance(v, validate.Range) and v.min == 0
             for v in (page_size_field.validators if hasattr(page_size_field, "validators") else [])
         )
+
+    def test_filter_schema_drops_write_validators(self) -> None:
+        """Filter fields must not inherit the base schema's write validators.
+
+        Filters compare against stored values, which may predate the current
+        write-time validation rules (e.g. a format validator added after rows
+        were imported). A filter value that no row matches is harmless; a 422
+        on the stored value makes those rows unreachable.
+        """
+
+        def _checksum(value: str) -> None:
+            raise ValidationError("always fails")  # pragma: no cover
+
+        class ValidatedSchema(Schema):
+            imo = fields.String(validate=[validate.Regexp(r"^\d{7}$"), _checksum])
+            length = fields.Integer(validate=validate.Range(min=0))
+
+        filter_schema = generate_filter_schema(ValidatedSchema)()
+
+        # Preserved equality field: non-conforming stored value loads fine.
+        loaded = filter_schema.load({"imo": "LEGACY-1"})
+        assert isinstance(loaded, dict)
+        assert loaded["imo"] == "LEGACY-1"
+
+        # Suffixed clones: the Range validator is dropped too.
+        loaded = filter_schema.load({"length__min": -5})
+        assert isinstance(loaded, dict)
+        assert loaded["length__min"] == -5
+
+        for name in ("imo", "length", "length__min", "length__max"):
+            assert filter_schema.fields[name].validators == []
 
     def test_filter_schema_includes_nulls_match_field(self) -> None:
         """nulls_match parameter should always be present, boolean, optional, default False."""

@@ -30,6 +30,12 @@ def _clone_field(field: ma.fields.Field) -> ma.fields.Field:
     new_field.load_only = True
     new_field.dump_only = False
     new_field.required = False
+    # Write-schema validators (Regexp, Length, Range, custom callables) must not
+    # apply to filter parameters: filters compare against *stored* values, and
+    # rows may legitimately predate the current write-time validation rules.
+    # Filtering by an arbitrary value is always safe — it simply matches
+    # nothing. Type coercion (the field class itself) still applies.
+    new_field.validators = []
     return new_field
 
 
