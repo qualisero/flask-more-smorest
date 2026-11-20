@@ -130,7 +130,7 @@ class TestValidatePasswordLength:
             validate_password_length("\u4e2d" * 25)
 
     def test_check_password_hash_long_password_returns_false(self) -> None:
-        """check_password_hash returns False for a >72-byte password rather than raising."""
-        valid_hash = generate_password_hash("short")
-        result = check_password_hash("a" * 73, valid_hash)
-        assert result is False
+        """A >72-byte password is rejected even when its first 72 bytes match the hash."""
+        valid_hash = generate_password_hash("a" * 72)
+        assert check_password_hash("a" * 72, valid_hash) is True
+        assert check_password_hash("a" * 73, valid_hash) is False

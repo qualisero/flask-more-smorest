@@ -58,6 +58,9 @@ def check_password_hash(password: str | bytes | None, hashed: bytes | str | None
         password = password.encode("utf-8")
     if isinstance(hashed, str):
         hashed = hashed.encode("utf-8")
+    # bcrypt 4 silently truncates at 72 bytes; bcrypt 5 raises. Reject explicitly on both.
+    if len(password) > 72:
+        return False
     try:
         return bcrypt.checkpw(password, hashed)
     except ValueError:
