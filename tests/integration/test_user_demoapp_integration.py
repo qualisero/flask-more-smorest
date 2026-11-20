@@ -1557,6 +1557,70 @@ def test_13_user_full_details_endpoint(app: Flask, api: Api) -> None:
     assert full_user["last_name"] == "Doe"
 
 
+def test_13b_meta_exclude_keeps_component_name(app: Flask, api: Api) -> None:
+    """Meta.exclude schemas keep their component name; instance-level exclude is inlined."""
+
+    class UserOutputSchema(SQLAlchemyAutoSchema[Any]):
+        class Meta:
+            model = CustomUser
+            load_instance = False
+
+    class UserPrivateSchema(SQLAlchemyAutoSchema[Any]):
+        class Meta:
+            model = CustomUser
+            load_instance = False
+            exclude = ("roles", "settings", "tokens")
+
+    user_bp = SharedUserBlueprint(
+        name="user",
+        import_name=__name__,
+        url_prefix="/api/user/",
+        model=CustomUser,
+        schema=UserOutputSchema,
+        me_schema=UserOutputSchema,
+        methods={CRUDMethod.GET: {}},
+    )
+
+    @user_bp.route("private/<uuid:user_id>", methods=["GET"])
+    @user_bp.response(200, UserPrivateSchema)
+    def get_user_private(user_id: uuid.UUID) -> CustomUser:
+        """Return user without sensitive relations."""
+        return CustomUser.get_or_404(user_id)
+
+    api.register_blueprint(user_bp)
+
+    spec_schemas = api.spec.to_dict()["components"]["schemas"]
+
+    # Class-level Meta.exclude produces a named component
+    assert "UserPrivate" in spec_schemas
+    # Excluded fields must not appear in the component's properties
+    assert not {"roles", "settings", "tokens"} & set(spec_schemas["UserPrivate"].get("properties", {}))
+
+    names_before = set(spec_schemas)
+
+    # Second blueprint with only an instance-level-exclude response route
+    extra_bp = SharedUserBlueprint(
+        name="user_extra",
+        import_name=__name__,
+        url_prefix="/api/user_extra/",
+        model=CustomUser,
+        schema=UserOutputSchema,
+        me_schema=None,
+        methods={},
+    )
+
+    @extra_bp.route("filtered/<uuid:user_id>", methods=["GET"])
+    @extra_bp.response(200, UserOutputSchema(exclude=("email",)))
+    def get_user_filtered(user_id: uuid.UUID) -> CustomUser:
+        """Return user with instance-level exclude (inlined, no new component)."""
+        return CustomUser.get_or_404(user_id)
+
+    api.register_blueprint(extra_bp)
+
+    names_after = set(api.spec.to_dict()["components"]["schemas"])
+    assert names_after == names_before  # instance exclude adds no new component
+
+
 def test_14_error_handling_scenarios(app: Flask, api: Api) -> None:
     """Test various error scenarios."""
 

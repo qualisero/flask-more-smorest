@@ -177,6 +177,17 @@ class TestUserBlueprintClass:
         assert hasattr(bp, "public_endpoint")
         assert callable(bp.public_endpoint)
 
+    def test_login_with_73_byte_password_returns_422(self, unit_app: Flask, api: Api) -> None:
+        """Posting a 73-byte password to the login endpoint returns 422."""
+        bp = UserBlueprint(register=False)
+        api.register_blueprint(bp)
+        client = unit_app.test_client()
+        resp = client.post(
+            "/api/users/login/",
+            json={"email": "user@example.com", "password": "a" * 73},
+        )
+        assert resp.status_code == 422
+
 
 class TestUserBlueprintWithCustomUser:
     """Test UserBlueprint with custom User model - CONFIGURATION TESTS."""

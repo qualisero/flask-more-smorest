@@ -4,6 +4,7 @@ import uuid
 from typing import Any
 
 from flask import Flask
+from sqlalchemy.orm import configure_mappers
 
 from flask_more_smorest.perms import clear_registration, init_fms
 from flask_more_smorest.perms.models import defaults as defaults_module
@@ -118,6 +119,10 @@ def test_domain_polymorphic_subclass(unit_app: Any, db_session: Any) -> None:
 
 def test_user_polymorphic_subclass(unit_app: Any, db_session: Any) -> None:
     """Test that custom AbstractUser subclasses can be persisted."""
+    # Resolve the default models' relationships against each other before the
+    # registry is swapped to the custom models below; otherwise lazy mapper
+    # configuration mixes default and custom classes.
+    configure_mappers()
     module_name = f"{__name__}.dynamic_{uuid.uuid4().hex}"
     import sys
     import types

@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Schemas with `Meta.exclude` keep their OpenAPI component name.** The spec name resolver
+  previously inlined any schema whose `exclude` set was non-empty, which included class-level
+  `Meta.exclude`. It now inlines only instance-level modifiers (`partial=`, `only=`, and
+  `exclude=` beyond `Meta.exclude`). Generated clients will see a named type where they
+  previously saw a duplicated inline object; projects that worked around this with
+  `Meta.fields` whitelists can switch to `Meta.exclude`.
+- **marshmallow 3 and 4 are both supported.** Constraints widened to `marshmallow>=3.20,<5`
+  and `marshmallow-sqlalchemy>=1.4.2,<2`; CI runs the suite on both majors and the generated
+  OpenAPI spec is identical. Note: marshmallow-sqlalchemy 1.6+ requires marshmallow 4.
+  Downstream projects moving to marshmallow 4 must add `**kwargs` to `@validates`/hook methods.
+- **bcrypt 5 supported.** bcrypt 5 raises instead of silently truncating passwords at 72
+  bytes. Passwords longer than 72 bytes are now rejected with 422 at the schema boundary
+  (`password`, `old_password`) and `check_password_hash` returns `False` for them. Accounts
+  whose password was longer than 72 bytes when hashed under bcrypt 4 can no longer log in with
+  it and need a password reset.
+
+### Fixed
+
+- `handle_generic_exception` and `handle_db_exception` no longer raise `TypeError` in debug
+  mode when the wrapped exception has more than one argument (e.g. `OSError(errno, strerror)`);
+  the 500 body now carries `str(e)`.
+
+### Dependencies
+
+- Lockfile refreshed: SQLAlchemy 2.1, flask-smorest 0.47, marshmallow 4.4,
+  marshmallow-sqlalchemy 1.6, bcrypt 5. Dev tooling: pytest 9, pytest-cov 7, pre-commit 4,
+  ruff 0.17, Sphinx 9, myst-parser 5, sphinx-rtd-theme 3, sphinx-autodoc-typehints 3.
+
 ## [0.15.1] - 2026-08-30
 
 ### Fixed

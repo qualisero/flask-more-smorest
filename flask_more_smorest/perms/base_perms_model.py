@@ -1,7 +1,7 @@
 """Base permission-aware model for Flask-More-Smorest."""
 
 import logging
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from typing import Any, Self, cast
 
@@ -45,7 +45,7 @@ class BasePermsModel(SQLABaseModel):
 
     @classmethod
     @contextmanager
-    def bypass_perms(cls) -> Iterator[None]:
+    def bypass_perms(cls) -> Generator[None, None, None]:
         """Temporarily disable permission checking for this model class.
 
         Example:

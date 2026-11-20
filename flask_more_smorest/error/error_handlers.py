@@ -91,7 +91,7 @@ def handle_generic_exception(e: Exception) -> "Response":
     # Never echo raw exception text (it may embed SQL statements and
     # parameter values) outside debug/testing mode.
     if _is_debug_mode():
-        api_exc = ApiInternalServerError(*e.args)
+        api_exc = ApiInternalServerError(str(e))
     else:
         api_exc = ApiInternalServerError("An internal error occurred.")
     return api_exc.make_error_response()
@@ -165,7 +165,7 @@ def handle_db_exception(e: DatabaseError) -> "Response":
     logger.exception("Database error")
     # Never echo the driver's error text (SQL statement and parameter values)
     # outside debug/testing mode.
-    api_exc = DBError(*e.args) if _is_debug_mode() else DBError(GENERIC_DB_ERROR_MESSAGE)
+    api_exc = DBError(str(e)) if _is_debug_mode() else DBError(GENERIC_DB_ERROR_MESSAGE)
     return api_exc.make_error_response()
 
 
