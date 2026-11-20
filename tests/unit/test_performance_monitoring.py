@@ -24,7 +24,7 @@ def reset_performance_hooks():
 
 
 @pytest.fixture
-def app_with_monitoring() -> Generator[Flask, None, None]:
+def app_with_monitoring() -> Generator[Flask]:
     """Create a Flask app with performance monitoring enabled."""
     app = Flask(__name__)
     app.config["TESTING"] = True
@@ -42,7 +42,7 @@ def app_with_monitoring() -> Generator[Flask, None, None]:
 
 
 @pytest.fixture
-def app_without_monitoring() -> Generator[Flask, None, None]:
+def app_without_monitoring() -> Generator[Flask]:
     """Create a Flask app without performance monitoring."""
     app = Flask(__name__)
     app.config["TESTING"] = True

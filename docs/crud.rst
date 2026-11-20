@@ -239,7 +239,7 @@ INDEX endpoints support automatic pagination:
 
 Response includes pagination metadata:
 
-.. code-block:: json
+.. code-block:: text
 
    {
        "data": [...],

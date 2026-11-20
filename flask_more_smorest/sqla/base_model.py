@@ -8,7 +8,7 @@ import datetime as dt
 import uuid
 from collections.abc import Generator, Iterable
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Self, TypeAlias, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import sqlalchemy as sa
 from sqlalchemy.orm import (
@@ -25,7 +25,7 @@ from ..error.exceptions import NotFoundError
 from .database import db
 from .schema import BaseSchema, create_model_schema
 
-PropertyOrColumn: TypeAlias = MapperProperty[Any] | sa.Column[Any]
+type PropertyOrColumn = MapperProperty[Any] | sa.Column[Any]
 
 
 class BaseModelMeta(DeclarativeMeta):
@@ -311,7 +311,7 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):
 
     @classmethod
     @contextmanager
-    def bypass_perms(cls) -> Generator[None, None, None]:
+    def bypass_perms(cls) -> Generator[None]:
         """No-op context manager for base class (overridden in perms model)."""
         yield
 

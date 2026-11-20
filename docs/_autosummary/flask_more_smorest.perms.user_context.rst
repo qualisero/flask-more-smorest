@@ -8,15 +8,8 @@ flask\_more\_smorest.perms.user\_context
 
    .. autosummary::
    
-      clear_registration
       get_current_user
       get_current_user_id
       is_current_user_admin
       is_current_user_superadmin
-      init_fms
-   
-   .. rubric:: Classes
-
-   .. autosummary::
-   
    

@@ -3,7 +3,7 @@
 Provides a single registry for all user-related models, serving as the
 canonical integration point for the permissions system.
 
-**Quick Start:**
+**Quick Start:**::
 
     # Use all default models (no imports needed)
     from flask_more_smorest.perms import init_fms
@@ -26,6 +26,7 @@ canonical integration point for the permissions system.
     )
 
 **Resolution Order:**
+
 1. Explicitly registered model
 2. Default model (auto-loaded by init_fms)
 3. Error (model not registered)
@@ -34,7 +35,7 @@ canonical integration point for the permissions system.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, cast, overload
 
 from flask import has_app_context
 
@@ -53,12 +54,6 @@ else:  # pragma: no cover - runtime placeholder
     AbstractDomain = object
     AbstractUserSetting = object
     GetCurrentUserFunc = Callable[[], object | None]
-
-UserT = TypeVar("UserT", bound="AbstractUser")
-RoleT = TypeVar("RoleT", bound="AbstractUserRole")
-TokenT = TypeVar("TokenT", bound="AbstractToken")
-DomainT = TypeVar("DomainT", bound="AbstractDomain")
-SettingT = TypeVar("SettingT", bound="AbstractUserSetting")
 
 # Registry storage
 _USER_REGISTRY_STATE_KEY = "user_registry"
@@ -278,14 +273,14 @@ def ensure_models_initialized() -> None:
 
 
 @overload
-def get_user_model(expected: type[UserT]) -> type[UserT]: ...
+def get_user_model[UserT: "AbstractUser"](expected: type[UserT]) -> type[UserT]: ...
 
 
 @overload
 def get_user_model(expected: None = None) -> type[AbstractUser]: ...
 
 
-def get_user_model(expected: type[UserT] | None = None) -> type[UserT] | type[AbstractUser]:
+def get_user_model[UserT: "AbstractUser"](expected: type[UserT] | None = None) -> type[UserT] | type[AbstractUser]:
     """Get the registered User model class.
 
     Args:
@@ -309,14 +304,16 @@ def get_user_model(expected: type[UserT] | None = None) -> type[UserT] | type[Ab
 
 
 @overload
-def get_role_model(expected: type[RoleT]) -> type[RoleT]: ...
+def get_role_model[RoleT: "AbstractUserRole"](expected: type[RoleT]) -> type[RoleT]: ...
 
 
 @overload
 def get_role_model(expected: None = None) -> type[AbstractUserRole]: ...
 
 
-def get_role_model(expected: type[RoleT] | None = None) -> type[RoleT] | type[AbstractUserRole]:
+def get_role_model[RoleT: "AbstractUserRole"](
+    expected: type[RoleT] | None = None,
+) -> type[RoleT] | type[AbstractUserRole]:
     """Get the registered UserRole model class.
 
     Args:
@@ -340,14 +337,16 @@ def get_role_model(expected: type[RoleT] | None = None) -> type[RoleT] | type[Ab
 
 
 @overload
-def get_token_model(expected: type[TokenT]) -> type[TokenT]: ...
+def get_token_model[TokenT: "AbstractToken"](expected: type[TokenT]) -> type[TokenT]: ...
 
 
 @overload
 def get_token_model(expected: None = None) -> type[AbstractToken]: ...
 
 
-def get_token_model(expected: type[TokenT] | None = None) -> type[TokenT] | type[AbstractToken]:
+def get_token_model[TokenT: "AbstractToken"](
+    expected: type[TokenT] | None = None,
+) -> type[TokenT] | type[AbstractToken]:
     """Get the registered Token model class.
 
     Args:
@@ -371,14 +370,16 @@ def get_token_model(expected: type[TokenT] | None = None) -> type[TokenT] | type
 
 
 @overload
-def get_domain_model(expected: type[DomainT]) -> type[DomainT]: ...
+def get_domain_model[DomainT: "AbstractDomain"](expected: type[DomainT]) -> type[DomainT]: ...
 
 
 @overload
 def get_domain_model(expected: None = None) -> type[AbstractDomain]: ...
 
 
-def get_domain_model(expected: type[DomainT] | None = None) -> type[DomainT] | type[AbstractDomain]:
+def get_domain_model[DomainT: "AbstractDomain"](
+    expected: type[DomainT] | None = None,
+) -> type[DomainT] | type[AbstractDomain]:
     """Get the registered Domain model class.
 
     Args:
@@ -402,14 +403,16 @@ def get_domain_model(expected: type[DomainT] | None = None) -> type[DomainT] | t
 
 
 @overload
-def get_setting_model(expected: type[SettingT]) -> type[SettingT]: ...
+def get_setting_model[SettingT: "AbstractUserSetting"](expected: type[SettingT]) -> type[SettingT]: ...
 
 
 @overload
 def get_setting_model(expected: None = None) -> type[AbstractUserSetting]: ...
 
 
-def get_setting_model(expected: type[SettingT] | None = None) -> type[SettingT] | type[AbstractUserSetting]:
+def get_setting_model[SettingT: "AbstractUserSetting"](
+    expected: type[SettingT] | None = None,
+) -> type[SettingT] | type[AbstractUserSetting]:
     """Get the registered UserSetting model class.
 
     Args:
@@ -432,27 +435,27 @@ def get_setting_model(expected: type[SettingT] | None = None) -> type[SettingT] 
     raise RuntimeError("No UserSetting model registered. Call init_fms(...) before using perms models.")
 
 
-def expect_user_model(expected: type[UserT]) -> type[UserT]:
+def expect_user_model[UserT: "AbstractUser"](expected: type[UserT]) -> type[UserT]:
     """Return the registered User model and enforce the expected type."""
     return get_user_model(expected)
 
 
-def expect_role_model(expected: type[RoleT]) -> type[RoleT]:
+def expect_role_model[RoleT: "AbstractUserRole"](expected: type[RoleT]) -> type[RoleT]:
     """Return the registered UserRole model and enforce the expected type."""
     return get_role_model(expected)
 
 
-def expect_token_model(expected: type[TokenT]) -> type[TokenT]:
+def expect_token_model[TokenT: "AbstractToken"](expected: type[TokenT]) -> type[TokenT]:
     """Return the registered Token model and enforce the expected type."""
     return get_token_model(expected)
 
 
-def expect_domain_model(expected: type[DomainT]) -> type[DomainT]:
+def expect_domain_model[DomainT: "AbstractDomain"](expected: type[DomainT]) -> type[DomainT]:
     """Return the registered Domain model and enforce the expected type."""
     return get_domain_model(expected)
 
 
-def expect_setting_model(expected: type[SettingT]) -> type[SettingT]:
+def expect_setting_model[SettingT: "AbstractUserSetting"](expected: type[SettingT]) -> type[SettingT]:
     """Return the registered UserSetting model and enforce the expected type."""
     return get_setting_model(expected)
 

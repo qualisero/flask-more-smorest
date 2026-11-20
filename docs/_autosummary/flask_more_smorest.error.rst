@@ -12,3 +12,4 @@ flask\_more\_smorest.error
 
    error_handlers
    exceptions
+   integrity

@@ -307,9 +307,9 @@ def to_api_exception(exc: IntegrityError) -> ApiException:
 
     Returns:
         IntegrityConflict (422) for caller-fixable violations (unique,
-            fk_missing, not_null, check).
-        ResourceInUse (409) for state conflicts (restrict, exclusion).
-        DBError (500) with a sanitised message when parsing fails.
+        fk_missing, not_null, check); ResourceInUse (409) for state conflicts
+        (restrict, exclusion); DBError (500) with a sanitised message when
+        parsing fails.
     """
     violation = parse_integrity_error(exc)
 

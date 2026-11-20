@@ -12,7 +12,7 @@ from flask_more_smorest.perms.models import defaults as defaults_module
 
 
 @pytest.fixture
-def app() -> Generator[Flask, None, None]:
+def app() -> Generator[Flask]:
     """Base Flask app fixture for unit tests."""
     app = Flask(__name__)
     app.config["TESTING"] = True
@@ -42,7 +42,7 @@ def app() -> Generator[Flask, None, None]:
 
 
 @pytest.fixture
-def unit_app() -> Generator[Flask, None, None]:
+def unit_app() -> Generator[Flask]:
     """Flask app with extended config for API testing."""
     app = Flask(__name__)
     app.config["TESTING"] = True
@@ -86,7 +86,7 @@ def unit_api(unit_app: Flask) -> Api:
 
 
 @pytest.fixture
-def db_session(app: Flask) -> Generator[None, None, None]:
+def db_session(app: Flask) -> Generator[None]:
     """Database session fixture that creates and drops tables.
 
     Note: This fixture yields None. Use db.session for database operations.

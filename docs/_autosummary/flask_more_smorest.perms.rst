@@ -4,6 +4,12 @@ flask\_more\_smorest.perms
 .. automodule:: flask_more_smorest.perms
 
    
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      clear_registration
+   
 .. rubric:: Modules
 
 .. autosummary::
@@ -18,4 +24,5 @@ flask\_more\_smorest.perms
    perms_blueprint
    user_blueprint
    user_context
+   user_registry
    user_schemas

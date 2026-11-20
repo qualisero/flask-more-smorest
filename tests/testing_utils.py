@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 
 @contextmanager
-def as_user(user: Any) -> Generator[Any, None, None]:
+def as_user(user: Any) -> Generator[Any]:
     """Context manager to run code as a specific user.
 
     Temporarily replaces the current user getter function to return
@@ -105,7 +105,7 @@ def _create_mock_user(
 
 
 @contextmanager
-def as_admin(user_id: uuid.UUID | None = None) -> Generator[MagicMock, None, None]:
+def as_admin(user_id: uuid.UUID | None = None) -> Generator[MagicMock]:
     """Context manager to run code as an admin user.
 
     Creates a mock admin user and sets it as the current user for the
@@ -129,7 +129,7 @@ def as_admin(user_id: uuid.UUID | None = None) -> Generator[MagicMock, None, Non
 
 
 @contextmanager
-def as_superadmin(user_id: uuid.UUID | None = None) -> Generator[MagicMock, None, None]:
+def as_superadmin(user_id: uuid.UUID | None = None) -> Generator[MagicMock]:
     """Context manager to run code as a superadmin user.
 
     Creates a mock superadmin user and sets it as the current user for the
@@ -153,7 +153,7 @@ def as_superadmin(user_id: uuid.UUID | None = None) -> Generator[MagicMock, None
 
 
 @contextmanager
-def as_anonymous() -> Generator[None, None, None]:
+def as_anonymous() -> Generator[None]:
     """Context manager to run code as an unauthenticated user.
 
     Sets the current user to None, simulating an unauthenticated request.

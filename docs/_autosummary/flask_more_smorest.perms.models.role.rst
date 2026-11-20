@@ -8,7 +8,6 @@ flask\_more\_smorest.perms.models.role
 
    .. autosummary::
    
-      DefaultUserRole
       Domain
       UserRole
    

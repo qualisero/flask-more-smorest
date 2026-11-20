@@ -12,11 +12,13 @@ flask\_more\_smorest.error.exceptions
       BadRequestError
       ConflictError
       DBError
+      DomainNotFoundError
       ForbiddenError
+      IntegrityConflict
       InternalServerError
-      NoTenantAccessError
+      NoDomainAccessError
       NotFoundError
-      TenantNotFoundError
+      ResourceInUse
       UnauthorizedError
       UnprocessableEntity
    

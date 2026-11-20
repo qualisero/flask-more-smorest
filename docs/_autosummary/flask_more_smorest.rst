@@ -15,4 +15,5 @@ flask\_more\_smorest
    perms
    protocols
    sqla
+   testing
    utils
