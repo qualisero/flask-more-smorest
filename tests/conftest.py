@@ -13,7 +13,7 @@ from flask_more_smorest.perms import clear_registration
 
 
 @pytest.fixture(autouse=True)
-def _reset_perms_registry() -> Generator[None, None, None]:
+def _reset_perms_registry() -> Generator[None]:
     """Reset perms registry between tests to avoid cross-test leakage.
 
     Preserves global state set by init_fms() when called without app context,
@@ -51,7 +51,7 @@ def _reset_perms_registry() -> Generator[None, None, None]:
 
 
 @pytest.fixture(scope="module", autouse=True)
-def _cleanup_test_mappers() -> Generator[None, None, None]:
+def _cleanup_test_mappers() -> Generator[None]:
     """Clean up SQLAlchemy mappers defined in tests at the end of each module.
 
     This ensures that test-specific models (like CustomUser in test_user_perms.py)

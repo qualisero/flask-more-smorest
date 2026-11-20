@@ -15,10 +15,9 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Framework :: Flask",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
@@ -33,7 +32,7 @@ include = [
 exclude = ["tests", "docs", "examples"]
 
 [tool.poetry.dependencies]
-python = ">=3.11,<4.0"
+python = ">=3.13,<4.0"
 flask = "^3.0.0"
 sqlalchemy = "^2.0.25"
 flask-smorest = "*"
@@ -62,14 +61,10 @@ pre-commit = "^4.7"
 tox = "^4.11.4"
 
 # Documentation
-# Sphinx 9.1+ requires Python >=3.12 (9.2: >=3.13); this project supports >=3.11,
-# so the cap is 9.0, the newest line installable across the whole range.
-sphinx = "^9.0"
+sphinx = "^9.2"
 sphinx-rtd-theme = "^3.1"
 myst-parser = "^5.2"
-# sphinx-autodoc-typehints 3.6.2+ requires Python >=3.12; 3.6.1 is the newest
-# line installable across the project's >=3.11 range.
-sphinx-autodoc-typehints = "^3.6.1"
+sphinx-autodoc-typehints = "^3.17"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -113,7 +108,7 @@ exclude_lines = [
 # Ruff replaces black, isort, and flake8
 [tool.ruff]
 line-length = 120
-target-version = "py311"
+target-version = "py313"
 
 # Enable formatting (black replacement)
 [tool.ruff.format]
@@ -175,7 +170,7 @@ include = ["flask_more_smorest", "tests"]
 exclude = ["**/__pycache__", "**/node_modules", "**/*.egg-info"]
 typeCheckingMode = "strict"
 # Track the supported floor, not the development interpreter.
-pythonVersion = "3.11"
+pythonVersion = "3.13"
 
 # flask-smorest, marshmallow-sqlalchemy and flask-jwt-extended ship no type
 # information, so nearly every call into them produces a partially unknown type.
@@ -228,7 +223,7 @@ reportUnusedClass = "none"
 legacy_tox_ini = """
 [tox]
 isolated_build = true
-envlist = py311,py312,py313,py314,lint,types
+envlist = py313,py314,py315,lint,types
 
 [testenv]
 deps = pytest

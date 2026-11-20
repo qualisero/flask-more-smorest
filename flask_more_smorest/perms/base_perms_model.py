@@ -45,7 +45,7 @@ class BasePermsModel(SQLABaseModel):
 
     @classmethod
     @contextmanager
-    def bypass_perms(cls) -> Generator[None, None, None]:
+    def bypass_perms(cls) -> Generator[None]:
         """Temporarily disable permission checking for this model class.
 
         Example:

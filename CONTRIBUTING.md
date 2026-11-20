@@ -6,7 +6,7 @@ Thank you for your interest in contributing! This document outlines the process 
 
 ### Prerequisites
 
-- Python 3.11 or higher
+- Python 3.13 or higher
 - Poetry for dependency management
 - Git
 
@@ -85,19 +85,17 @@ Thank you for your interest in contributing! This document outlines the process 
 ```python
 from typing import Optional, List, Dict, Any
 
-def process_user_data(
-    user_data: Dict[str, Any], 
-    include_inactive: bool = False
-) -> List[Dict[str, Any]]:
+
+def process_user_data(user_data: Dict[str, Any], include_inactive: bool = False) -> List[Dict[str, Any]]:
     """Process user data and return filtered results.
-    
+
     Args:
         user_data: Dictionary containing user information
         include_inactive: Whether to include inactive users
-        
+
     Returns:
         List of processed user dictionaries
-        
+
     Raises:
         ValueError: If user_data is malformed
     """
@@ -119,19 +117,17 @@ def process_user_data(
 import pytest
 from flask_more_smorest import CRUDBlueprint
 
+
 def test_crud_blueprint_creation():
     """Test that CRUDBlueprint can be created with minimal parameters."""
-    blueprint = CRUDBlueprint('users', __name__)
-    assert blueprint.name == 'users'
-    assert blueprint.url_prefix == '/users/'
+    blueprint = CRUDBlueprint("users", __name__)
+    assert blueprint.name == "users"
+    assert blueprint.url_prefix == "/users/"
+
 
 def test_crud_blueprint_with_custom_model():
     """Test CRUDBlueprint with custom model and schema names."""
-    blueprint = CRUDBlueprint(
-        'products', __name__,
-        model='Product',
-        schema='ProductSchema'
-    )
+    blueprint = CRUDBlueprint("products", __name__, model="Product", schema="ProductSchema")
     # Assert expected behavior
 ```
 

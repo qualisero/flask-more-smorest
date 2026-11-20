@@ -61,14 +61,14 @@ def reset_models() -> None:
 
 
 @pytest.fixture(autouse=True)
-def _clear_registration() -> Generator[None, None, None]:
+def _clear_registration() -> Generator[None]:
     reset_models()
     yield
     reset_models()
 
 
 @pytest.fixture
-def unit_app() -> Generator[Flask, None, None]:
+def unit_app() -> Generator[Flask]:
     app = Flask(__name__)
     app.config["TESTING"] = True
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
@@ -87,7 +87,7 @@ def unit_app() -> Generator[Flask, None, None]:
 
 
 @pytest.fixture
-def db_session(unit_app: Flask) -> Generator[None, None, None]:
+def db_session(unit_app: Flask) -> Generator[None]:
     with unit_app.app_context():
         yield
         db.session.remove()
@@ -97,7 +97,7 @@ def db_session(unit_app: Flask) -> Generator[None, None, None]:
 class TestCustomGetter:
     """Test extending User model with custom get_current_user mechanism."""
 
-    def test_init_fms_with_custom_getter(self, unit_app: Flask, db_session: Generator[None, None, None]) -> None:
+    def test_init_fms_with_custom_getter(self, unit_app: Flask, db_session: Generator[None]) -> None:
         """Test that init_fms with custom getter works."""
         CustomUser = build_models()
 
@@ -130,9 +130,7 @@ class TestCustomGetter:
         assert current.external_id == "EXT123"
         assert current.source_system == "LDAP"
 
-    def test_custom_getter_overrides_jwt_fallback(
-        self, unit_app: Flask, db_session: Generator[None, None, None]
-    ) -> None:
+    def test_custom_getter_overrides_jwt_fallback(self, unit_app: Flask, db_session: Generator[None]) -> None:
         """Test that custom getter takes precedence over JWT."""
         CustomUser = build_models()
 
@@ -159,7 +157,7 @@ class TestCustomGetter:
         assert current is not None
         assert current.email == "custom@example.com"
 
-    def test_custom_getter_returns_none(self, unit_app: Flask, db_session: Generator[None, None, None]) -> None:
+    def test_custom_getter_returns_none(self, unit_app: Flask, db_session: Generator[None]) -> None:
         """Test that custom getter returning None is handled correctly."""
         CustomUser = build_models()
 
@@ -176,7 +174,7 @@ class TestCustomGetter:
         current = CustomUser.get_current_user()
         assert current is None
 
-    def test_custom_getter_with_roles(self, unit_app: Flask, db_session: Generator[None, None, None]) -> None:
+    def test_custom_getter_with_roles(self, unit_app: Flask, db_session: Generator[None]) -> None:
         """Test custom getter with role checks."""
         CustomUser = build_models()
 

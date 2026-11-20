@@ -62,7 +62,7 @@ When asked to create a release:
    ```
 
 7. **Automation:** GitHub Actions will automatically:
-   - Run tests (Python 3.11 to 3.14)
+   - Run tests (Python 3.13 to 3.15)
    - Run linting and security checks (ruff, including the S ruleset)
    - Build package
    - Publish to PyPI (via Trusted Publishing/OIDC)
@@ -160,7 +160,7 @@ All files must be committed together in the version bump commit.
 - **Pull requests**: Tests and checks only
 
 ### Jobs
-1. **test** - Python 3.11 to 3.14 test matrix
+1. **test** - Python 3.13 to 3.15 test matrix
 2. **lint** - Ruff formatting, linting (including the S security ruleset) and pyright
 3. **build** - Build Python package
 4. **publish** - Publish to PyPI (release only, via Trusted Publishing)

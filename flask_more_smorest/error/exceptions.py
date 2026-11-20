@@ -6,7 +6,8 @@ with RFC 7807 Problem Details format, automatic logging, and debug information.
 The error responses follow RFC 7807 (Problem Details for HTTP APIs):
 https://datatracker.ietf.org/doc/html/rfc7807
 
-Example response:
+Example response::
+
     {
         "type": "https://api.example.com/errors/not_found_error",
         "title": "Not Found",
@@ -22,7 +23,7 @@ import traceback
 from collections.abc import Mapping, Sequence
 from http import HTTPStatus
 from pprint import pformat
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Any
 
 from flask import current_app, has_app_context, has_request_context, make_response, request
 
@@ -36,10 +37,8 @@ logger = logging.getLogger(__name__)
 # Debug context is a JSON-shaped structure: scalars, plus nested mappings and
 # sequences of the same. Mapping/Sequence keep it covariant, so a plain
 # dict[str, str | None] can be stored as a value.
-DebugContextValue: TypeAlias = (
-    str | int | bool | Sequence["DebugContextValue"] | Mapping[str, "DebugContextValue"] | None
-)
-DebugContext: TypeAlias = dict[str, DebugContextValue]
+type DebugContextValue = str | int | bool | Sequence["DebugContextValue"] | Mapping[str, "DebugContextValue"] | None
+type DebugContext = dict[str, DebugContextValue]
 
 
 def _is_debug_mode() -> bool:

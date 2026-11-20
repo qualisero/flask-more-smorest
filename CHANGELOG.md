@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Python 3.15 added to the CI test matrix and package classifiers.
+
+### Removed
+
+- Python 3.11 and 3.12 support dropped; the minimum is now Python 3.13.
+
 ### Changed
 
 - **Schemas with `Meta.exclude` keep their OpenAPI component name.** The spec name resolver
@@ -30,12 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `handle_generic_exception` and `handle_db_exception` no longer raise `TypeError` in debug
   mode when the wrapped exception has more than one argument (e.g. `OSError(errno, strerror)`);
   the 500 body now carries `str(e)`.
+- Sphinx docs build with zero warnings; ReadTheDocs and CI now fail on warnings.
 
 ### Dependencies
 
 - Lockfile refreshed: SQLAlchemy 2.1, flask-smorest 0.47, marshmallow 4.4,
   marshmallow-sqlalchemy 1.6, bcrypt 5. Dev tooling: pytest 9, pytest-cov 7, pre-commit 4,
-  ruff 0.17, Sphinx 9, myst-parser 5, sphinx-rtd-theme 3, sphinx-autodoc-typehints 3.
+  ruff 0.17, Sphinx 9.2, myst-parser 5, sphinx-rtd-theme 3, sphinx-autodoc-typehints 3.17.
 
 ## [0.15.1] - 2026-08-30
 

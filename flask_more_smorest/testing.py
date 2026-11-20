@@ -46,7 +46,7 @@ def clear_registration() -> None:
 @contextmanager
 def as_user(
     client: FlaskClient, user_id: str | uuid.UUID, additional_claims: dict[str, Any] | None = None
-) -> Generator[None, None, None]:
+) -> Generator[None]:
     """Context manager to set JWT authentication for a user in test requests.
 
     This simplifies testing authenticated endpoints by automatically setting
@@ -117,7 +117,7 @@ def as_admin(
     user_id: str | uuid.UUID,
     additional_claims: dict[str, Any] | None = None,
     roles: list[str] | None = None,
-) -> Generator[None, None, None]:
+) -> Generator[None]:
     """Context manager to set JWT authentication for an admin user in test requests.
 
     This is a convenience wrapper around :func:`as_user` that automatically adds

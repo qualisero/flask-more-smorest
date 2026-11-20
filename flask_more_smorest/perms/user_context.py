@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from contextlib import suppress
-from typing import TYPE_CHECKING, Literal, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Literal, cast, overload
 
 # Admin role type - constrained to valid admin roles only
 AdminRole = Literal["ADMIN", "SUPERADMIN"]
@@ -26,18 +26,16 @@ else:  # pragma: no cover - runtime placeholder
     AbstractUser = object
     GetCurrentUserFunc = Callable[[], object | None]
 
-UserT = TypeVar("UserT", bound="AbstractUser")
-
 
 @overload
 def get_current_user() -> AbstractUser | None: ...
 
 
 @overload
-def get_current_user(user_type: type[UserT]) -> UserT | None: ...
+def get_current_user[UserT: "AbstractUser"](user_type: type[UserT]) -> UserT | None: ...
 
 
-def get_current_user(user_type: type[UserT] | None = None) -> UserT | AbstractUser | None:
+def get_current_user[UserT: "AbstractUser"](user_type: type[UserT] | None = None) -> UserT | AbstractUser | None:
     """Get the current authenticated user.
 
     Resolution order:
