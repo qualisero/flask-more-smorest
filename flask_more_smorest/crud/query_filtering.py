@@ -7,6 +7,9 @@ filter parameters into SQLAlchemy query statements. It supports:
 - Enum list filters (field__in)
 """
 
+# Deferred annotations: ma.fields.Field[Any] is not subscriptable on marshmallow 3.
+from __future__ import annotations
+
 import copy
 from collections.abc import Mapping
 from typing import Any
