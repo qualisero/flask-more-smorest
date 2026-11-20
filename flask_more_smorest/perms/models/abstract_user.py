@@ -9,7 +9,7 @@ from __future__ import annotations
 import enum
 import logging
 import uuid
-from typing import TYPE_CHECKING, Self, TypeVar
+from typing import TYPE_CHECKING, Any, Self, TypeVar
 
 import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declared_attr
@@ -246,6 +246,13 @@ class AbstractUser(BasePermsModel):
             return self.id == user.id or user.is_admin
         except Exception:
             return False
+
+    @classmethod
+    def _readable_filter(cls, user: Any) -> sa.ColumnElement[bool]:
+        # Admin case handled by _user_bypasses_perms before this is consulted.
+        if not user:
+            return sa.false()
+        return cls.id == user.id
 
     def _can_write(self, user: Self | None) -> bool:
         """Default write permission: users can edit their own profile.

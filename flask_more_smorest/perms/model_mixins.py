@@ -171,6 +171,15 @@ class UserOwnershipMixin(HasUserMixin):
             return self._can_write(user)
         return bool(user) and self.user_id == user.id
 
+    @classmethod
+    def _readable_filter(cls, user: Any) -> sa.ColumnElement[bool] | None:
+        """Return SQL criterion; falls back to per-row when _can_read is overridden."""
+        if cls.__delegate_to_user__ or cls._can_read is not UserOwnershipMixin._can_read:
+            return None
+        if not user:
+            return sa.false()
+        return cls.user_id == user.id
+
     def _can_create(self, user: Any) -> bool:
         if not self.__delegate_to_user__:
             return True

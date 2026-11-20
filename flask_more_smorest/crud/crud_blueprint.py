@@ -6,6 +6,7 @@ with Marshmallow schemas.
 """
 
 import enum
+import logging
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -27,6 +28,8 @@ from ..utils import convert_snake_to_camel
 from .blueprint_operationid import BlueprintOperationIdMixin
 from .pagination import CRUDPaginationMixin
 from .query_filtering import generate_filter_schema, get_statements_from_filters
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from flask_smorest.pagination import PaginationParameters
@@ -603,8 +606,41 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
                     pagination_parameters is injected by the paginate decorator, and is None
                     when the blueprint has no default page size.
                     """
+                    # Inline import to avoid a cycle: perms -> crud -> perms
+                    from ..perms.base_perms_model import BasePermsModel
+                    from ..perms.user_context import get_current_user
+
                     stmts = get_statements_from_filters(filters, model=model_cls)
                     base_query = sa.select(model_cls).filter_by(**kwargs).filter(*stmts)
+
+                    per_row_check = False
+                    if issubclass(model_cls, BasePermsModel):
+                        user = get_current_user()
+                        if model_cls._user_bypasses_perms(user):  # pyright: ignore[reportPrivateUsage]
+                            # Admin bypass skips is_admin targets (_check_admin_bypass): let can_read() decide per row.
+                            per_row_check = hasattr(model_cls, "is_admin")
+                        else:
+                            criterion = model_cls._readable_filter(user)  # pyright: ignore[reportPrivateUsage]
+                            if criterion is not None:
+                                base_query = base_query.where(criterion)
+                            else:
+                                per_row_check = True
+
+                    if per_row_check:
+                        # No SQL criterion: filter in Python before paginating so item_count and
+                        # page boundaries stay exact. Loads the whole filtered set; models with
+                        # large tables should implement _readable_filter.
+                        rows = [
+                            r
+                            for r in self._db_session.execute(base_query).scalars()
+                            if r.can_read(user)  # pyright: ignore[reportAttributeAccessIssue, reportPossiblyUnboundVariable]
+                        ]
+                        if pagination_parameters is not None:
+                            pagination_parameters.item_count = len(rows)  # pyright: ignore[reportAttributeAccessIssue]
+                            if pagination_parameters.page_size > 0:
+                                start = pagination_parameters.page_size * (pagination_parameters.page - 1)
+                                rows = rows[start : start + pagination_parameters.page_size]
+                        return rows
 
                     if pagination_parameters is not None:
                         count_query = sa.select(sa.func.count()).select_from(base_query.subquery())
@@ -617,6 +653,17 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
                             )
 
                     return self._db_session.execute(base_query).scalars().all()
+
+                # Warn at registration time if this model falls back to per-row checks.
+                from ..perms.base_perms_model import BasePermsModel
+
+                if issubclass(model_cls, BasePermsModel) and (
+                    model_cls._readable_filter.__func__ is BasePermsModel._readable_filter.__func__  # pyright: ignore[reportPrivateUsage]
+                ):
+                    logger.info(
+                        "%s: INDEX uses per-row can_read(); define _readable_filter() for a SQL filter",
+                        model_cls.__name__,
+                    )
 
                 # Decorators are applied bottom-up, so this list reads in decorator order.
                 index_view = self.doc(operationId=f"list{config.model_name}")(index_get)

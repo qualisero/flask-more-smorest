@@ -48,6 +48,10 @@ class Domain(AbstractDomain):
         """
         return True
 
+    @classmethod
+    def _readable_filter(cls, user: Any) -> sa.ColumnElement[bool]:
+        return sa.true()
+
 
 class UserRole(AbstractUserRole):
     """User roles with domain scoping for multi-domain applications.

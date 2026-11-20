@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- CRUD INDEX routes now apply read permissions: rows for which `can_read()` is false are no
+  longer listed. Models can return a SQL criterion from the new `_readable_filter(user)`
+  classmethod; `UserOwnershipMixin`, `AbstractUser` and `Domain` ship one. Models
+  without it are filtered per row.
+
 ## [0.16.0] - 2026-11-20
 
 ### Added
