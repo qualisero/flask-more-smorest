@@ -174,8 +174,6 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
         skip_methods: List of CRUDMethod to explicitly disable.
             Applied after methods resolution. Useful when using dict-style
             methods to disable specific defaults.
-        *pargs: Additional positional arguments passed to Blueprint.
-        **kwargs: Additional keyword arguments for CRUD configuration
 
     Examples:
 
