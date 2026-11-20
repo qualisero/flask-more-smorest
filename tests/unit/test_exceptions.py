@@ -6,6 +6,7 @@ from http import HTTPStatus
 
 from flask import Flask
 
+from flask_more_smorest.error.error_handlers import handle_generic_exception
 from flask_more_smorest.error.exceptions import (
     ApiException,
     ForbiddenError,
@@ -293,3 +294,26 @@ def test_user_context_not_included_in_production() -> None:
 
     finally:
         clear_registration()
+
+
+def test_handle_generic_exception_multi_arg_oserror_in_debug_mode() -> None:
+    """handle_generic_exception must not raise TypeError for multi-arg exceptions.
+
+    OSError(2, "No such file or directory") has two args; previously *e.args
+    was passed to ApiInternalServerError which only accepts one positional arg.
+    """
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.register_error_handler(Exception, handle_generic_exception)
+
+    @app.route("/boom")
+    def boom() -> str:
+        raise OSError(2, "No such file or directory")
+
+    with app.test_client() as client:
+        response = client.get("/boom")
+
+    assert response.status_code == 500
+    payload = response.get_json()
+    assert payload is not None
+    assert "No such file or directory" in payload.get("detail", "")

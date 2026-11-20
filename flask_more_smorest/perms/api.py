@@ -211,28 +211,20 @@ class Api(ApiOrig):
 
 
 def custom_schema_name_resolver(schema: type[Schema], **kwargs: str | bool) -> str:
-    """Custom schema name resolver for OpenAPI spec.
+    """Schema name resolver for the OpenAPI spec.
 
-    Filters out partial, only, and exclude schemas to keep the
-    OpenAPI spec clean and avoid duplicate schema definitions.
-
-    Args:
-        schema: Marshmallow schema class to resolve name for
-        **kwargs: Additional keyword arguments
-
-    Returns:
-        Empty string for partial/filtered schemas, default name otherwise
+    Schemas whose shape is modified per instance (``partial=``, ``only=``, or an
+    ``exclude=`` beyond what ``Meta.exclude`` already declares) are inlined so that
+    one class never produces several conflicting components. Class-level
+    ``Meta.exclude`` has exactly one shape and keeps its component name.
     """
-    # print(schema.__class__.__name__, getattr(schema, 'exclude', False))
-    if getattr(schema, "partial", False):
+    if getattr(schema, "partial", None) or getattr(schema, "only", None):
         return ""
-        # return default_resolver(schema) + 'Partial'
-    if getattr(schema, "only", False):
+    # Instance-level exclude only: Meta.exclude is merged into schema.exclude by marshmallow.
+    inst_exclude: set[str] = set(getattr(schema, "exclude", ()))
+    meta_exclude: set[str] = set(getattr(getattr(schema, "opts", None), "exclude", ()))
+    if inst_exclude - meta_exclude:
         return ""
-    if getattr(schema, "exclude", False):
-        return ""
-
     if schema.__class__.__name__ == "NestedSchema":
         return ""
-
     return default_resolver(schema)
