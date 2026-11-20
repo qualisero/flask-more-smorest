@@ -7,6 +7,13 @@ and string case conversion.
 import re
 
 import bcrypt
+from marshmallow import ValidationError
+
+
+def validate_password_length(value: str) -> None:
+    """Raise ValidationError when the password exceeds bcrypt's 72-byte limit."""
+    if len(value.encode("utf-8")) > 72:
+        raise ValidationError("Password cannot be longer than 72 bytes.")
 
 
 def generate_password_hash(password: str | bytes) -> bytes:
@@ -51,7 +58,10 @@ def check_password_hash(password: str | bytes | None, hashed: bytes | str | None
         password = password.encode("utf-8")
     if isinstance(hashed, str):
         hashed = hashed.encode("utf-8")
-    return bcrypt.checkpw(password, hashed)
+    try:
+        return bcrypt.checkpw(password, hashed)
+    except ValueError:
+        return False
 
 
 def convert_snake_to_camel(word: str) -> str:

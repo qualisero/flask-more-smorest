@@ -164,7 +164,7 @@ class TestPostArgSchema:
             secret_code = fields.Str(required=True)
 
             @validates("secret_code")
-            def validate_secret(self, value: str) -> None:
+            def validate_secret(self, value: str, **kwargs: Any) -> None:
                 if value != "open-sesame":
                     raise ValidationError("Invalid secret code.")
 
@@ -287,7 +287,7 @@ class TestPostArgSchema:
             invite_code = fields.Str(required=True, load_only=True)
 
             @validates("invite_code")
-            def validate_invite(self, value: str) -> None:
+            def validate_invite(self, value: str, **kwargs: Any) -> None:
                 if value != "open-sesame":
                     raise ValidationError("Invalid invite code.")
 
@@ -382,7 +382,7 @@ class TestPostArgSchema:
             invite_code = fields.Str(required=True, load_only=True)
 
             @validates("invite_code")
-            def validate_invite(self, value: str) -> None:
+            def validate_invite(self, value: str, **kwargs: Any) -> None:
                 if value != "open-sesame":
                     raise ValidationError("Invalid invite code.")
 

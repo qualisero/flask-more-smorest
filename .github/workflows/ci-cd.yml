@@ -17,6 +17,7 @@ on:
 
 jobs:
   test:
+    name: test (py${{ matrix.python-version }}, marshmallow ${{ matrix.marshmallow }})
     runs-on: ubuntu-latest
     strategy:
       # One version failing, or one transient network error installing Poetry,
@@ -24,6 +25,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
+        marshmallow: ["3", "4"]
     
     steps:
     - uses: actions/checkout@v5
@@ -45,7 +47,7 @@ jobs:
       uses: actions/cache@v5
       with:
         path: .venv
-        key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+        key: venv-${{ runner.os }}-${{ matrix.python-version }}-marshmallow${{ matrix.marshmallow }}-${{ hashFiles('**/poetry.lock') }}
     
     - name: Install dependencies
       if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
@@ -53,6 +55,10 @@ jobs:
     
     - name: Install project
       run: poetry install --no-interaction
+    
+    - name: Pin marshmallow 3
+      if: matrix.marshmallow == '3'
+      run: poetry run pip install "marshmallow<4" "marshmallow-sqlalchemy<1.6"
     
     - name: Run tests
       run: |

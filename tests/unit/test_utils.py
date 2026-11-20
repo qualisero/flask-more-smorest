@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+import pytest
 import sqlalchemy as sa
 from flask import Flask
-from marshmallow import fields
+from marshmallow import ValidationError, fields
 from sqlalchemy.orm import Mapped, mapped_column
 
 from flask_more_smorest import BaseModel, BaseSchema, db
-from flask_more_smorest.utils import convert_snake_to_camel
-
-if TYPE_CHECKING:  # pragma: no cover
-    pass
+from flask_more_smorest.utils import (
+    check_password_hash,
+    convert_snake_to_camel,
+    generate_password_hash,
+    validate_password_length,
+)
 
 
 class TestConvertSnakeToCamel:
@@ -104,3 +105,32 @@ class TestSchemaPreload:
             ctx.request.view_args = {"resource_id": "123"}
             data = schema.pre_load({}, view_args={}, unknown=None)
             assert data["resource_id"] == "123"
+
+
+class TestValidatePasswordLength:
+    """Tests for validate_password_length and the bcrypt guard."""
+
+    def test_73_byte_ascii_raises(self) -> None:
+        """A 73-byte ASCII password raises ValidationError."""
+        with pytest.raises(ValidationError, match="72 bytes"):
+            validate_password_length("a" * 73)
+
+    def test_72_byte_ascii_passes(self) -> None:
+        """A 72-byte ASCII password passes."""
+        validate_password_length("a" * 72)  # no exception
+
+    def test_72_byte_multibyte_passes(self) -> None:
+        """24 characters each 3 bytes (72 bytes total) passes."""
+        # U+4E2D is 3 bytes in UTF-8
+        validate_password_length("\u4e2d" * 24)  # no exception
+
+    def test_73_byte_multibyte_raises(self) -> None:
+        """25 characters each 3 bytes (75 bytes) raises ValidationError."""
+        with pytest.raises(ValidationError):
+            validate_password_length("\u4e2d" * 25)
+
+    def test_check_password_hash_long_password_returns_false(self) -> None:
+        """check_password_hash returns False for a >72-byte password rather than raising."""
+        valid_hash = generate_password_hash("short")
+        result = check_password_hash("a" * 73, valid_hash)
+        assert result is False

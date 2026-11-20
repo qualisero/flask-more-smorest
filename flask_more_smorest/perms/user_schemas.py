@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 from marshmallow import fields, pre_load
 
 from ..sqla.base_model import BaseSchema
+from ..utils import validate_password_length
 from .user_registry import get_user_model
 
 if TYPE_CHECKING:
@@ -18,8 +19,8 @@ else:
 class UserSchema(BaseUserSchema):
     """Public user schema - extends auto-generated schema."""
 
-    password = fields.Str(required=True, load_only=True)
-    old_password = fields.Str(load_only=True, load_default=None)
+    password = fields.Str(required=True, load_only=True, validate=validate_password_length)
+    old_password = fields.Str(load_only=True, load_default=None, validate=validate_password_length)
     is_admin = fields.Bool(dump_only=True)
     is_superadmin = fields.Bool(dump_only=True)
 
