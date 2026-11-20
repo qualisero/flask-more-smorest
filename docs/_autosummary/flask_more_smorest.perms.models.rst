@@ -10,6 +10,12 @@ flask\_more\_smorest.perms.models
    :toctree:
    :recursive:
 
+   abstract_role
+   abstract_setting
+   abstract_token
+   abstract_user
+   base_roles
+   defaults
    role
    setting
    token

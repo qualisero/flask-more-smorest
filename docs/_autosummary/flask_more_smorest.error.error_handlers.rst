@@ -11,6 +11,7 @@ flask\_more\_smorest.error.error\_handlers
       handle_api_exception
       handle_db_exception
       handle_generic_exception
+      handle_integrity_error
       server_error_handler
       unauthorized_handler
    

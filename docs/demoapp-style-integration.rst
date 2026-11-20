@@ -459,7 +459,7 @@ Key Features Explained
 -----------------------
 
 Custom Domain Model
-~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 The ``Domain`` model extends ``AbstractDomain`` to add:
 
@@ -515,7 +515,7 @@ Soft Delete Usage:
     # (is_enabled is automatically set to False)
 
 Login Validation Hooks
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 ``DemoUserBlueprint`` overrides ``_validate_login()`` to add domain access checks:
 
@@ -548,7 +548,7 @@ You can add any validation here:
 - Custom audit logging
 
 Invite System
-~~~~~~~~~~~~
+~~~~~~~~~~~~~
 
 The ``Invite`` model demonstrates custom models that extend ``BasePermsModel``:
 
@@ -557,7 +557,7 @@ The ``Invite`` model demonstrates custom models that extend ``BasePermsModel``:
 - Integrates with custom User model
 
 Password Recovery Flow
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 Two endpoints handle password reset:
 
@@ -599,7 +599,7 @@ Configure with:
 
 
 Testing This Pattern
--------------------
+--------------------
 
 See :doc:`testing` for testing helpers. Example tests for this pattern
 are available in ``tests/integration/test_user_demoapp_integration.py``:

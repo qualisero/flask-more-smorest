@@ -161,17 +161,21 @@ class CRUDBlueprint(  # pyright: ignore[reportIncompatibleMethodOverride]
         model: Model class or string name to use
         schema: Schema class or string name to use
         methods: Controls which CRUD methods to enable. Can be:
+
             - List of CRUDMethod: Only these methods are enabled
             - Dict mapping CRUDMethod to config: All methods enabled by default,
               unless explicitly set to False or present in skip_methods.
               Dict values can be:
-                - True: Enable with defaults
-                - False: Disable this method
-                - MethodConfig dict: Enable with custom configuration
+
+              - True: Enable with defaults
+              - False: Disable this method
+              - MethodConfig dict: Enable with custom configuration
+
         skip_methods: List of CRUDMethod to explicitly disable.
             Applied after methods resolution. Useful when using dict-style
             methods to disable specific defaults.
-        *pargs, **kwargs: Additional keyword arguments for CRUD configuration
+        *pargs: Additional positional arguments passed to Blueprint.
+        **kwargs: Additional keyword arguments for CRUD configuration
 
     Examples:
 

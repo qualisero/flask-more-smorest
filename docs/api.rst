@@ -16,18 +16,14 @@ SQLAlchemy Base Models
 ----------------------
 
 .. autosummary::
-   :toctree: _autosummary
-   :recursive:
 
    flask_more_smorest.sqla.base_model
-   flask_more_smorest.sqla.db
+   flask_more_smorest.sqla.database
 
 Permissions System
 ------------------
 
 .. autosummary::
-   :toctree: _autosummary
-   :recursive:
 
    flask_more_smorest.perms.base_perms_model
    flask_more_smorest.perms.model_mixins
@@ -40,8 +36,6 @@ CRUD Blueprints
 ---------------
 
 .. autosummary::
-   :toctree: _autosummary
-   :recursive:
 
    flask_more_smorest.crud.crud_blueprint
    flask_more_smorest.crud.query_filtering
@@ -50,8 +44,6 @@ Blueprint Extensions
 --------------------
 
 .. autosummary::
-   :toctree: _autosummary
-   :recursive:
 
    flask_more_smorest.crud.blueprint_operationid
    flask_more_smorest.perms.perms_blueprint
@@ -61,8 +53,6 @@ Utilities
 ---------
 
 .. autosummary::
-   :toctree: _autosummary
-   :recursive:
 
    flask_more_smorest.utils
    flask_more_smorest.error.exceptions
