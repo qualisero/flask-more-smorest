@@ -6,7 +6,7 @@ that includes automatic Marshmallow schema generation and common CRUD operations
 
 import datetime as dt
 import uuid
-from collections.abc import Iterable, Iterator
+from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Self, TypeAlias, cast
 
@@ -311,7 +311,7 @@ class BaseModel(db.Model, metaclass=BaseModelMeta):
 
     @classmethod
     @contextmanager
-    def bypass_perms(cls) -> Iterator[None]:
+    def bypass_perms(cls) -> Generator[None, None, None]:
         """No-op context manager for base class (overridden in perms model)."""
         yield
 

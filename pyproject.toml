@@ -38,34 +38,38 @@ flask = "^3.0.0"
 sqlalchemy = "^2.0.25"
 flask-smorest = "*"
 flask-sqlalchemy = "^3.1.1"
-marshmallow-sqlalchemy = "^1.4.2"
-marshmallow = "^3.20.0"
+marshmallow-sqlalchemy = ">=1.4.2,<2"
+marshmallow = ">=3.20,<5"
 flask-jwt-extended = "^4.6.0"
-bcrypt = "^4.1.0"
+bcrypt = ">=4.1,<6"
 werkzeug = "^3.0.0"
 alembic = "^1.13.0"
 inflect = ">=7.5.0,<9"
 
 [tool.poetry.group.dev.dependencies]
 # Testing
-pytest = "^8.4.1"
-pytest-cov = "^6.1.1"
+pytest = "^9.2"
+pytest-cov = "^7.1"
 pytest-mock = "^3.12.0"
 pytest-xdist = "^3.5.0"
 
 # Code Quality (ruff replaces black, isort and flake8; pyright is the type checker)
-ruff = "^0.16.2"
+ruff = "^0.17"
 pyright = "^1.1.408"
 
 # Development Tools
-pre-commit = "^3.6.0"
+pre-commit = "^4.7"
 tox = "^4.11.4"
 
 # Documentation
-sphinx = "^7.2.6"
-sphinx-rtd-theme = "^2.0.0"
-myst-parser = "^2.0.0"
-sphinx-autodoc-typehints = "^2.0.0"
+# Sphinx 9.1+ requires Python >=3.12 (9.2: >=3.13); this project supports >=3.11,
+# so the cap is 9.0, the newest line installable across the whole range.
+sphinx = "^9.0"
+sphinx-rtd-theme = "^3.1"
+myst-parser = "^5.2"
+# sphinx-autodoc-typehints 3.6.2+ requires Python >=3.12; 3.6.1 is the newest
+# line installable across the project's >=3.11 range.
+sphinx-autodoc-typehints = "^3.6.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

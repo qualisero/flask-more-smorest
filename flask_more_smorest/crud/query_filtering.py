@@ -24,7 +24,7 @@ _NUMERIC_FIELDS = (ma.fields.Integer, ma.fields.Float, ma.fields.Decimal)
 _TEMPORAL_FIELDS = (ma.fields.DateTime, ma.fields.Date)
 
 
-def _clone_field(field: ma.fields.Field) -> ma.fields.Field:
+def _clone_field(field: ma.fields.Field[Any]) -> ma.fields.Field[Any]:
     new_field = copy.deepcopy(field)
     new_field.load_default = None
     new_field.load_only = True
@@ -74,11 +74,11 @@ def generate_filter_schema(base_schema: type[ma.Schema] | ma.Schema) -> type[ma.
         base_cls = base_schema
         base_instance = base_cls()
 
-    field_definitions: dict[str, ma.fields.Field] = {}
-    preserved_fields: dict[str, ma.fields.Field] = {}
+    field_definitions: dict[str, ma.fields.Field[Any]] = {}
+    preserved_fields: dict[str, ma.fields.Field[Any]] = {}
 
     for field_name, field_obj in base_instance.fields.items():
-        new_fields: dict[str, ma.fields.Field] = {}
+        new_fields: dict[str, ma.fields.Field[Any]] = {}
         keep_original = True
 
         if isinstance(field_obj, _TEMPORAL_FIELDS):
@@ -117,7 +117,7 @@ def generate_filter_schema(base_schema: type[ma.Schema] | ma.Schema) -> type[ma.
     # reset by the generic _on_bind_field hook that normalises schema fields.
     _CONTROL_FIELDS = frozenset({"page", "page_size", "nulls_match"})
 
-    def _on_bind_field(self: ma.Schema, field_name: str, field_obj: ma.fields.Field) -> None:
+    def _on_bind_field(self: ma.Schema, field_name: str, field_obj: ma.fields.Field[Any]) -> None:
         if field_name in _CONTROL_FIELDS:
             return
         field_obj.load_default = None
