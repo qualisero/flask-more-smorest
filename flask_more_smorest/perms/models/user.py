@@ -8,8 +8,9 @@ from __future__ import annotations
 import enum
 import logging
 import uuid
-from typing import TypeVar, cast
+from typing import Any, TypeVar, cast
 
+import sqlalchemy as sa
 from flask_jwt_extended import current_user as jwt_current_user
 from flask_jwt_extended import exceptions, verify_jwt_in_request
 
@@ -221,6 +222,15 @@ class User(AbstractUser):
             return self.id == user.id
         except Exception:
             return False
+
+    @classmethod
+    def _readable_filter(cls, user: Any) -> sa.ColumnElement[bool] | None:
+        """Same self-only rule as _can_read above; subclasses overriding _can_read fall back to per-row."""
+        if cls._can_read is not User._can_read:
+            return None
+        if not user:
+            return sa.false()
+        return cls.id == user.id
 
     def _can_write(self, user: AbstractUser | None) -> bool:
         """Default write permission: users can edit their own profile.

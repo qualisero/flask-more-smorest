@@ -589,3 +589,24 @@ class TestOwnershipOverride:
         resp = perms_index_app.test_client().get("/override_notes/", headers=_auth(tokens["a"]))
         assert resp.status_code == 200
         assert resp.get_json() == []
+
+
+# ---------------------------------------------------------------------------
+# User models: default User keeps the SQL filter; a _can_read override falls back
+# ---------------------------------------------------------------------------
+
+
+class TestUserReadableFilter:
+    def test_default_user_has_sql_filter(self, users: dict[str, Any]) -> None:
+        criterion = defaults_module.User._readable_filter(users["a"])
+        assert criterion is not None
+        assert str(criterion) == str(defaults_module.User.id == users["a"].id)
+
+    def test_overridden_can_read_falls_back(self, users: dict[str, Any]) -> None:
+        class CustomUser(defaults_module.User):
+            __abstract__ = True
+
+            def _can_read(self, user: Any) -> bool:
+                return True
+
+        assert CustomUser._readable_filter(users["a"]) is None

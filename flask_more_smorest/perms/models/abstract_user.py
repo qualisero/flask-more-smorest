@@ -248,7 +248,10 @@ class AbstractUser(BasePermsModel):
             return False
 
     @classmethod
-    def _readable_filter(cls, user: Any) -> sa.ColumnElement[bool]:
+    def _readable_filter(cls, user: Any) -> sa.ColumnElement[bool] | None:
+        """Return SQL criterion; falls back to per-row when _can_read is overridden."""
+        if cls._can_read is not AbstractUser._can_read:
+            return None
         # Admin case handled by _user_bypasses_perms before this is consulted.
         if not user:
             return sa.false()
