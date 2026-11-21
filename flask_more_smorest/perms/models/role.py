@@ -48,6 +48,13 @@ class Domain(AbstractDomain):
         """
         return True
 
+    @classmethod
+    def _readable_filter(cls, user: Any) -> sa.ColumnElement[bool] | None:
+        """Everyone may list domains; subclasses overriding _can_read fall back to per-row."""
+        if cls._can_read is not Domain._can_read:
+            return None
+        return sa.true()
+
 
 class UserRole(AbstractUserRole):
     """User roles with domain scoping for multi-domain applications.

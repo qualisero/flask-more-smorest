@@ -62,6 +62,19 @@ class BasePermsModel(SQLABaseModel):
     def _should_bypass_perms(self) -> bool:
         return self.perms_disabled or not has_request_context()
 
+    @classmethod
+    def _user_bypasses_perms(cls, user: Any) -> bool:
+        """User-side half of _check_admin_bypass: no target instance needed.
+
+        True when perms are disabled, outside a request context, or the user is admin.
+        UserRole keeps its own rules and never bypasses.
+        """
+        if cls.perms_disabled or not has_request_context():
+            return True
+        if cls.__name__ == "UserRole":
+            return False
+        return user is not None and (user.has_role(ROLE_ADMIN) or user.has_role(ROLE_SUPERADMIN))
+
     def _check_admin_bypass(self, user: Any) -> bool:
         """Check if current operation should bypass due to admin privileges.
 
@@ -76,15 +89,11 @@ class BasePermsModel(SQLABaseModel):
         if self._should_bypass_perms():
             return True
 
-        # UserRole has special admin rules
-        if type(self).__name__ == "UserRole":
-            return False
-
         # Don't auto-allow if target has is_admin=True
         if getattr(self, "is_admin", False):
             return False
 
-        return user is not None and (user.has_role(ROLE_ADMIN) or user.has_role(ROLE_SUPERADMIN))
+        return self._user_bypasses_perms(user)
 
     def _execute_permission_check(self, check_func: Callable[[], bool], operation: str) -> bool:
         """Execute permission check with consistent error handling.
@@ -198,6 +207,17 @@ class BasePermsModel(SQLABaseModel):
                   Defaults to calling `_can_write()` (if you can write, you can read).
         """
         return self._can_write(user)
+
+    @classmethod
+    def _readable_filter(cls, user: Any) -> sa.ColumnElement[bool] | None:
+        """SQL criterion selecting the rows `user` may read, used by CRUD INDEX routes.
+
+        Return None (default) when the rule cannot be expressed in SQL; the index then
+        falls back to calling can_read() on every row, which is correct but loads the
+        whole result set. Return sa.true() for models readable by everyone who can
+        reach the endpoint.
+        """
+        return None
 
     def _check_permission(self, operation: str) -> None:
         """Ensure permissions exist before mutating resource.
