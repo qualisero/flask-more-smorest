@@ -610,3 +610,14 @@ class TestUserReadableFilter:
                 return True
 
         assert CustomUser._readable_filter(users["a"]) is None
+
+    def test_domain_override_falls_back(self, users: dict[str, Any]) -> None:
+        assert defaults_module.Domain._readable_filter(users["a"]) is not None
+
+        class CustomDomain(defaults_module.Domain):
+            __abstract__ = True
+
+            def _can_read(self, user: Any) -> bool:
+                return False
+
+        assert CustomDomain._readable_filter(users["a"]) is None
